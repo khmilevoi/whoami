@@ -76,9 +76,9 @@ describe("reverse mode service", () => {
     const target = withVote.players.find((player) => player.id === pendingVote.targetWordOwnerId)!;
     const intruder = withVote.players.find((player) => player.id !== target.id && player.id !== asker.id)!;
 
-    await expect(components.reverseMode.handleVote(started.id, intruder.telegramUserId, "YES")).rejects.toThrow(
-      "Player is not allowed to vote in this poll",
-    );
+    await expect(components.reverseMode.handleVote(started.id, intruder.telegramUserId, "YES")).rejects.toMatchObject({
+      code: "PLAYER_NOT_ALLOWED_TO_VOTE",
+    });
 
     await expect(components.reverseMode.handleVote(started.id, target.telegramUserId, "YES")).resolves.toBeUndefined();
 

@@ -1,4 +1,5 @@
 import { GameService } from "../../src/application/game-service";
+import { TextService } from "../../src/application/text-service";
 import { GameEngine } from "../../src/domain/game-engine";
 import { GameMode, GameState, PairingMode, PlayMode, VoteDecision } from "../../src/domain/types";
 import {
@@ -30,6 +31,7 @@ interface HarnessOptions {
 
 export interface GameServiceHarness {
   readonly service: GameService;
+  readonly texts: TextService;
   readonly engine: GameEngine;
   readonly repository: FakeGameRepository;
   readonly transactionRunner: FakeTransactionRunner;
@@ -63,6 +65,7 @@ export const createGameServiceHarness = (options: HarnessOptions = {}): GameServ
     maxPlayers: options.maxPlayers ?? 20,
   };
 
+  const texts = new TextService("ru");
   const engine = new GameEngine();
   const repository = new FakeGameRepository();
   const transactionRunner = new FakeTransactionRunner();
@@ -72,7 +75,7 @@ export const createGameServiceHarness = (options: HarnessOptions = {}): GameServ
   const clock = new FakeClock(options.startIso ?? "2026-01-01T00:00:00.000Z", options.clockStepMs ?? 1000);
   const logger = new FakeLogger();
 
-  const service = new GameService(engine, repository, transactionRunner, notifier, identity, idPort, clock, logger, limits);
+  const service = new GameService(engine, repository, transactionRunner, notifier, identity, idPort, clock, logger, texts, limits);
 
   const getGameByChat = (chatId: string): GameState => {
     const game = repository.findActiveByChatId(chatId);
@@ -181,6 +184,7 @@ export const createGameServiceHarness = (options: HarnessOptions = {}): GameServ
 
   return {
     service,
+    texts,
     engine,
     repository,
     transactionRunner,

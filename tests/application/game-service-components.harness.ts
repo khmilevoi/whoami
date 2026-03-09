@@ -33,6 +33,7 @@ export const createGameServiceComponentHarness = (): GameServiceComponentHarness
     idPort: game.idPort,
     clock: game.clock,
     logger: game.logger,
+    texts: game.texts,
     limits: game.limits,
   });
 

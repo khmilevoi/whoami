@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { DomainError } from "../../src/domain/errors";
+import { TextService } from "../../src/application/text-service";
 import { VoteDecision } from "../../src/domain/types";
 import { createGameServiceHarness } from "./game-service.harness";
 import { SentPrivateKeyboard, SentPrivateMessage } from "../mocks/fake-notifier";
-const MANUAL_PAIR_PROMPT_TEXT = "Выберите игрока, которому загадываете слово:";
+const MANUAL_PAIR_PROMPT_TEXT = new TextService("ru").manualPairPrompt();
 
 const extractPairTargetIds = (buttons: Array<Array<{ text: string; data: string }>>, gameId: string): string[] => {
   const suffix = `:${gameId}`;

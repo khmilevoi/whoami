@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createGameServiceComponentHarness } from "./game-service-components.harness";
 import { SentPrivateKeyboard, SentPrivateMessage } from "../mocks/fake-notifier";
-import { MANUAL_PAIR_PROMPT_TEXT } from "../../src/application/stages/normal-pairing-stage-service";
+import { TextService } from "../../src/application/text-service";
+
+const MANUAL_PAIR_PROMPT_TEXT = new TextService("ru").manualPairPrompt();
 
 const extractPairTargetIds = (buttons: Array<Array<{ text: string; data: string }>>, gameId: string): string[] => {
   const suffix = `:${gameId}`;
