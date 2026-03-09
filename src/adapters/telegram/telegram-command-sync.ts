@@ -1,10 +1,11 @@
 import { ChatCommandResolver } from "../../application/chat-command-resolver";
-import { BotCommandDef, PRIVATE_COMMANDS } from "../../application/bot-commands";
+import { BotCommandDef, GROUP_COMMANDS, PRIVATE_COMMANDS } from "../../application/bot-commands";
 import { GameQueryService } from "../../application/game-query-service";
 import { LoggerPort } from "../../application/ports";
 
 type TelegramScope =
   | { type: "all_private_chats" }
+  | { type: "all_group_chats" }
   | { type: "chat"; chat_id: number | string }
   | { type: "chat_member"; chat_id: number | string; user_id: number };
 
@@ -32,6 +33,10 @@ const scopeKey = (scope: TelegramScope): string => {
     return "all_private_chats";
   }
 
+  if (scope.type === "all_group_chats") {
+    return "all_group_chats";
+  }
+
   if (scope.type === "chat") {
     return `chat:${scope.chat_id}`;
   }
@@ -42,6 +47,10 @@ const scopeKey = (scope: TelegramScope): string => {
 const scopeLabel = (scope: TelegramScope): string => {
   if (scope.type === "all_private_chats") {
     return "all_private_chats";
+  }
+
+  if (scope.type === "all_group_chats") {
+    return "all_group_chats";
   }
 
   if (scope.type === "chat") {
@@ -70,6 +79,10 @@ export class TelegramCommandSync {
 
   async syncPrivateCommands(): Promise<void> {
     await this.applyScope({ type: "all_private_chats" }, PRIVATE_COMMANDS, "global");
+  }
+
+  async syncGroupCommands(): Promise<void> {
+    await this.applyScope({ type: "all_group_chats" }, GROUP_COMMANDS, "global");
   }
 
   async syncActiveChats(): Promise<void> {

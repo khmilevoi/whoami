@@ -39,4 +39,5 @@ Telegram bot for "Кто я?" game.
 - Only one active game per group chat is allowed.
 - Game state and history are saved in SQLite.
 - Sensitive steps (word input) run via bot private chat.
+- Group chats always show `/whoami_start` as default command, even before first game.
 

@@ -24,8 +24,10 @@ export const BOT_COMMANDS = {
 } as const satisfies Record<string, BotCommandDef>;
 
 export const PRIVATE_COMMANDS: BotCommandDef[] = [BOT_COMMANDS.START_PRIVATE];
+export const GROUP_COMMANDS: BotCommandDef[] = [BOT_COMMANDS.START_GAME];
 
 export const noGameResolution = (): ChatCommandResolution => ({
   chatCommands: [BOT_COMMANDS.START_GAME],
   memberOverrides: [],
 });
+

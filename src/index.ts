@@ -30,6 +30,7 @@ const start = async (): Promise<void> => {
 
     try {
       await commandSync.syncPrivateCommands();
+      await commandSync.syncGroupCommands();
       await commandSync.syncActiveChats();
     } catch (error) {
       logger.error("commands_sync_failed", {
