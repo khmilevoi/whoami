@@ -88,9 +88,9 @@ export class ReverseModeService extends BaseGameModeService {
       return;
     }
 
-    await this.context.notifier.sendPrivateKeyboard(
-      target.telegramUserId,
-      `${this.context.playerLabel(updated, pending.askerPlayerId)} задал вопрос. Выберите ответ:`,
+    await this.context.notifier.sendGroupKeyboard(
+      updated.chatId,
+      `${this.context.playerLabel(updated, pending.askerPlayerId)} задал вопрос. Отвечает ${this.context.playerLabel(updated, target.id)}:`,
       [[
         { text: "Да", data: `vote:YES:${updated.id}` },
         { text: "Нет", data: `vote:NO:${updated.id}` },
@@ -99,3 +99,4 @@ export class ReverseModeService extends BaseGameModeService {
     );
   }
 }
+

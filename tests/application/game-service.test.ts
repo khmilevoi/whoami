@@ -15,7 +15,6 @@ const extractPairTargetIds = (buttons: Array<Array<{ text: string; data: string 
   });
 };
 
-
 describe("game service", () => {
   it("runs NORMAL + ONLINE + RANDOM happy path to finished state", async () => {
     const harness = createGameServiceHarness();
@@ -122,6 +121,17 @@ describe("game service", () => {
 
     const targetPlayer = withPendingVote.players.find((player) => player.id === pendingVote!.targetWordOwnerId);
     expect(targetPlayer).toBeDefined();
+    expect(
+      harness.notifier.sent.some(
+        (entry) =>
+          entry.kind === "group-keyboard" &&
+          entry.chatId === chatId &&
+          entry.text.includes(`Отвечает ${targetPlayer!.displayName}`) &&
+          entry.buttons[0]?.some((button) => button.text === "Да") &&
+          entry.buttons[0]?.some((button) => button.text === "Нет") &&
+          entry.buttons[0]?.some((button) => button.text === "Угадал"),
+      ),
+    ).toBe(true);
 
     await harness.service.handleVote(withPendingVote.id, targetPlayer!.telegramUserId, "NO");
 
@@ -356,4 +366,3 @@ describe("game service", () => {
     ).toBe(true);
   });
 });
-
