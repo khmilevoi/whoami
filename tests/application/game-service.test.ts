@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 import { DomainError } from "../../src/domain/errors";
 import { VoteDecision } from "../../src/domain/types";
 import { createGameServiceHarness } from "./game-service.harness";
+import { SentPrivateKeyboard, SentPrivateMessage } from "../mocks/fake-notifier";
+const MANUAL_PAIR_PROMPT_TEXT = "Выберите игрока, которому загадываете слово:";
+
+const extractPairTargetIds = (buttons: Array<Array<{ text: string; data: string }>>, gameId: string): string[] => {
+  const suffix = `:${gameId}`;
+
+  return buttons.flat().map((button) => {
+    expect(button.data.startsWith("pair:")).toBe(true);
+    expect(button.data.endsWith(suffix)).toBe(true);
+    return button.data.slice("pair:".length, -suffix.length);
+  });
+};
+
 
 describe("game service", () => {
   it("runs NORMAL + ONLINE + RANDOM happy path to finished state", async () => {
@@ -210,6 +223,113 @@ describe("game service", () => {
 
     const updated = harness.getGameById(game.id);
     expect(updated.turns[updated.turns.length - 1]?.outcome).toBe("GIVEUP");
+  });
+
+  it("prompts manual pairing queue sequentially and starts word collection only after last choice", async () => {
+    const harness = createGameServiceHarness();
+    const chatId = "chat-manual-sequence";
+    const actors = [harness.createActor(1), harness.createActor(2), harness.createActor(3), harness.createActor(4)];
+
+    await harness.service.startGame(chatId, actors[0]);
+    for (const actor of actors.slice(1)) {
+      await harness.service.joinGame(chatId, actor);
+    }
+
+    await harness.service.beginConfiguration(chatId, actors[0].telegramUserId);
+
+    const game = harness.getGameByChat(chatId);
+    await harness.configureGame(game.id, actors[0].telegramUserId, "NORMAL", "ONLINE", "MANUAL");
+
+    const players = harness.getGameById(game.id).players;
+    const player1 = players.find((player) => player.telegramUserId === actors[0].telegramUserId)!;
+    const player2 = players.find((player) => player.telegramUserId === actors[1].telegramUserId)!;
+    const player3 = players.find((player) => player.telegramUserId === actors[2].telegramUserId)!;
+    const player4 = players.find((player) => player.telegramUserId === actors[3].telegramUserId)!;
+
+    const pairPromptsAfterConfig = harness.notifier.sent.filter(
+      (entry): entry is SentPrivateKeyboard => entry.kind === "private-keyboard" && entry.text === MANUAL_PAIR_PROMPT_TEXT,
+    );
+
+    expect(pairPromptsAfterConfig).toHaveLength(1);
+    expect(pairPromptsAfterConfig[0]?.userId).toBe(player1.telegramUserId);
+    expect(extractPairTargetIds(pairPromptsAfterConfig[0]!.buttons, game.id)).toEqual(
+      expect.arrayContaining([player2.id, player3.id, player4.id]),
+    );
+    expect(extractPairTargetIds(pairPromptsAfterConfig[0]!.buttons, game.id)).not.toContain(player1.id);
+
+    await harness.service.applyManualPair(game.id, player1.telegramUserId, player2.id);
+
+    const pairPromptsAfterFirstChoice = harness.notifier.sent.filter(
+      (entry): entry is SentPrivateKeyboard => entry.kind === "private-keyboard" && entry.text === MANUAL_PAIR_PROMPT_TEXT,
+    );
+
+    expect(pairPromptsAfterFirstChoice).toHaveLength(2);
+    expect(pairPromptsAfterFirstChoice[1]?.userId).toBe(player2.telegramUserId);
+    const secondChooserTargets = extractPairTargetIds(pairPromptsAfterFirstChoice[1]!.buttons, game.id);
+    expect(secondChooserTargets).not.toContain(player2.id);
+
+    expect(
+      harness.notifier.sent.some(
+        (entry) =>
+          entry.kind === "group-message" &&
+          entry.chatId === chatId &&
+          entry.text.includes("Ручное распределение завершено. Переходим к вводу слов."),
+      ),
+    ).toBe(false);
+
+    await harness.service.applyManualPair(game.id, player2.telegramUserId, player3.id);
+    await harness.service.applyManualPair(game.id, player3.telegramUserId, player4.id);
+    await harness.service.applyManualPair(game.id, player4.telegramUserId, player1.id);
+
+    const completionMessages = harness.notifier.sent.filter(
+      (entry) =>
+        entry.kind === "group-message" &&
+        entry.chatId === chatId &&
+        entry.text.includes("Ручное распределение завершено. Переходим к вводу слов."),
+    );
+
+    expect(completionMessages).toHaveLength(1);
+
+    const wordPrompts = harness.notifier.sent.filter(
+      (entry): entry is SentPrivateMessage => entry.kind === "private-message" && entry.text === "Введите слово для игры:",
+    );
+    expect(wordPrompts).toHaveLength(actors.length);
+  });
+
+  it("re-sends current manual pairing prompt on startup recovery", async () => {
+    const harness = createGameServiceHarness();
+    const chatId = "chat-manual-recovery";
+    const actors = [harness.createActor(1), harness.createActor(2), harness.createActor(3), harness.createActor(4)];
+
+    await harness.service.startGame(chatId, actors[0]);
+    for (const actor of actors.slice(1)) {
+      await harness.service.joinGame(chatId, actor);
+    }
+
+    await harness.service.beginConfiguration(chatId, actors[0].telegramUserId);
+
+    const game = harness.getGameByChat(chatId);
+    await harness.configureGame(game.id, actors[0].telegramUserId, "NORMAL", "ONLINE", "MANUAL");
+
+    const players = harness.getGameById(game.id).players;
+    const player1 = players.find((player) => player.telegramUserId === actors[0].telegramUserId)!;
+    const player2 = players.find((player) => player.telegramUserId === actors[1].telegramUserId)!;
+
+    await harness.service.applyManualPair(game.id, player1.telegramUserId, player2.id);
+
+    harness.notifier.sent.length = 0;
+
+    await harness.service.recoverManualPairingPromptsOnStartup();
+
+    const restoredPrompts = harness.notifier.sent.filter(
+      (entry): entry is SentPrivateKeyboard => entry.kind === "private-keyboard" && entry.text === MANUAL_PAIR_PROMPT_TEXT,
+    );
+
+    expect(restoredPrompts).toHaveLength(1);
+    expect(restoredPrompts[0]?.userId).toBe(player2.telegramUserId);
+
+    const targets = extractPairTargetIds(restoredPrompts[0]!.buttons, game.id);
+    expect(targets).not.toContain(player2.id);
   });
 
   it("allows cancel only for creator", async () => {

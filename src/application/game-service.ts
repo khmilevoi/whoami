@@ -363,6 +363,25 @@ export class GameService {
     await this.notifier.sendPrivateMessage(telegramUserId, "ЛС активирован. Если вы в игре, продолжайте шаги здесь.");
   }
 
+  async recoverManualPairingPromptsOnStartup(): Promise<void> {
+    const activeGames = this.repository.listActiveGames();
+
+    for (const game of activeGames) {
+      if (game.stage !== "PREPARE_WORDS") {
+        continue;
+      }
+
+      if (game.config?.mode !== "NORMAL" || game.config.pairingMode !== "MANUAL") {
+        continue;
+      }
+
+      if (game.preparation.manualPairingCursor >= game.preparation.manualPairingQueue.length) {
+        continue;
+      }
+
+      await this.promptManualPairChooser(game);
+    }
+  }
   async handleGroupText(chatId: string, telegramUserId: string, text: string): Promise<void> {
     const game = this.repository.findActiveByChatId(chatId);
     if (!game || game.stage !== "IN_PROGRESS" || game.config?.playMode !== "ONLINE") {
@@ -751,3 +770,4 @@ export class GameService {
     return "Сдался";
   }
 }
+

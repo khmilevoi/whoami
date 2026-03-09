@@ -3,6 +3,7 @@ import { TelegramCommandSync } from "./telegram-command-sync";
 import { GameService } from "../../application/game-service";
 import { LoggerPort } from "../../application/ports";
 import { DomainError } from "../../domain/errors";
+import { parseManualPairPayload } from "./manual-pair-payload";
 
 const asActor = (ctx: Context) => ({
   telegramUserId: String(ctx.from?.id ?? ""),
@@ -261,7 +262,7 @@ export const registerTelegramHandlers = (
         }
 
         if (parts[0] === "pair") {
-          const [, targetPlayerId, gameId] = parts;
+          const { targetPlayerId, gameId } = parseManualPairPayload(payload);
           await gameService.applyManualPair(gameId, fromUser, targetPlayerId);
           await ctx.answerCallbackQuery();
           return;
@@ -298,3 +299,6 @@ export const registerTelegramHandlers = (
     );
   });
 };
+
+
+

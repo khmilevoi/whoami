@@ -7,6 +7,7 @@ import { GameService } from "./application/game-service";
 import { LoggerPort } from "./application/ports";
 import { loadConfig } from "./config";
 import { buildContainer } from "./container";
+import { runStartupTasks } from "./startup";
 
 const start = async (): Promise<void> => {
   const config = loadConfig();
@@ -28,17 +29,11 @@ const start = async (): Promise<void> => {
   app.listen(config.appPort, async () => {
     logger.info("http_started", { port: config.appPort });
 
-    try {
-      await commandSync.syncPrivateCommands();
-      await commandSync.syncGroupCommands();
-      await commandSync.syncActiveChats();
-    } catch (error) {
-      logger.error("commands_sync_failed", {
-        chatId: "startup",
-        scope: "startup",
-        reason: error instanceof Error ? error.message : String(error),
-      });
-    }
+    await runStartupTasks({
+      commandSync,
+      gameService,
+      logger,
+    });
 
     if (config.webhookUrl) {
       const webhook = `${config.webhookUrl.replace(/\/$/, "")}/telegram/webhook`;
@@ -56,3 +51,4 @@ start().catch((error) => {
   console.error(error);
   process.exit(1);
 });
+
