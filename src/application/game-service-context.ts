@@ -1,8 +1,9 @@
-import { DomainError } from "../domain/errors";
+import * as appErrors from "../domain/errors";
 import { GameState, TurnRecord } from "../domain/types";
 import { TextService } from "./text-service";
 import { ClockPort, GameRepository, IdPort, IdentityPort, LoggerPort, NotifierPort, TransactionRunner } from "./ports";
 import { GameEngine } from "../domain/game-engine";
+import type { GameServiceContextError } from "./errors";
 
 export interface GameServiceDeps {
   engine: GameEngine;
@@ -60,18 +61,18 @@ export class GameServiceContext {
     return this.deps.limits;
   }
 
-  requireGameByChat(chatId: string): GameState {
+  getGameByChatOrError(chatId: string): GameState | appErrors.ActiveGameNotFoundByChatError {
     const game = this.repository.findActiveByChatId(chatId);
     if (!game) {
-      throw new DomainError({ code: "ACTIVE_GAME_NOT_FOUND_BY_CHAT" });
+      return new appErrors.ActiveGameNotFoundByChatError();
     }
     return game;
   }
 
-  requireGameById(gameId: string): GameState {
+  getGameByIdOrError(gameId: string): GameState | appErrors.GameNotFoundError {
     const game = this.repository.findById(gameId);
     if (!game) {
-      throw new DomainError({ code: "GAME_NOT_FOUND" });
+      return new appErrors.GameNotFoundError();
     }
     return game;
   }
@@ -81,10 +82,10 @@ export class GameServiceContext {
     return active.find((game) => game.players.some((player) => player.telegramUserId === telegramUserId)) ?? null;
   }
 
-  requirePlayerByTelegram(game: GameState, telegramUserId: string) {
+  getPlayerByTelegramOrError(game: GameState, telegramUserId: string): GameState["players"][number] | appErrors.PlayerNotFoundInGameError {
     const player = game.players.find((candidate) => candidate.telegramUserId === telegramUserId);
     if (!player) {
-      throw new DomainError({ code: "PLAYER_NOT_FOUND_IN_GAME" });
+      return new appErrors.PlayerNotFoundInGameError();
     }
     return player;
   }
@@ -102,3 +103,4 @@ export class GameServiceContext {
     return this.texts.voteOutcome(outcome);
   }
 }
+

@@ -1,4 +1,5 @@
-import { DomainErrorPayload } from "../domain/errors";
+import * as errore from "errore";
+import { DomainAppError } from "../domain/errors";
 import { GameMode, PairingMode, PlayMode, TurnRecord, VoteDecision } from "../domain/types";
 
 export type SupportedLocale = "ru";
@@ -14,96 +15,53 @@ type VoteOutcome = TurnRecord["outcome"];
 export class TextService {
   constructor(readonly locale: SupportedLocale) {}
 
-  renderError(error: DomainErrorPayload): string {
-    switch (error.code) {
-      case "INVALID_MANUAL_PAIR_PAYLOAD":
-        return "Некорректные данные выбора пары";
-      case "ACTIVE_GAME_NOT_FOUND_BY_CHAT":
-        return "Активная игра в этом чате не найдена";
-      case "GAME_NOT_FOUND":
-        return "Игра не найдена";
-      case "PLAYER_NOT_FOUND_IN_GAME":
-        return "Игрок не найден в этой игре";
-      case "ACTIVE_GAME_ALREADY_EXISTS_IN_CHAT":
-        return "В этом чате уже идет активная игра. Завершите ее перед стартом новой.";
-      case "GAME_CONFIGURATION_NOT_SET":
-      case "GAME_CONFIGURATION_MISSING":
-        return "Конфигурация игры не задана";
-      case "ONLY_GAME_CREATOR_CAN_CANCEL":
-        return "Только создатель игры может отменить игру";
-      case "UNKNOWN_GAME_MODE":
-        return `Неизвестный режим игры: ${error.params.mode}`;
-      case "ONLY_GAME_CREATOR_CAN_CONFIGURE":
-        return "Только создатель игры может настраивать режим";
-      case "JOIN_ALLOWED_ONLY_WHEN_LOBBY_OPEN":
-        return "Присоединиться можно только пока открыт набор игроков";
-      case "MAX_PLAYERS_REACHED":
-        return `Достигнут максимум игроков: ${error.params.maxPlayers}.`;
-      case "LOBBY_ALREADY_CLOSED":
-        return "Набор игроков уже закрыт";
-      case "ONLY_GAME_CREATOR_CAN_CLOSE_LOBBY":
-        return "Только создатель игры может закрыть набор игроков";
-      case "MIN_PLAYERS_REQUIRED_TO_START":
-        return `Для старта нужно минимум ${error.params.minPlayers} игрока(ов).`;
-      case "GAME_CAN_BE_CONFIGURED_ONLY_AFTER_LOBBY_CLOSED":
-        return "Настраивать игру можно только после закрытия набора игроков";
-      case "PAIRING_MODE_REQUIRED_FOR_NORMAL_MODE":
-        return "Для обычного режима нужно выбрать распределение пар";
-      case "MANUAL_PAIRING_AVAILABLE_ONLY_FOR_NORMAL_MANUAL_MODE":
-        return "Ручное распределение доступно только для обычного режима с ручным выбором пар";
-      case "NOT_PLAYERS_TURN_TO_PICK_PAIR":
-        return "Сейчас не ход этого игрока для выбора пары";
-      case "WORD_CANNOT_BE_EMPTY":
-        return "Слово не может быть пустым";
-      case "WORD_MUST_BE_SUBMITTED_BEFORE_CONFIRMATION":
-        return "Сначала нужно ввести слово";
-      case "WORD_MUST_BE_CONFIRMED_BEFORE_CLUE_SUBMISSION":
-        return "Сначала подтвердите слово, потом добавляйте пояснение";
-      case "WORD_MUST_BE_CONFIRMED_BEFORE_FINALIZATION":
-        return "Сначала подтвердите слово";
-      case "NOT_ALL_PLAYERS_CONFIRMED_WORDS":
-        return "Не все игроки подтвердили слова";
-      case "PENDING_VOTE_MUST_BE_RESOLVED_FIRST":
-        return "Сначала нужно завершить текущее голосование";
-      case "QUESTION_TEXT_REQUIRED_IN_ONLINE_MODE":
-        return "В онлайн-режиме нужно отправить текст вопроса";
-      case "NOT_PLAYERS_TURN":
-        return "Сейчас не ход этого игрока";
-      case "REVERSE_MODE_TARGET_MISSING":
-        return "Не удалось определить игрока, чье слово сейчас угадывают";
-      case "NO_PENDING_VOTE":
-        return "Нет активного голосования";
-      case "PLAYER_NOT_ALLOWED_TO_VOTE":
-        return "Этот игрок не может голосовать в текущем опросе";
-      case "REVERSE_VOTE_TARGET_MISSING":
-        return "Не удалось определить цель голосования в обратном режиме";
-      case "NO_ACTIVE_PLAYERS_LEFT":
-        return "Не осталось активных игроков";
-      case "UNABLE_TO_RESOLVE_CURRENT_ASKER":
-        return "Не удалось определить текущего задающего вопрос";
-      case "REVERSE_MODE_ASKER_MISSING":
-        return "Не удалось определить текущего задающего вопрос в обратном режиме";
-      case "WORD_ACTIONS_NOT_AVAILABLE_IN_CURRENT_STAGE":
-        return "Сейчас нельзя выполнять действия со словом";
-      case "EXPECTED_STAGE_MISMATCH":
-        return `Ожидался этап ${error.params.expectedStage}, получен ${error.params.actualStage}`;
-      case "PLAYER_NOT_FOUND":
-        return "Игрок не найден";
-      case "WORD_ENTRY_FOR_PLAYER_MISSING":
-        return "Для игрока не найдено слово";
-      case "NEED_AT_LEAST_TWO_PLAYERS_FOR_PAIRINGS":
-        return "Для распределения пар нужно минимум два игрока";
-      case "UNKNOWN_PLAYER_IN_MANUAL_PAIRING":
-        return "В ручном распределении указан неизвестный игрок";
-      case "PLAYER_CANNOT_PAIR_WITH_SELF":
-        return "Нельзя назначить игрока самому себе";
-      case "PLAYER_HAS_ALREADY_SELECTED_A_PAIR":
-        return "Игрок уже выбрал пару";
-      case "SELECTED_TARGET_IS_ALREADY_TAKEN":
-        return "Выбранный игрок уже занят";
-      default:
-        return this.genericErrorRetry();
-    }
+  renderError(error: DomainAppError): string {
+    return errore.matchError(error, {
+      InvalidManualPairPayloadError: () => "Некорректные данные выбора пары",
+      ActiveGameNotFoundByChatError: () => "Активная игра в этом чате не найдена",
+      GameNotFoundError: () => "Игра не найдена",
+      PlayerNotFoundInGameError: () => "Игрок не найден в этой игре",
+      ActiveGameAlreadyExistsInChatError: () => "В этом чате уже идет активная игра. Завершите ее перед стартом новой.",
+      GameConfigurationNotSetError: () => "Конфигурация игры не задана",
+      GameConfigurationMissingError: () => "Конфигурация игры не задана",
+      OnlyGameCreatorCanCancelError: () => "Только создатель игры может отменить игру",
+      UnknownGameModeError: (typedError) => `Неизвестный режим игры: ${typedError.mode}`,
+      OnlyGameCreatorCanConfigureError: () => "Только создатель игры может настраивать режим",
+      JoinAllowedOnlyWhenLobbyOpenError: () => "Присоединиться можно только пока открыт набор игроков",
+      MaxPlayersReachedError: (typedError) => `Достигнут максимум игроков: ${typedError.maxPlayers}.`,
+      LobbyAlreadyClosedError: () => "Набор игроков уже закрыт",
+      OnlyGameCreatorCanCloseLobbyError: () => "Только создатель игры может закрыть набор игроков",
+      MinPlayersRequiredToStartError: (typedError) => `Для старта нужно минимум ${typedError.minPlayers} игрока(ов).`,
+      GameCanBeConfiguredOnlyAfterLobbyClosedError: () => "Настраивать игру можно только после закрытия набора игроков",
+      PairingModeRequiredForNormalModeError: () => "Для обычного режима нужно выбрать распределение пар",
+      ManualPairingAvailableOnlyForNormalManualModeError: () => "Ручное распределение доступно только для обычного режима с ручным выбором пар",
+      NotPlayersTurnToPickPairError: () => "Сейчас не ход этого игрока для выбора пары",
+      WordCannotBeEmptyError: () => "Слово не может быть пустым",
+      WordMustBeSubmittedBeforeConfirmationError: () => "Сначала нужно ввести слово",
+      WordMustBeConfirmedBeforeClueSubmissionError: () => "Сначала подтвердите слово, потом добавляйте пояснение",
+      WordMustBeConfirmedBeforeFinalizationError: () => "Сначала подтвердите слово",
+      NotAllPlayersConfirmedWordsError: () => "Не все игроки подтвердили слова",
+      PendingVoteMustBeResolvedFirstError: () => "Сначала нужно завершить текущее голосование",
+      QuestionTextRequiredInOnlineModeError: () => "В онлайн-режиме нужно отправить текст вопроса",
+      NotPlayersTurnError: () => "Сейчас не ход этого игрока",
+      ReverseModeTargetMissingError: () => "Не удалось определить игрока, чье слово сейчас угадывают",
+      NoPendingVoteError: () => "Нет активного голосования",
+      PlayerNotAllowedToVoteError: () => "Этот игрок не может голосовать в текущем опросе",
+      ReverseVoteTargetMissingError: () => "Не удалось определить цель голосования в обратном режиме",
+      NoActivePlayersLeftError: () => "Не осталось активных игроков",
+      UnableToResolveCurrentAskerError: () => "Не удалось определить текущего задающего вопрос",
+      ReverseModeAskerMissingError: () => "Не удалось определить текущего задающего вопрос в обратном режиме",
+      WordActionsNotAvailableInCurrentStageError: () => "Сейчас нельзя выполнять действия со словом",
+      ExpectedStageMismatchError: (typedError) => `Ожидался этап ${typedError.expectedStage}, получен ${typedError.actualStage}`,
+      PlayerNotFoundError: () => "Игрок не найден",
+      WordEntryForPlayerMissingError: () => "Для игрока не найдено слово",
+      NeedAtLeastTwoPlayersForPairingsError: () => "Для распределения пар нужно минимум два игрока",
+      UnknownPlayerInManualPairingError: () => "В ручном распределении указан неизвестный игрок",
+      PlayerCannotPairWithSelfError: () => "Нельзя назначить игрока самому себе",
+      PlayerHasAlreadySelectedAPairError: () => "Игрок уже выбрал пару",
+      SelectedTargetIsAlreadyTakenError: () => "Выбранный игрок уже занят",
+      Error: () => this.genericErrorRetry(),
+    });
   }
 
   commandOpenPrivateChatDescription(): string {
@@ -398,3 +356,5 @@ export class TextService {
     return "Редактировать";
   }
 }
+
+

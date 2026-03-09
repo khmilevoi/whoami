@@ -1,7 +1,7 @@
+import * as appErrors from "./errors";
 import { buildRandomDerangement, validateManualPairChoice } from "./pairing";
 import { computeMajorityDecision } from "./rules";
 import { buildGameResult } from "./stats";
-import { DomainError } from "./errors";
 import {
   ConfigureGameInput,
   GameState,
@@ -75,8 +75,10 @@ export class GameEngine {
     };
   }
 
-  markDmOpened(game: GameState, playerId: string, now: string): GameState {
+  markDmOpened(game: GameState, playerId: string, now: string) {
     const player = this.mustGetPlayer(game, playerId);
+    if (player instanceof Error) return player;
+
     player.dmOpened = true;
     if (player.stage === "BLOCKED_DM") {
       player.stage = "JOINED";
@@ -85,8 +87,10 @@ export class GameEngine {
     return this.touch(game, now);
   }
 
-  markDmBlocked(game: GameState, playerId: string, now: string): GameState {
+  markDmBlocked(game: GameState, playerId: string, now: string) {
     const player = this.mustGetPlayer(game, playerId);
+    if (player instanceof Error) return player;
+
     if (player.stage !== "READY" && player.stage !== "GUESSED" && player.stage !== "GAVE_UP") {
       player.stage = "BLOCKED_DM";
     }
@@ -94,18 +98,18 @@ export class GameEngine {
     return this.touch(game, now);
   }
 
-  joinGame(game: GameState, player: PlayerIdentity, limits: LobbyLimits, now: string): GameState {
+  joinGame(game: GameState, player: PlayerIdentity, limits: LobbyLimits, now: string) {
     if (game.stage !== "LOBBY_OPEN") {
-      throw new DomainError({ code: "JOIN_ALLOWED_ONLY_WHEN_LOBBY_OPEN" });
+      return new appErrors.JoinAllowedOnlyWhenLobbyOpenError();
     }
 
-    const existing = game.players.find((p) => p.id === player.id || p.telegramUserId === player.telegramUserId);
+    const existing = game.players.find((candidate) => candidate.id === player.id || candidate.telegramUserId === player.telegramUserId);
     if (existing) {
       return this.touch(game, now);
     }
 
     if (game.players.length >= limits.maxPlayers) {
-      throw new DomainError({ code: "MAX_PLAYERS_REACHED", params: { maxPlayers: limits.maxPlayers } });
+      return new appErrors.MaxPlayersReachedError({ maxPlayers: limits.maxPlayers });
     }
 
     const next = this.toPlayerState(player, now);
@@ -120,31 +124,30 @@ export class GameEngine {
     return this.touch(game, now);
   }
 
-  closeLobby(game: GameState, actorPlayerId: string, limits: LobbyLimits, now: string): GameState {
+  closeLobby(game: GameState, actorPlayerId: string, limits: LobbyLimits, now: string) {
     if (game.stage !== "LOBBY_OPEN") {
-      throw new DomainError({ code: "LOBBY_ALREADY_CLOSED" });
+      return new appErrors.LobbyAlreadyClosedError();
     }
     if (actorPlayerId !== game.creatorPlayerId) {
-      throw new DomainError({ code: "ONLY_GAME_CREATOR_CAN_CLOSE_LOBBY" });
+      return new appErrors.OnlyGameCreatorCanCloseLobbyError();
     }
     if (game.players.length < limits.minPlayers) {
-      throw new DomainError({ code: "MIN_PLAYERS_REQUIRED_TO_START", params: { minPlayers: limits.minPlayers } });
+      return new appErrors.MinPlayersRequiredToStartError({ minPlayers: limits.minPlayers });
     }
 
     game.stage = "CONFIGURING";
     return this.touch(game, now);
   }
 
-  configureGame(game: GameState, input: ConfigureGameInput, now: string): GameState {
+  configureGame(game: GameState, input: ConfigureGameInput, now: string) {
     if (game.stage !== "CONFIGURING") {
-      throw new DomainError({ code: "GAME_CAN_BE_CONFIGURED_ONLY_AFTER_LOBBY_CLOSED" });
+      return new appErrors.GameCanBeConfiguredOnlyAfterLobbyClosedError();
     }
     if (input.actorPlayerId !== game.creatorPlayerId) {
-      throw new DomainError({ code: "ONLY_GAME_CREATOR_CAN_CONFIGURE" });
+      return new appErrors.OnlyGameCreatorCanConfigureError();
     }
-
     if (input.mode === "NORMAL" && !input.pairingMode) {
-      throw new DomainError({ code: "PAIRING_MODE_REQUIRED_FOR_NORMAL_MODE" });
+      return new appErrors.PairingModeRequiredForNormalModeError();
     }
 
     game.config = {
@@ -162,9 +165,11 @@ export class GameEngine {
     game.words = {};
 
     if (input.mode === "NORMAL") {
-      const ids = game.players.map((p) => p.id);
+      const ids = game.players.map((player) => player.id);
       if (input.pairingMode === "RANDOM") {
-        game.pairings = buildRandomDerangement(ids);
+        const pairings = buildRandomDerangement(ids);
+        if (pairings instanceof Error) return pairings;
+        game.pairings = pairings;
         game.words = this.initWordsForNormal(game.pairings);
       } else {
         game.preparation.manualPairingQueue = ids;
@@ -185,19 +190,22 @@ export class GameEngine {
     return this.touch(game, now);
   }
 
-  selectManualPair(game: GameState, chooserPlayerId: string, targetPlayerId: string, now: string): GameState {
-    this.mustBeStage(game, "PREPARE_WORDS");
+  selectManualPair(game: GameState, chooserPlayerId: string, targetPlayerId: string, now: string) {
+    const stageError = this.mustBeStage(game, "PREPARE_WORDS");
+    if (stageError instanceof Error) return stageError;
+
     if (!game.config || game.config.mode !== "NORMAL" || game.config.pairingMode !== "MANUAL") {
-      throw new DomainError({ code: "MANUAL_PAIRING_AVAILABLE_ONLY_FOR_NORMAL_MANUAL_MODE" });
+      return new appErrors.ManualPairingAvailableOnlyForNormalManualModeError();
     }
 
     const queue = game.preparation.manualPairingQueue;
     const current = queue[game.preparation.manualPairingCursor];
     if (chooserPlayerId !== current) {
-      throw new DomainError({ code: "NOT_PLAYERS_TURN_TO_PICK_PAIR" });
+      return new appErrors.NotPlayersTurnToPickPairError();
     }
 
-    validateManualPairChoice(chooserPlayerId, targetPlayerId, game.pairings, queue);
+    const validationError = validateManualPairChoice(chooserPlayerId, targetPlayerId, game.pairings, queue);
+    if (validationError instanceof Error) return validationError;
 
     game.pairings[chooserPlayerId] = targetPlayerId;
     game.preparation.manualPairingCursor += 1;
@@ -209,31 +217,39 @@ export class GameEngine {
     return this.touch(game, now);
   }
 
-  submitWord(game: GameState, playerId: string, word: string, now: string): GameState {
-    this.mustBeWordStage(game);
+  submitWord(game: GameState, playerId: string, word: string, now: string) {
+    const stageError = this.mustBeWordStage(game);
+    if (stageError instanceof Error) return stageError;
 
     const normalized = word.trim();
     if (normalized.length < 1) {
-      throw new DomainError({ code: "WORD_CANNOT_BE_EMPTY" });
+      return new appErrors.WordCannotBeEmptyError();
     }
 
     const entry = this.mustGetWordEntry(game, playerId);
+    if (entry instanceof Error) return entry;
+
     entry.word = normalized;
     entry.clue = undefined;
     entry.wordConfirmed = false;
     entry.finalConfirmed = false;
 
     const player = this.mustGetPlayer(game, playerId);
-    player.stage = "WORD_DRAFT";
+    if (player instanceof Error) return player;
 
+    player.stage = "WORD_DRAFT";
     return this.touch(game, now);
   }
 
-  confirmWord(game: GameState, playerId: string, confirmed: boolean, now: string): GameState {
-    this.mustBeWordStage(game);
+  confirmWord(game: GameState, playerId: string, confirmed: boolean, now: string) {
+    const stageError = this.mustBeWordStage(game);
+    if (stageError instanceof Error) return stageError;
 
     const entry = this.mustGetWordEntry(game, playerId);
+    if (entry instanceof Error) return entry;
+
     const player = this.mustGetPlayer(game, playerId);
+    if (player instanceof Error) return player;
 
     if (!confirmed) {
       entry.word = undefined;
@@ -245,32 +261,38 @@ export class GameEngine {
     }
 
     if (!entry.word) {
-      throw new DomainError({ code: "WORD_MUST_BE_SUBMITTED_BEFORE_CONFIRMATION" });
+      return new appErrors.WordMustBeSubmittedBeforeConfirmationError();
     }
 
     entry.wordConfirmed = true;
     player.stage = "WORD_CONFIRMED";
-
     return this.touch(game, now);
   }
 
-  submitClue(game: GameState, playerId: string, clue: string | undefined, now: string): GameState {
-    this.mustBeWordStage(game);
+  submitClue(game: GameState, playerId: string, clue: string | undefined, now: string) {
+    const stageError = this.mustBeWordStage(game);
+    if (stageError instanceof Error) return stageError;
 
     const entry = this.mustGetWordEntry(game, playerId);
+    if (entry instanceof Error) return entry;
+
     if (!entry.wordConfirmed) {
-      throw new DomainError({ code: "WORD_MUST_BE_CONFIRMED_BEFORE_CLUE_SUBMISSION" });
+      return new appErrors.WordMustBeConfirmedBeforeClueSubmissionError();
     }
 
     entry.clue = clue?.trim() || undefined;
     return this.touch(game, now);
   }
 
-  finalizeWord(game: GameState, playerId: string, confirmed: boolean, now: string): GameState {
-    this.mustBeWordStage(game);
+  finalizeWord(game: GameState, playerId: string, confirmed: boolean, now: string) {
+    const stageError = this.mustBeWordStage(game);
+    if (stageError instanceof Error) return stageError;
 
     const entry = this.mustGetWordEntry(game, playerId);
+    if (entry instanceof Error) return entry;
+
     const player = this.mustGetPlayer(game, playerId);
+    if (player instanceof Error) return player;
 
     if (!confirmed) {
       entry.word = undefined;
@@ -282,7 +304,7 @@ export class GameEngine {
     }
 
     if (!entry.wordConfirmed) {
-      throw new DomainError({ code: "WORD_MUST_BE_CONFIRMED_BEFORE_FINALIZATION" });
+      return new appErrors.WordMustBeConfirmedBeforeFinalizationError();
     }
 
     entry.finalConfirmed = true;
@@ -295,24 +317,24 @@ export class GameEngine {
     return this.touch(game, now);
   }
 
-  startGameIfReady(game: GameState, now: string): GameState {
+  startGameIfReady(game: GameState, now: string) {
     if (game.stage !== "READY_WAIT") {
       return this.touch(game, now);
     }
 
     if (!this.allWordsReady(game)) {
-      throw new DomainError({ code: "NOT_ALL_PLAYERS_CONFIRMED_WORDS" });
+      return new appErrors.NotAllPlayersConfirmedWordsError();
     }
 
     game.stage = "IN_PROGRESS";
     game.inProgress.round = 1;
 
     if (!game.config) {
-      throw new DomainError({ code: "GAME_CONFIGURATION_MISSING" });
+      return new appErrors.GameConfigurationMissingError();
     }
 
     if (game.config.mode === "NORMAL") {
-      game.inProgress.turnOrder = game.players.map((p) => p.id);
+      game.inProgress.turnOrder = game.players.map((player) => player.id);
       game.inProgress.turnCursor = 0;
       game.inProgress.currentTargetPlayerId = undefined;
       game.inProgress.targetCursor = 0;
@@ -327,26 +349,28 @@ export class GameEngine {
     return this.touch(game, now);
   }
 
-  askQuestion(game: GameState, input: AskQuestionInput): GameState {
-    this.mustBeStage(game, "IN_PROGRESS");
+  askQuestion(game: GameState, input: AskQuestionInput) {
+    const stageError = this.mustBeStage(game, "IN_PROGRESS");
+    if (stageError instanceof Error) return stageError;
 
     if (!game.config) {
-      throw new DomainError({ code: "GAME_CONFIGURATION_MISSING" });
+      return new appErrors.GameConfigurationMissingError();
     }
 
     if (game.inProgress.pendingVote) {
-      throw new DomainError({ code: "PENDING_VOTE_MUST_BE_RESOLVED_FIRST" });
+      return new appErrors.PendingVoteMustBeResolvedFirstError();
     }
 
     if (game.config.playMode === "ONLINE" && !input.questionText?.trim()) {
-      throw new DomainError({ code: "QUESTION_TEXT_REQUIRED_IN_ONLINE_MODE" });
+      return new appErrors.QuestionTextRequiredInOnlineModeError();
     }
 
     const round = game.inProgress.round;
     const asker = this.resolveCurrentAsker(game);
+    if (asker instanceof Error) return asker;
 
     if (input.actorPlayerId !== asker) {
-      throw new DomainError({ code: "NOT_PLAYERS_TURN" });
+      return new appErrors.NotPlayersTurnError();
     }
 
     game.progress[asker].questionsAsked += 1;
@@ -367,7 +391,7 @@ export class GameEngine {
     } else {
       const targetId = game.inProgress.currentTargetPlayerId;
       if (!targetId) {
-        throw new DomainError({ code: "REVERSE_MODE_TARGET_MISSING" });
+        return new appErrors.ReverseModeTargetMissingError();
       }
       game.inProgress.pendingVote = {
         id: input.voteId,
@@ -385,16 +409,17 @@ export class GameEngine {
     return this.touch(game, input.now);
   }
 
-  castVote(game: GameState, input: CastVoteInput): GameState {
-    this.mustBeStage(game, "IN_PROGRESS");
+  castVote(game: GameState, input: CastVoteInput) {
+    const stageError = this.mustBeStage(game, "IN_PROGRESS");
+    if (stageError instanceof Error) return stageError;
 
     const pending = game.inProgress.pendingVote;
     if (!pending) {
-      throw new DomainError({ code: "NO_PENDING_VOTE" });
+      return new appErrors.NoPendingVoteError();
     }
 
     if (!pending.eligibleVoterIds.includes(input.voterPlayerId)) {
-      throw new DomainError({ code: "PLAYER_NOT_ALLOWED_TO_VOTE" });
+      return new appErrors.PlayerNotAllowedToVoteError();
     }
 
     if (pending.votes[input.voterPlayerId]) {
@@ -415,31 +440,32 @@ export class GameEngine {
     }
 
     if (!game.config) {
-      throw new DomainError({ code: "GAME_CONFIGURATION_MISSING" });
+      return new appErrors.GameConfigurationMissingError();
     }
 
-    if (game.config.mode === "NORMAL") {
-      this.resolveNormalVote(game, pending, input.turnRecordId, input.now);
-    } else {
-      this.resolveReverseVote(game, pending, input.turnRecordId, input.now);
-    }
+    const resolutionError = game.config.mode === "NORMAL"
+      ? this.resolveNormalVote(game, pending, input.turnRecordId, input.now)
+      : this.resolveReverseVote(game, pending, input.turnRecordId, input.now);
+    if (resolutionError instanceof Error) return resolutionError;
 
     game.inProgress.pendingVote = undefined;
-
     return this.touch(game, input.now);
   }
 
-  giveUp(game: GameState, input: GiveUpInput): GameState {
-    this.mustBeStage(game, "IN_PROGRESS");
+  giveUp(game: GameState, input: GiveUpInput) {
+    const stageError = this.mustBeStage(game, "IN_PROGRESS");
+    if (stageError instanceof Error) return stageError;
 
     if (!game.config) {
-      throw new DomainError({ code: "GAME_CONFIGURATION_MISSING" });
+      return new appErrors.GameConfigurationMissingError();
     }
 
     const round = game.inProgress.round;
 
     if (game.config.mode === "NORMAL") {
       const player = this.mustGetPlayer(game, input.playerId);
+      if (player instanceof Error) return player;
+
       if (terminalPlayerStages.has(player.stage)) {
         return this.touch(game, input.now);
       }
@@ -458,12 +484,18 @@ export class GameEngine {
 
       if (this.allNormalPlayersFinished(game)) {
         game.stage = "FINISHED";
-        game.result = buildGameResult(game, input.now);
+        const result = buildGameResult(game, input.now);
+        if (result instanceof Error) return result;
+        game.result = result;
         return this.touch(game, input.now);
       }
 
-      if (!game.inProgress.pendingVote && this.resolveCurrentAsker(game) === input.playerId) {
-        this.advanceNormalTurn(game);
+      const currentAsker = this.resolveCurrentAsker(game);
+      if (currentAsker instanceof Error) return currentAsker;
+
+      if (!game.inProgress.pendingVote && currentAsker === input.playerId) {
+        const advanceError = this.advanceNormalTurn(game);
+        if (advanceError instanceof Error) return advanceError;
       }
 
       return this.touch(game, input.now);
@@ -490,22 +522,26 @@ export class GameEngine {
       createdAt: input.now,
     });
 
-    if (!game.inProgress.pendingVote && this.resolveCurrentAsker(game) === input.playerId) {
+    const currentAsker = this.resolveCurrentAsker(game);
+    if (currentAsker instanceof Error) return currentAsker;
+
+    if (!game.inProgress.pendingVote && currentAsker === input.playerId) {
       this.advanceReverseTurn(game, input.playerId);
     }
 
-    this.ensureReverseProgress(game, input.now);
+    const progressError = this.ensureReverseProgress(game, input.now);
+    if (progressError instanceof Error) return progressError;
 
     return this.touch(game, input.now);
   }
 
-  cancelGame(game: GameState, reason: string, now: string): GameState {
+  cancelGame(game: GameState, reason: string, now: string) {
     game.stage = "CANCELED";
     game.canceledReason = reason;
     return this.touch(game, now);
   }
 
-  private resolveNormalVote(game: GameState, pending: PendingVote, turnRecordId: string, now: string): void {
+  private resolveNormalVote(game: GameState, pending: PendingVote, turnRecordId: string, now: string) {
     const outcome = computeMajorityDecision(Object.values(pending.votes));
 
     game.turns.push({
@@ -519,24 +555,30 @@ export class GameEngine {
 
     if (outcome === "GUESSED") {
       const player = this.mustGetPlayer(game, pending.askerPlayerId);
+      if (player instanceof Error) return player;
+
       player.stage = "GUESSED";
       game.progress[pending.askerPlayerId].guessedAtRound = pending.round;
       game.progress[pending.askerPlayerId].roundsUsed = Math.max(game.progress[pending.askerPlayerId].roundsUsed, pending.round);
-      this.advanceNormalTurn(game);
+      const advanceError = this.advanceNormalTurn(game);
+      if (advanceError instanceof Error) return advanceError;
     } else if (outcome === "NO") {
-      this.advanceNormalTurn(game);
+      const advanceError = this.advanceNormalTurn(game);
+      if (advanceError instanceof Error) return advanceError;
     }
 
     if (this.allNormalPlayersFinished(game)) {
       game.stage = "FINISHED";
-      game.result = buildGameResult(game, now);
+      const result = buildGameResult(game, now);
+      if (result instanceof Error) return result;
+      game.result = result;
     }
   }
 
-  private resolveReverseVote(game: GameState, pending: PendingVote, turnRecordId: string, now: string): void {
+  private resolveReverseVote(game: GameState, pending: PendingVote, turnRecordId: string, now: string) {
     const targetId = pending.targetWordOwnerId;
     if (!targetId) {
-      throw new DomainError({ code: "REVERSE_VOTE_TARGET_MISSING" });
+      return new appErrors.ReverseVoteTargetMissingError();
     }
 
     const targetDecision = pending.votes[targetId] ?? "NO";
@@ -561,18 +603,19 @@ export class GameEngine {
         word.solved = true;
       }
       this.advanceReverseTarget(game);
-      this.ensureReverseProgress(game, now);
-      return;
+      return this.ensureReverseProgress(game, now);
     }
 
     this.advanceReverseTurn(game, pending.askerPlayerId);
-    this.ensureReverseProgress(game, now);
+    return this.ensureReverseProgress(game, now);
   }
 
-  private ensureReverseProgress(game: GameState, now: string): void {
+  private ensureReverseProgress(game: GameState, now: string) {
     if (!game.inProgress.currentTargetPlayerId) {
       game.stage = "FINISHED";
-      game.result = buildGameResult(game, now);
+      const result = buildGameResult(game, now);
+      if (result instanceof Error) return result;
+      game.result = result;
       return;
     }
 
@@ -591,19 +634,21 @@ export class GameEngine {
 
     if (!game.inProgress.currentTargetPlayerId) {
       game.stage = "FINISHED";
-      game.result = buildGameResult(game, now);
+      const result = buildGameResult(game, now);
+      if (result instanceof Error) return result;
+      game.result = result;
     }
   }
 
-  private resolveCurrentAsker(game: GameState): string {
+  private resolveCurrentAsker(game: GameState) {
     if (!game.config) {
-      throw new DomainError({ code: "GAME_CONFIGURATION_MISSING" });
+      return new appErrors.GameConfigurationMissingError();
     }
 
     if (game.config.mode === "NORMAL") {
       const active = new Set(this.getActiveNormalPlayers(game));
       if (active.size === 0) {
-        throw new DomainError({ code: "NO_ACTIVE_PLAYERS_LEFT" });
+        return new appErrors.NoActivePlayersLeftError();
       }
 
       let guard = 0;
@@ -612,16 +657,18 @@ export class GameEngine {
         if (active.has(playerId)) {
           return playerId;
         }
-        this.advanceNormalTurn(game);
+
+        const advanceError = this.advanceNormalTurn(game);
+        if (advanceError instanceof Error) return advanceError;
         guard += 1;
       }
 
-      throw new DomainError({ code: "UNABLE_TO_RESOLVE_CURRENT_ASKER" });
+      return new appErrors.UnableToResolveCurrentAskerError();
     }
 
     const current = game.inProgress.turnOrder[game.inProgress.turnCursor];
     if (!current) {
-      throw new DomainError({ code: "REVERSE_MODE_ASKER_MISSING" });
+      return new appErrors.ReverseModeAskerMissingError();
     }
 
     return current;
@@ -639,7 +686,7 @@ export class GameEngine {
     return game.players.every((player) => terminalPlayerStages.has(player.stage));
   }
 
-  private advanceNormalTurn(game: GameState): void {
+  private advanceNormalTurn(game: GameState) {
     const turnOrder = game.inProgress.turnOrder;
     if (turnOrder.length === 0) {
       return;
@@ -656,6 +703,7 @@ export class GameEngine {
 
       const candidate = turnOrder[next];
       const player = this.mustGetPlayer(game, candidate);
+      if (player instanceof Error) return player;
       if (!terminalPlayerStages.has(player.stage)) {
         return;
       }
@@ -666,7 +714,7 @@ export class GameEngine {
 
   private getReverseGuessers(game: GameState, targetPlayerId: string): string[] {
     return game.players
-      .map((p) => p.id)
+      .map((player) => player.id)
       .filter((playerId) => playerId !== targetPlayerId)
       .filter((playerId) => !game.progress[playerId].reverseGiveUpsByTarget.includes(targetPlayerId));
   }
@@ -724,7 +772,7 @@ export class GameEngine {
   }
 
   private advanceReverseTarget(game: GameState): void {
-    const ids = game.players.map((p) => p.id);
+    const ids = game.players.map((player) => player.id);
     if (ids.length === 0) {
       game.inProgress.currentTargetPlayerId = undefined;
       return;
@@ -779,30 +827,30 @@ export class GameEngine {
     return wordEntries.every((entry) => Boolean(entry.word && entry.wordConfirmed && entry.finalConfirmed));
   }
 
-  private mustBeWordStage(game: GameState): void {
+  private mustBeWordStage(game: GameState) {
     if (game.stage !== "PREPARE_WORDS" && game.stage !== "READY_WAIT") {
-      throw new DomainError({ code: "WORD_ACTIONS_NOT_AVAILABLE_IN_CURRENT_STAGE" });
+      return new appErrors.WordActionsNotAvailableInCurrentStageError();
     }
   }
 
-  private mustBeStage(game: GameState, stage: GameState["stage"]): void {
+  private mustBeStage(game: GameState, stage: GameState["stage"]) {
     if (game.stage !== stage) {
-      throw new DomainError({ code: "EXPECTED_STAGE_MISMATCH", params: { expectedStage: stage, actualStage: game.stage } });
+      return new appErrors.ExpectedStageMismatchError({ expectedStage: stage, actualStage: game.stage });
     }
   }
 
-  private mustGetPlayer(game: GameState, playerId: string): PlayerState {
-    const player = game.players.find((p) => p.id === playerId);
+  private mustGetPlayer(game: GameState, playerId: string) {
+    const player = game.players.find((candidate) => candidate.id === playerId);
     if (!player) {
-      throw new DomainError({ code: "PLAYER_NOT_FOUND" });
+      return new appErrors.PlayerNotFoundError();
     }
     return player;
   }
 
-  private mustGetWordEntry(game: GameState, playerId: string): WordEntry {
+  private mustGetWordEntry(game: GameState, playerId: string) {
     const entry = game.words[playerId];
     if (!entry) {
-      throw new DomainError({ code: "WORD_ENTRY_FOR_PLAYER_MISSING" });
+      return new appErrors.WordEntryForPlayerMissingError();
     }
 
     return entry;

@@ -1,3 +1,4 @@
+import type { NotificationError } from "../domain/errors";
 import { GameState, PlayerIdentity } from "../domain/types";
 
 export interface GameRepository {
@@ -32,8 +33,12 @@ export interface IdentityPort {
 }
 
 export interface NotifierPort {
-  sendGroupMessage(chatId: string, text: string): Promise<void>;
-  sendGroupKeyboard(chatId: string, text: string, buttons: Array<Array<{ text: string; data: string }>>): Promise<void>;
+  sendGroupMessage(chatId: string, text: string): Promise<void | NotificationError>;
+  sendGroupKeyboard(
+    chatId: string,
+    text: string,
+    buttons: Array<Array<{ text: string; data: string }>>,
+  ): Promise<void | NotificationError>;
   sendPrivateMessage(userId: string, text: string): Promise<boolean>;
   sendPrivateKeyboard(userId: string, text: string, buttons: Array<Array<{ text: string; data: string }>>): Promise<boolean>;
   buildBotDeepLink(): string;

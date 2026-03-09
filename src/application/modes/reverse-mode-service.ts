@@ -1,4 +1,6 @@
+import type { NotificationError } from "../../domain/errors";
 import { GameState } from "../../domain/types";
+import type { StartQuestionError } from "../errors";
 import { GameServiceContext } from "../game-service-context";
 import { BaseGameModeService } from "./base-game-mode-service";
 
@@ -9,7 +11,7 @@ export class ReverseModeService extends BaseGameModeService {
     super(context);
   }
 
-  async announceCurrentTurn(game: GameState): Promise<void> {
+  async announceCurrentTurn(game: GameState): Promise<void | NotificationError> {
     const currentAskerId = game.inProgress.turnOrder[game.inProgress.turnCursor];
     if (!currentAskerId) {
       return;
@@ -19,26 +21,28 @@ export class ReverseModeService extends BaseGameModeService {
 
     if (game.inProgress.currentTargetPlayerId) {
       const targetLabel = this.context.playerLabel(game, game.inProgress.currentTargetPlayerId);
-      await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.reverseTargetTurn(targetLabel, label));
+      const sentTargetTurn = await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.reverseTargetTurn(targetLabel, label));
+      if (sentTargetTurn instanceof Error) return sentTargetTurn;
     } else {
-      await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.currentTurn(label));
+      const sentTurn = await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.currentTurn(label));
+      if (sentTurn instanceof Error) return sentTurn;
     }
 
     if (game.config?.playMode === "OFFLINE") {
-      await this.context.notifier.sendGroupKeyboard(
+      const sentPrompt = await this.context.notifier.sendGroupKeyboard(
         game.chatId,
         this.context.texts.askOfflinePrompt(label),
         [[{ text: this.context.texts.startPollButton(), data: `ask:${game.id}` }]],
       );
+      if (sentPrompt instanceof Error) return sentPrompt;
     }
   }
 
   async beforeFirstTurn(_game: GameState): Promise<void> {}
 
-  async sendFinalSummary(game: GameState): Promise<void> {
+  async sendFinalSummary(game: GameState): Promise<void | NotificationError> {
     if (!game.result) {
-      await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.gameFinished());
-      return;
+      return this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.gameFinished());
     }
 
     const owner = game.result.reverse?.asWordOwner ?? [];
@@ -56,21 +60,26 @@ export class ReverseModeService extends BaseGameModeService {
       })
       .join("\n");
 
-    await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.reverseSummary(ownerText, guesserText));
+    return this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.reverseSummary(ownerText, guesserText));
   }
 
-  protected async startQuestion(gameId: string, actorPlayerId: string, questionText?: string): Promise<void> {
+  protected async startQuestion(gameId: string, actorPlayerId: string, questionText?: string): Promise<void | StartQuestionError> {
     const updated = this.context.transactionRunner.runInTransaction(() => {
-      const current = this.context.requireGameById(gameId);
+      const current = this.context.getGameByIdOrError(gameId);
+      if (current instanceof Error) return current;
+
       const next = this.context.engine.askQuestion(current, {
         actorPlayerId,
         questionText,
         voteId: this.context.idPort.nextId(),
         now: this.context.clock.nowIso(),
       });
+      if (next instanceof Error) return next;
+
       this.context.repository.update(next);
       return next;
     });
+    if (updated instanceof Error) return updated;
 
     const pending = updated.inProgress.pendingVote;
     if (!pending?.targetWordOwnerId) {
@@ -82,7 +91,7 @@ export class ReverseModeService extends BaseGameModeService {
       return;
     }
 
-    await this.context.notifier.sendGroupKeyboard(
+    const sentVote = await this.context.notifier.sendGroupKeyboard(
       updated.chatId,
       this.context.texts.reverseVotePrompt(
         this.context.playerLabel(updated, pending.askerPlayerId),
@@ -94,5 +103,6 @@ export class ReverseModeService extends BaseGameModeService {
         { text: this.context.texts.voteDecisionButton("GUESSED"), data: `vote:GUESSED:${updated.id}` },
       ]],
     );
+    if (sentVote instanceof Error) return sentVote;
   }
 }

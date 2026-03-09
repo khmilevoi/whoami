@@ -1,3 +1,4 @@
+import * as appErrors from "./domain/errors";
 import { AwilixContainer } from "awilix";
 import { Bot } from "grammy";
 import { buildHttpServer } from "./adapters/http/server";
@@ -10,11 +11,11 @@ import { loadConfig } from "./config";
 import { buildContainer } from "./container";
 import { runStartupTasks } from "./startup";
 
-const start = async (): Promise<void> => {
+const start = async (): Promise<void | appErrors.StartAppError> => {
   const config = loadConfig();
 
   if (!config.botToken) {
-    throw new Error("BOT_TOKEN is required");
+    return new appErrors.MissingBotTokenError();
   }
 
   const container: AwilixContainer = buildContainer(config);
@@ -39,7 +40,14 @@ const start = async (): Promise<void> => {
 
     if (config.webhookUrl) {
       const webhook = `${config.webhookUrl.replace(/\/$/, "")}/telegram/webhook`;
-      await bot.api.setWebhook(webhook);
+      const webhookResult = await bot.api
+        .setWebhook(webhook)
+        .catch((error) => new appErrors.TelegramApiError({ operation: "setWebhook", cause: error }));
+      if (webhookResult instanceof Error) {
+        logger.error("telegram_webhook_set_failed", { reason: webhookResult.message });
+        return;
+      }
+
       logger.info("telegram_webhook_set", { webhook });
       return;
     }
@@ -49,7 +57,12 @@ const start = async (): Promise<void> => {
   });
 };
 
-start().catch((error) => {
+start().then((result) => {
+  if (result instanceof Error) {
+    console.error(result);
+    process.exit(1);
+  }
+}).catch((error) => {
   console.error(error);
   process.exit(1);
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { CommandSyncError } from "../../src/domain/errors";
 import { TelegramCommandSync } from "../../src/adapters/telegram/telegram-command-sync";
 import { GameService } from "../../src/application/game-service";
 import { LoggerPort } from "../../src/application/ports";
@@ -37,7 +38,36 @@ describe("startup tasks", () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 
-  it("still runs manual pairing recovery when command sync fails", async () => {
+  it("still runs manual pairing recovery when command sync returns an expected error", async () => {
+    const commandSync = {
+      syncPrivateCommands: vi.fn(async () => new CommandSyncError({ scope: "all_private_chats" })),
+      syncGroupCommands: vi.fn(async () => undefined),
+      syncKnownChats: vi.fn(async () => undefined),
+    } as unknown as TelegramCommandSync;
+
+    const gameService = {
+      recoverManualPairingPromptsOnStartup: vi.fn(async () => undefined),
+    } as unknown as GameService;
+
+    const logger = createLogger();
+
+    await runStartupTasks({
+      commandSync,
+      gameService,
+      logger,
+    });
+
+    expect(gameService.recoverManualPairingPromptsOnStartup).toHaveBeenCalledTimes(1);
+    expect(logger.error).toHaveBeenCalledWith(
+      "commands_sync_failed",
+      expect.objectContaining({
+        chatId: "startup",
+        scope: "all_private_chats",
+      }),
+    );
+  });
+
+  it("still runs manual pairing recovery when startup task throws unexpectedly", async () => {
     const commandSync = {
       syncPrivateCommands: vi.fn(async () => {
         throw new Error("sync failed");
@@ -60,10 +90,9 @@ describe("startup tasks", () => {
 
     expect(gameService.recoverManualPairingPromptsOnStartup).toHaveBeenCalledTimes(1);
     expect(logger.error).toHaveBeenCalledWith(
-      "commands_sync_failed",
+      "startup_task_failed",
       expect.objectContaining({
-        chatId: "startup",
-        scope: "startup",
+        task: "syncPrivateCommands",
       }),
     );
   });

@@ -1,5 +1,8 @@
+import * as errore from "errore";
+import * as appErrors from "./domain/errors";
 import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync";
 import { GameService } from "./application/game-service";
+import type { RecoveryStartupError } from "./application/errors";
 import { LoggerPort } from "./application/ports";
 
 interface StartupDependencies {
@@ -8,25 +11,59 @@ interface StartupDependencies {
   logger: LoggerPort;
 }
 
-export const runStartupTasks = async ({ commandSync, gameService, logger }: StartupDependencies): Promise<void> => {
-  try {
-    await commandSync.syncPrivateCommands();
-    await commandSync.syncGroupCommands();
-    await commandSync.syncKnownChats();
-  } catch (error) {
-    logger.error("commands_sync_failed", {
-      chatId: "startup",
-      scope: "startup",
-      reason: error instanceof Error ? error.message : String(error),
-    });
-  }
+const logStartupError = (logger: LoggerPort, error: appErrors.StartupAppError): void => {
+  errore.matchError(error, {
+    CommandSyncError: (typedError) => {
+      logger.error("commands_sync_failed", {
+        chatId: "startup",
+        scope: typedError.scope,
+        reason: typedError.message,
+      });
+    },
+    StartupTaskError: (typedError) => {
+      logger.error("startup_task_failed", {
+        task: typedError.task,
+        reason: typedError.message,
+      });
+    },
+    Error: (unexpected) => {
+      logger.error("startup_task_failed", {
+        task: "unknown",
+        reason: unexpected.message,
+      });
+    },
+  });
+};
 
-  try {
-    await gameService.recoverManualPairingPromptsOnStartup();
-  } catch (error) {
-    logger.error("manual_pairing_recovery_failed", {
-      scope: "startup",
-      reason: error instanceof Error ? error.message : String(error),
-    });
+const runCommandSyncTask = async (
+  task: string,
+  action: () => Promise<void | appErrors.CommandSyncAppError>,
+  logger: LoggerPort,
+): Promise<void> => {
+  const result = await action().catch((cause) => new appErrors.StartupTaskError({ task, cause }));
+  if (result instanceof Error) {
+    logStartupError(logger, result);
   }
+};
+
+const runRecoveryTask = async (
+  task: string,
+  action: () => Promise<void | RecoveryStartupError>,
+  logger: LoggerPort,
+): Promise<void> => {
+  const result = await action().catch((cause) => new appErrors.StartupTaskError({ task, cause }));
+  if (result instanceof appErrors.StartupTaskError) {
+    logStartupError(logger, result);
+    return;
+  }
+  if (result instanceof Error) {
+    logStartupError(logger, new appErrors.StartupTaskError({ task, cause: result }));
+  }
+};
+
+export const runStartupTasks = async ({ commandSync, gameService, logger }: StartupDependencies): Promise<void> => {
+  await runCommandSyncTask("syncPrivateCommands", () => commandSync.syncPrivateCommands(), logger);
+  await runCommandSyncTask("syncGroupCommands", () => commandSync.syncGroupCommands(), logger);
+  await runCommandSyncTask("syncKnownChats", () => commandSync.syncKnownChats(), logger);
+  await runRecoveryTask("recoverManualPairingPromptsOnStartup", () => gameService.recoverManualPairingPromptsOnStartup(), logger);
 };

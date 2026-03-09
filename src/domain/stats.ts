@@ -1,3 +1,5 @@
+import type { StatsError } from "./errors";
+import { GameConfigurationMissingError } from "./errors";
 import { FinalScore, GameResult, GameState, ReverseSummary } from "./types";
 
 const addCrowns = (scores: FinalScore[]): FinalScore[] => {
@@ -66,9 +68,9 @@ const computeReverseScores = (game: GameState): ReverseSummary => {
   };
 };
 
-export const buildGameResult = (game: GameState, now: string): GameResult => {
+export const buildGameResult = (game: GameState, now: string): GameResult | StatsError => {
   if (!game.config) {
-    throw new Error("Cannot compute game result without config");
+    return new GameConfigurationMissingError();
   }
 
   const base = {
@@ -81,11 +83,11 @@ export const buildGameResult = (game: GameState, now: string): GameResult => {
     return {
       ...base,
       normal: computeNormalScores(game),
-    };
+    } satisfies GameResult;
   }
 
   return {
     ...base,
     reverse: computeReverseScores(game),
-  };
+  } satisfies GameResult;
 };

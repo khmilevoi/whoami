@@ -15,6 +15,7 @@
     "awilix": "^13.0.3",
     "better-sqlite3": "^12.6.2",
     "dotenv": "^17.3.1",
+    "errore": "^0.14.0",
     "express": "^5.2.1",
     "grammy": "^1.41.1",
     "nanoid": "^5.1.6"
@@ -23,6 +24,8 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.6",
     "@types/node": "^25.3.5",
+    "eslint": "^10.0.3",
+    "prettier": "^3.8.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"

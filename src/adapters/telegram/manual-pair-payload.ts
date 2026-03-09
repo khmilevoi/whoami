@@ -1,22 +1,21 @@
-import { DomainError } from "../../domain/errors";
+import type { ManualPairPayloadError } from "../../domain/errors";
+import { InvalidManualPairPayloadError } from "../../domain/errors";
 
-export interface ManualPairPayload {
-  targetPlayerId: string;
+interface ManualPairPayload {
   gameId: string;
+  targetPlayerId: string;
 }
 
-const manualPairPayloadPattern = /^pair:(.+):([^:]+)$/;
-
-export const parseManualPairPayload = (payload: string): ManualPairPayload => {
-  const match = manualPairPayloadPattern.exec(payload);
-  if (!match) {
-    throw new DomainError({ code: "INVALID_MANUAL_PAIR_PAYLOAD" });
+export const parseManualPairPayload = (payload: string): ManualPairPayload | ManualPairPayloadError => {
+  const parts = payload.split(":");
+  if (parts.length !== 3 || parts[0] !== "pair") {
+    return new InvalidManualPairPayloadError();
   }
 
-  const [, targetPlayerId, gameId] = match;
+  const [, targetPlayerId, gameId] = parts;
   if (!targetPlayerId || !gameId) {
-    throw new DomainError({ code: "INVALID_MANUAL_PAIR_PAYLOAD" });
+    return new InvalidManualPairPayloadError();
   }
 
-  return { targetPlayerId, gameId };
+  return { gameId, targetPlayerId } satisfies ManualPairPayload;
 };

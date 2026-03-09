@@ -1,4 +1,5 @@
 import { GameState } from "../../domain/types";
+import type { NormalPairingStageError } from "../errors";
 import { GameServiceContext } from "../game-service-context";
 import { WordPreparationStageService } from "./word-preparation-stage-service";
 
@@ -8,25 +9,32 @@ export class NormalPairingStageService {
     private readonly wordPreparationStage: WordPreparationStageService,
   ) {}
 
-  async applyManualPair(gameId: string, chooserTelegramUserId: string, targetPlayerId: string): Promise<void> {
+  async applyManualPair(gameId: string, chooserTelegramUserId: string, targetPlayerId: string): Promise<void | NormalPairingStageError> {
     const updated = this.context.transactionRunner.runInTransaction(() => {
-      const current = this.context.requireGameById(gameId);
-      const chooser = this.context.requirePlayerByTelegram(current, chooserTelegramUserId);
+      const current = this.context.getGameByIdOrError(gameId);
+      if (current instanceof Error) return current;
+
+      const chooser = this.context.getPlayerByTelegramOrError(current, chooserTelegramUserId);
+      if (chooser instanceof Error) return chooser;
+
       const next = this.context.engine.selectManualPair(current, chooser.id, targetPlayerId, this.context.clock.nowIso());
+      if (next instanceof Error) return next;
+
       this.context.repository.update(next);
       return next;
     });
+    if (updated instanceof Error) return updated;
 
     if (Object.keys(updated.words).length < updated.players.length) {
-      await this.promptCurrentChooser(updated);
-      return;
+      return this.promptCurrentChooser(updated);
     }
 
-    await this.context.notifier.sendGroupMessage(updated.chatId, this.context.texts.manualPairingCompleted());
-    await this.wordPreparationStage.promptWordCollection(updated);
+    const sentCompletion = await this.context.notifier.sendGroupMessage(updated.chatId, this.context.texts.manualPairingCompleted());
+    if (sentCompletion instanceof Error) return sentCompletion;
+    return this.wordPreparationStage.promptWordCollection(updated);
   }
 
-  async recoverPromptsOnStartup(): Promise<void> {
+  async recoverPromptsOnStartup(): Promise<void | NormalPairingStageError> {
     const activeGames = this.context.repository.listActiveGames();
 
     for (const game of activeGames) {
@@ -42,11 +50,14 @@ export class NormalPairingStageService {
         continue;
       }
 
-      await this.promptCurrentChooser(game);
+      const result = await this.promptCurrentChooser(game);
+      if (result instanceof Error) {
+        return result;
+      }
     }
   }
 
-  async promptCurrentChooser(game: GameState): Promise<void> {
+  async promptCurrentChooser(game: GameState): Promise<void | NormalPairingStageError> {
     const chooserId = game.preparation.manualPairingQueue[game.preparation.manualPairingCursor];
     const chooser = game.players.find((player) => player.id === chooserId);
     if (!chooser) {
@@ -61,10 +72,11 @@ export class NormalPairingStageService {
 
     const ok = await this.context.notifier.sendPrivateKeyboard(chooser.telegramUserId, this.context.texts.manualPairPrompt(), buttons);
     if (!ok) {
-      await this.context.notifier.sendGroupMessage(
+      const sentFallback = await this.context.notifier.sendGroupMessage(
         game.chatId,
         this.context.texts.dmLinkRequired(this.context.playerLabel(game, chooser.id), this.context.notifier.buildBotDeepLink()),
       );
+      if (sentFallback instanceof Error) return sentFallback;
     }
   }
 }

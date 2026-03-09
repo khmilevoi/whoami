@@ -1,4 +1,6 @@
+import type { NotificationError } from "../../domain/errors";
 import { GameState } from "../../domain/types";
+import type { StartQuestionError } from "../errors";
 import { GameServiceContext } from "../game-service-context";
 import { BaseGameModeService } from "./base-game-mode-service";
 
@@ -9,21 +11,23 @@ export class NormalModeService extends BaseGameModeService {
     super(context);
   }
 
-  async announceCurrentTurn(game: GameState): Promise<void> {
+  async announceCurrentTurn(game: GameState): Promise<void | NotificationError> {
     const currentAskerId = game.inProgress.turnOrder[game.inProgress.turnCursor];
     if (!currentAskerId) {
       return;
     }
 
     const label = this.context.playerLabel(game, currentAskerId);
-    await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.currentTurn(label));
+    const sentTurn = await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.currentTurn(label));
+    if (sentTurn instanceof Error) return sentTurn;
 
     if (game.config?.playMode === "OFFLINE") {
-      await this.context.notifier.sendGroupKeyboard(
+      const sentPrompt = await this.context.notifier.sendGroupKeyboard(
         game.chatId,
         this.context.texts.askOfflinePrompt(label),
         [[{ text: this.context.texts.startPollButton(), data: `ask:${game.id}` }]],
       );
+      if (sentPrompt instanceof Error) return sentPrompt;
     }
   }
 
@@ -38,10 +42,9 @@ export class NormalModeService extends BaseGameModeService {
     }
   }
 
-  async sendFinalSummary(game: GameState): Promise<void> {
+  async sendFinalSummary(game: GameState): Promise<void | NotificationError> {
     if (!game.result) {
-      await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.gameFinished());
-      return;
+      return this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.gameFinished());
     }
 
     const lines = (game.result.normal ?? []).map((row) => {
@@ -49,28 +52,33 @@ export class NormalModeService extends BaseGameModeService {
       return `- ${this.context.playerLabel(game, row.playerId)}: ${row.rounds}/${row.questions}${crown}`;
     });
 
-    await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.normalSummary(lines));
+    return this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.normalSummary(lines));
   }
 
-  protected async startQuestion(gameId: string, actorPlayerId: string, questionText?: string): Promise<void> {
+  protected async startQuestion(gameId: string, actorPlayerId: string, questionText?: string): Promise<void | StartQuestionError> {
     const updated = this.context.transactionRunner.runInTransaction(() => {
-      const current = this.context.requireGameById(gameId);
+      const current = this.context.getGameByIdOrError(gameId);
+      if (current instanceof Error) return current;
+
       const next = this.context.engine.askQuestion(current, {
         actorPlayerId,
         questionText,
         voteId: this.context.idPort.nextId(),
         now: this.context.clock.nowIso(),
       });
+      if (next instanceof Error) return next;
+
       this.context.repository.update(next);
       return next;
     });
+    if (updated instanceof Error) return updated;
 
     const pending = updated.inProgress.pendingVote;
     if (!pending) {
       return;
     }
 
-    await this.context.notifier.sendGroupKeyboard(
+    const sentVote = await this.context.notifier.sendGroupKeyboard(
       updated.chatId,
       this.context.texts.votePrompt(this.context.playerLabel(updated, pending.askerPlayerId)),
       [[
@@ -79,5 +87,6 @@ export class NormalModeService extends BaseGameModeService {
         { text: this.context.texts.voteDecisionButton("GUESSED"), data: `vote:GUESSED:${updated.id}` },
       ]],
     );
+    if (sentVote instanceof Error) return sentVote;
   }
 }

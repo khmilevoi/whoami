@@ -1,5 +1,6 @@
-import { DomainError } from "../../domain/errors";
+import * as appErrors from "../../domain/errors";
 import { ConfigureGameInput, GameMode, PairingMode, PlayMode } from "../../domain/types";
+import type { ConfigurationStageError } from "../errors";
 import { GameServiceContext } from "../game-service-context";
 import { ConfigDraftStore } from "../stores/config-draft-store";
 import { NormalPairingStageService } from "./normal-pairing-stage-service";
@@ -13,12 +14,20 @@ export class ConfigurationStageService {
     private readonly wordPreparationStage: WordPreparationStageService,
   ) {}
 
-  async applyConfigStep(gameId: string, actorTelegramUserId: string, key: "mode" | "play" | "pair", value: string): Promise<void> {
-    const game = this.context.requireGameById(gameId);
-    const actor = this.context.requirePlayerByTelegram(game, actorTelegramUserId);
+  async applyConfigStep(
+    gameId: string,
+    actorTelegramUserId: string,
+    key: "mode" | "play" | "pair",
+    value: string,
+  ): Promise<void | ConfigurationStageError> {
+    const game = this.context.getGameByIdOrError(gameId);
+    if (game instanceof Error) return game;
+
+    const actor = this.context.getPlayerByTelegramOrError(game, actorTelegramUserId);
+    if (actor instanceof Error) return actor;
 
     if (actor.id !== game.creatorPlayerId) {
-      throw new DomainError({ code: "ONLY_GAME_CREATOR_CAN_CONFIGURE" });
+      return new appErrors.OnlyGameCreatorCanConfigureError();
     }
 
     const draft = this.configDraftStore.get(gameId);
@@ -40,7 +49,7 @@ export class ConfigurationStageService {
     }
 
     if (!draft.playMode) {
-      await this.context.notifier.sendPrivateKeyboard(
+      const sentPrompt = await this.context.notifier.sendPrivateKeyboard(
         actorTelegramUserId,
         this.context.texts.choosePlayModePrompt(),
         [
@@ -48,11 +57,18 @@ export class ConfigurationStageService {
           [{ text: this.context.texts.playModeButton("OFFLINE"), data: `cfg:play:OFFLINE:${gameId}` }],
         ],
       );
+      if (!sentPrompt) {
+        const sentFallback = await this.context.notifier.sendGroupMessage(
+          game.chatId,
+          this.context.texts.creatorDmRequired(this.context.notifier.buildBotDeepLink()),
+        );
+        if (sentFallback instanceof Error) return sentFallback;
+      }
       return;
     }
 
     if (draft.mode === "NORMAL" && !draft.pairingMode) {
-      await this.context.notifier.sendPrivateKeyboard(
+      const sentPrompt = await this.context.notifier.sendPrivateKeyboard(
         actorTelegramUserId,
         this.context.texts.choosePairingModePrompt(),
         [
@@ -60,11 +76,20 @@ export class ConfigurationStageService {
           [{ text: this.context.texts.pairingModeButton("MANUAL"), data: `cfg:pair:MANUAL:${gameId}` }],
         ],
       );
+      if (!sentPrompt) {
+        const sentFallback = await this.context.notifier.sendGroupMessage(
+          game.chatId,
+          this.context.texts.creatorDmRequired(this.context.notifier.buildBotDeepLink()),
+        );
+        if (sentFallback instanceof Error) return sentFallback;
+      }
       return;
     }
 
     const configured = this.context.transactionRunner.runInTransaction(() => {
-      const current = this.context.requireGameById(gameId);
+      const current = this.context.getGameByIdOrError(gameId);
+      if (current instanceof Error) return current;
+
       const updateInput: ConfigureGameInput = {
         actorPlayerId: actor.id,
         mode: draft.mode!,
@@ -73,13 +98,16 @@ export class ConfigurationStageService {
       };
 
       const updated = this.context.engine.configureGame(current, updateInput, this.context.clock.nowIso());
+      if (updated instanceof Error) return updated;
+
       this.context.repository.update(updated);
       return updated;
     });
+    if (configured instanceof Error) return configured;
 
     this.configDraftStore.delete(gameId);
 
-    await this.context.notifier.sendGroupMessage(
+    const sentConfig = await this.context.notifier.sendGroupMessage(
       configured.chatId,
       this.context.texts.configSaved({
         mode: configured.config!.mode,
@@ -87,12 +115,12 @@ export class ConfigurationStageService {
         pairingMode: configured.config!.pairingMode,
       }),
     );
+    if (sentConfig instanceof Error) return sentConfig;
 
     if (configured.config?.mode === "NORMAL" && configured.config.pairingMode === "MANUAL" && Object.keys(configured.words).length === 0) {
-      await this.normalPairingStage.promptCurrentChooser(configured);
-      return;
+      return this.normalPairingStage.promptCurrentChooser(configured);
     }
 
-    await this.wordPreparationStage.promptWordCollection(configured);
+    return this.wordPreparationStage.promptWordCollection(configured);
   }
 }

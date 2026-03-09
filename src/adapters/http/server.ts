@@ -1,6 +1,23 @@
+import * as errore from "errore";
 import express from "express";
 import { Bot } from "grammy";
 import { LoggerPort } from "../../application/ports";
+import { WebhookAppError, WebhookHandlingError } from "../../domain/errors";
+
+const logWebhookError = (logger: LoggerPort, error: WebhookAppError): void => {
+  errore.matchError(error, {
+    WebhookHandlingError: (typedError) => {
+      logger.error("telegram_webhook_error", {
+        error: typedError.message,
+      });
+    },
+    Error: (unexpected) => {
+      logger.error("telegram_webhook_error", {
+        error: unexpected.message,
+      });
+    },
+  });
+};
 
 export const buildHttpServer = (bot: Bot, logger: LoggerPort) => {
   const app = express();
@@ -12,15 +29,14 @@ export const buildHttpServer = (bot: Bot, logger: LoggerPort) => {
   });
 
   app.post("/telegram/webhook", async (req, res) => {
-    try {
-      await bot.handleUpdate(req.body);
-      res.status(200).json({ ok: true });
-    } catch (error) {
-      logger.error("telegram_webhook_error", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+    const result = await bot.handleUpdate(req.body).catch((cause) => new WebhookHandlingError({ cause }));
+    if (result instanceof Error) {
+      logWebhookError(logger, result);
       res.status(500).json({ ok: false });
+      return;
     }
+
+    res.status(200).json({ ok: true });
   });
 
   return app;

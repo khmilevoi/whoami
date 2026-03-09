@@ -1,8 +1,15 @@
-import { DomainError } from "./errors";
+import type { PairingError, PairingValidationError } from "./errors";
+import {
+  NeedAtLeastTwoPlayersForPairingsError,
+  PlayerCannotPairWithSelfError,
+  PlayerHasAlreadySelectedAPairError,
+  SelectedTargetIsAlreadyTakenError,
+  UnknownPlayerInManualPairingError,
+} from "./errors";
 
-export const buildRandomDerangement = (playerIds: string[]): Record<string, string> => {
+export const buildRandomDerangement = (playerIds: string[]): Record<string, string> | PairingError => {
   if (playerIds.length < 2) {
-    throw new DomainError({ code: "NEED_AT_LEAST_TWO_PLAYERS_FOR_PAIRINGS" });
+    return new NeedAtLeastTwoPlayersForPairingsError();
   }
 
   const shuffled = [...playerIds];
@@ -33,19 +40,19 @@ export const validateManualPairChoice = (
   targetId: string,
   existingPairings: Record<string, string>,
   allPlayerIds: string[],
-): void => {
+): void | PairingValidationError => {
   if (!allPlayerIds.includes(chooserId) || !allPlayerIds.includes(targetId)) {
-    throw new DomainError({ code: "UNKNOWN_PLAYER_IN_MANUAL_PAIRING" });
+    return new UnknownPlayerInManualPairingError();
   }
   if (chooserId === targetId) {
-    throw new DomainError({ code: "PLAYER_CANNOT_PAIR_WITH_SELF" });
+    return new PlayerCannotPairWithSelfError();
   }
   if (existingPairings[chooserId]) {
-    throw new DomainError({ code: "PLAYER_HAS_ALREADY_SELECTED_A_PAIR" });
+    return new PlayerHasAlreadySelectedAPairError();
   }
 
   const selectedTargets = new Set(Object.values(existingPairings));
   if (selectedTargets.has(targetId)) {
-    throw new DomainError({ code: "SELECTED_TARGET_IS_ALREADY_TAKEN" });
+    return new SelectedTargetIsAlreadyTakenError();
   }
 };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DomainError } from "../../src/domain/errors";
+import { OnlyGameCreatorCanCancelError } from "../../src/domain/errors";
 import { TextService } from "../../src/application/text-service";
 import { VoteDecision } from "../../src/domain/types";
 import { createGameServiceHarness } from "./game-service.harness";
@@ -353,7 +353,7 @@ describe("game service", () => {
 
     const gameId = harness.getGameByChat(chatId).id;
 
-    await expect(harness.service.cancel(chatId, actors[1].telegramUserId)).rejects.toThrowError(DomainError);
+    await expect(harness.service.cancel(chatId, actors[1].telegramUserId)).resolves.toBeInstanceOf(OnlyGameCreatorCanCancelError);
 
     await harness.service.cancel(chatId, actors[0].telegramUserId);
 
@@ -367,3 +367,4 @@ describe("game service", () => {
     ).toBe(true);
   });
 });
+

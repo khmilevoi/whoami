@@ -1,9 +1,11 @@
+import * as errore from "errore";
+import * as appErrors from "../../domain/errors";
 import { Bot, Context } from "grammy";
-import { TelegramCommandSync } from "./telegram-command-sync";
 import { GameService } from "../../application/game-service";
+import type { TelegramHandlerError } from "../../application/errors";
 import { LoggerPort } from "../../application/ports";
 import { TextService } from "../../application/text-service";
-import { DomainError } from "../../domain/errors";
+import { TelegramCommandSync } from "./telegram-command-sync";
 import { parseManualPairPayload } from "./manual-pair-payload";
 
 type GroupMessageReadStatus = "enabled" | "disabled" | "unknown";
@@ -30,6 +32,7 @@ const safeReply = async (ctx: Context, text: string): Promise<void> => {
 
 const syncChatsSafely = async (
   commandSync: TelegramCommandSync | undefined,
+  logger: LoggerPort,
   chatIds: Set<string>,
 ): Promise<void> => {
   if (!commandSync || chatIds.size === 0) {
@@ -37,16 +40,19 @@ const syncChatsSafely = async (
   }
 
   for (const chatId of chatIds) {
-    try {
-      await commandSync.syncChat(chatId);
-    } catch {
-      // Errors are already logged by command sync service.
+    const result = await commandSync.syncChat(chatId);
+    if (result instanceof Error) {
+      logger.warn("commands_sync_failed_non_blocking", {
+        chatId,
+        reason: result.message,
+      });
     }
   }
 };
 
 const createSyncFinalizer = (
   ctx: Context,
+  logger: LoggerPort,
   commandSync: TelegramCommandSync | undefined,
   actorTelegramUserId?: string,
 ): (() => Promise<void>) => {
@@ -76,25 +82,54 @@ const createSyncFinalizer = (
       }
     }
 
-    await syncChatsSafely(commandSync, affectedChats);
+    await syncChatsSafely(commandSync, logger, affectedChats);
   };
+};
+
+const replyForReturnedError = async (
+  ctx: Context,
+  logger: LoggerPort,
+  texts: TextService,
+  error: TelegramHandlerError,
+): Promise<void> => {
+  if (error instanceof appErrors.DomainAppErrorBase) {
+    await safeReply(ctx, texts.renderError(error));
+    return;
+  }
+
+  await errore.matchError(error, {
+    TelegramApiError: async (typedError) => {
+      logger.error("telegram_handler_error", {
+        error: typedError.message,
+        kind: typedError.name,
+        updateId: ctx.update.update_id,
+      });
+      await safeReply(ctx, texts.genericErrorRetry());
+    },
+    Error: async (unexpected) => {
+      logger.error("telegram_handler_error", {
+        error: unexpected.message,
+        kind: unexpected.name,
+        updateId: ctx.update.update_id,
+      });
+      await safeReply(ctx, texts.genericErrorRetry());
+    },
+  });
 };
 
 const execute = async (
   ctx: Context,
   logger: LoggerPort,
   texts: TextService,
-  action: () => Promise<void>,
+  action: () => Promise<void | TelegramHandlerError>,
   onFinally?: () => Promise<void>,
 ): Promise<void> => {
   try {
-    await action();
-  } catch (error) {
-    if (error instanceof DomainError) {
-      await safeReply(ctx, texts.renderError(error.error));
-      return;
+    const result = await action();
+    if (result instanceof Error) {
+      await replyForReturnedError(ctx, logger, texts, result);
     }
-
+  } catch (error) {
     logger.error("telegram_handler_error", {
       error: error instanceof Error ? error.message : String(error),
       updateId: ctx.update.update_id,
@@ -103,7 +138,14 @@ const execute = async (
     await safeReply(ctx, texts.genericErrorRetry());
   } finally {
     if (onFinally) {
-      await onFinally();
+      try {
+        await onFinally();
+      } catch (error) {
+        logger.error("telegram_handler_finalizer_error", {
+          error: error instanceof Error ? error.message : String(error),
+          updateId: ctx.update.update_id,
+        });
+      }
     }
   }
 };
@@ -124,9 +166,8 @@ const createGroupMessageReadStatusResolver = (
       return inFlight;
     }
 
-    inFlight = (async () => {
-      try {
-        const me = await bot.api.getMe();
+    inFlight = bot.api.getMe()
+      .then((me) => {
         if (me.can_read_all_group_messages === true) {
           cached = "enabled";
           return cached;
@@ -142,16 +183,17 @@ const createGroupMessageReadStatusResolver = (
         });
         cached = "unknown";
         return cached;
-      } catch (error) {
+      })
+      .catch((error) => {
         logger.error("telegram_group_read_capability_check_failed", {
           reason: error instanceof Error ? error.message : String(error),
         });
         cached = "unknown";
         return cached;
-      } finally {
+      })
+      .finally(() => {
         inFlight = null;
-      }
-    })();
+      });
 
     return inFlight;
   };
@@ -167,14 +209,14 @@ export const registerTelegramHandlers = (
   const resolveGroupMessageReadStatus = createGroupMessageReadStatusResolver(bot, logger);
 
   bot.command("start", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
     await execute(
       ctx,
       logger,
       texts,
       async () => {
         if (isPrivate(ctx)) {
-          await gameService.handlePrivateStart(String(ctx.from!.id));
+          return gameService.handlePrivateStart(String(ctx.from!.id));
         }
       },
       finalizeSync,
@@ -182,7 +224,7 @@ export const registerTelegramHandlers = (
   });
 
   bot.command("whoami_start", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
     await execute(
       ctx,
       logger,
@@ -193,7 +235,9 @@ export const registerTelegramHandlers = (
           return;
         }
 
-        await gameService.startGame(String(ctx.chat!.id), asActor(ctx));
+        const result = await gameService.startGame(String(ctx.chat!.id), asActor(ctx));
+        if (result instanceof Error) return result;
+
         await safeReply(ctx, texts.gameCreatedAck());
       },
       finalizeSync,
@@ -201,7 +245,7 @@ export const registerTelegramHandlers = (
   });
 
   bot.command("join", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
     await execute(
       ctx,
       logger,
@@ -211,7 +255,9 @@ export const registerTelegramHandlers = (
           return;
         }
 
-        await gameService.joinGame(String(ctx.chat!.id), asActor(ctx));
+        const result = await gameService.joinGame(String(ctx.chat!.id), asActor(ctx));
+        if (result instanceof Error) return result;
+
         await safeReply(ctx, texts.joinedGameAck());
       },
       finalizeSync,
@@ -219,7 +265,7 @@ export const registerTelegramHandlers = (
   });
 
   bot.command("whoami_config", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
     await execute(
       ctx,
       logger,
@@ -229,7 +275,9 @@ export const registerTelegramHandlers = (
           return;
         }
 
-        await gameService.beginConfiguration(String(ctx.chat!.id), String(ctx.from!.id));
+        const result = await gameService.beginConfiguration(String(ctx.chat!.id), String(ctx.from!.id));
+        if (result instanceof Error) return result;
+
         await safeReply(ctx, texts.configSentToCreatorAck());
       },
       finalizeSync,
@@ -237,7 +285,7 @@ export const registerTelegramHandlers = (
   });
 
   bot.command("whoami_cancel", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
     await execute(
       ctx,
       logger,
@@ -247,7 +295,9 @@ export const registerTelegramHandlers = (
           return;
         }
 
-        await gameService.cancel(String(ctx.chat!.id), String(ctx.from!.id));
+        const result = await gameService.cancel(String(ctx.chat!.id), String(ctx.from!.id));
+        if (result instanceof Error) return result;
+
         await safeReply(ctx, texts.gameCancelledAck());
       },
       finalizeSync,
@@ -255,7 +305,7 @@ export const registerTelegramHandlers = (
   });
 
   bot.command("giveup", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
     await execute(
       ctx,
       logger,
@@ -264,14 +314,14 @@ export const registerTelegramHandlers = (
         if (!isGroupChat(ctx)) {
           return;
         }
-        await gameService.giveUp(String(ctx.chat!.id), String(ctx.from!.id));
+        return gameService.giveUp(String(ctx.chat!.id), String(ctx.from!.id));
       },
       finalizeSync,
     );
   });
 
   bot.command("ask", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
     await execute(
       ctx,
       logger,
@@ -280,14 +330,14 @@ export const registerTelegramHandlers = (
         if (!isGroupChat(ctx)) {
           return;
         }
-        await gameService.askOffline(String(ctx.chat!.id), String(ctx.from!.id));
+        return gameService.askOffline(String(ctx.chat!.id), String(ctx.from!.id));
       },
       finalizeSync,
     );
   });
 
   bot.on("message:text", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
     await execute(
       ctx,
       logger,
@@ -299,9 +349,10 @@ export const registerTelegramHandlers = (
         }
 
         if (isPrivate(ctx)) {
-          await gameService.handlePrivateText(String(ctx.from!.id), text);
-        } else if (isGroupChat(ctx)) {
-          await gameService.handleGroupText(String(ctx.chat!.id), String(ctx.from!.id), text);
+          return gameService.handlePrivateText(String(ctx.from!.id), text);
+        }
+        if (isGroupChat(ctx)) {
+          return gameService.handleGroupText(String(ctx.chat!.id), String(ctx.from!.id), text);
         }
       },
       finalizeSync,
@@ -309,7 +360,7 @@ export const registerTelegramHandlers = (
   });
 
   bot.on("callback_query:data", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
     await execute(
       ctx,
       logger,
@@ -342,38 +393,47 @@ export const registerTelegramHandlers = (
             }
           }
 
-          await gameService.applyConfigStep(gameId, fromUser, key as "mode" | "play" | "pair", value);
+          const result = await gameService.applyConfigStep(gameId, fromUser, key as "mode" | "play" | "pair", value);
+          if (result instanceof Error) return result;
           await ctx.answerCallbackQuery();
           return;
         }
 
         if (parts[0] === "pair") {
-          const { targetPlayerId, gameId } = parseManualPairPayload(payload);
-          await gameService.applyManualPair(gameId, fromUser, targetPlayerId);
+          const parsed = parseManualPairPayload(payload);
+          if (parsed instanceof Error) return parsed;
+
+          const result = await gameService.applyManualPair(parsed.gameId, fromUser, parsed.targetPlayerId);
+          if (result instanceof Error) return result;
           await ctx.answerCallbackQuery();
           return;
         }
 
         if (parts[0] === "word") {
           const [, action, value, gameId] = parts;
-          await gameService.handleWordCallback(gameId, fromUser, action as "confirm" | "clue" | "final", value as "YES" | "NO");
+          const result = await gameService.handleWordCallback(
+            gameId,
+            fromUser,
+            action as "confirm" | "clue" | "final",
+            value as "YES" | "NO",
+          );
+          if (result instanceof Error) return result;
           await ctx.answerCallbackQuery();
           return;
         }
 
         if (parts[0] === "vote") {
           const [, value, gameId] = parts;
-          await gameService.handleVote(gameId, fromUser, value as "YES" | "NO" | "GUESSED");
+          const result = await gameService.handleVote(gameId, fromUser, value as "YES" | "NO" | "GUESSED");
+          if (result instanceof Error) return result;
           await ctx.answerCallbackQuery();
           return;
         }
 
         if (parts[0] === "ask") {
-          const [, gameId] = parts;
-          const active = gameId;
-          void active;
           if (ctx.chat) {
-            await gameService.askOffline(String(ctx.chat.id), fromUser);
+            const result = await gameService.askOffline(String(ctx.chat.id), fromUser);
+            if (result instanceof Error) return result;
           }
           await ctx.answerCallbackQuery();
           return;

@@ -88,7 +88,7 @@ export const buildContainer = (externalConfig?: AppConfig) => {
     clock: asClass(SystemClock, { lifetime: Lifetime.SINGLETON }),
     identity: asClass(TelegramIdentityPort, { lifetime: Lifetime.SINGLETON }),
     notifier: asFunction(
-      ({ bot, config }: BaseCradle) => new TelegramNotifier(bot, config.botUsername),
+      ({ bot, config, logger }: BaseCradle & { logger: LoggerPort }) => new TelegramNotifier(bot, logger, config.botUsername),
       { lifetime: Lifetime.SINGLETON },
     ),
     gameServiceContext: asFunction(
@@ -163,3 +163,4 @@ export const buildContainer = (externalConfig?: AppConfig) => {
 
   return container;
 };
+

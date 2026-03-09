@@ -1,3 +1,4 @@
+import type { NotificationError } from "../../src/domain/errors";
 import { NotifierPort } from "../../src/application/ports";
 
 type Button = { text: string; data: string };
@@ -47,11 +48,11 @@ export class FakeNotifier implements NotifierPort {
     this.failedPrivateKeyboards.add(userId);
   }
 
-  async sendGroupMessage(chatId: string, text: string): Promise<void> {
+  async sendGroupMessage(chatId: string, text: string): Promise<void | NotificationError> {
     this.sent.push({ kind: "group-message", chatId, text });
   }
 
-  async sendGroupKeyboard(chatId: string, text: string, buttons: Button[][]): Promise<void> {
+  async sendGroupKeyboard(chatId: string, text: string, buttons: Button[][]): Promise<void | NotificationError> {
     this.sent.push({
       kind: "group-keyboard",
       chatId,
