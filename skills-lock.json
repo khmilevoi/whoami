@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "errore": {
+      "source": "remorses/errore",
+      "sourceType": "github",
+      "computedHash": "7597d6297947760bea8ef4dcb68ba13f928d2d9da99700376ec8fc3872fdc448"
+    }
+  }
+}
