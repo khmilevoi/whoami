@@ -2,17 +2,20 @@ import Database from "better-sqlite3";
 import { asClass, asFunction, asValue, createContainer, InjectionMode, Lifetime } from "awilix";
 import { Bot } from "grammy";
 import { AppConfig, loadConfig } from "./config";
+import { ChatCommandResolver } from "./application/chat-command-resolver";
+import { GameQueryService } from "./application/game-query-service";
 import { GameService } from "./application/game-service";
 import { ClockPort, GameRepository, IdentityPort, LoggerPort, NotifierPort, TransactionRunner } from "./application/ports";
+import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync";
+import { TelegramNotifier } from "./adapters/telegram/telegram-notifier";
 import { GameEngine } from "./domain/game-engine";
+import { SystemClock } from "./infrastructure/clock";
+import { NanoIdPort } from "./infrastructure/id-port";
+import { TelegramIdentityPort } from "./infrastructure/identity";
 import { ConsoleLogger } from "./infrastructure/logger";
 import { createDatabase } from "./infrastructure/sqlite/db";
 import { SqliteGameRepository } from "./infrastructure/sqlite/game-repository";
 import { SqliteTransactionRunner } from "./infrastructure/sqlite/transaction-runner";
-import { NanoIdPort } from "./infrastructure/id-port";
-import { SystemClock } from "./infrastructure/clock";
-import { TelegramIdentityPort } from "./infrastructure/identity";
-import { TelegramNotifier } from "./adapters/telegram/telegram-notifier";
 
 interface BaseCradle {
   config: AppConfig;
@@ -29,6 +32,12 @@ interface ServiceCradle extends BaseCradle {
   idPort: NanoIdPort;
   clock: ClockPort;
   logger: LoggerPort;
+}
+
+interface CommandsCradle extends BaseCradle {
+  logger: LoggerPort;
+  queryService: GameQueryService;
+  commandResolver: ChatCommandResolver;
 }
 
 export const buildContainer = (externalConfig?: AppConfig) => {
@@ -57,6 +66,15 @@ export const buildContainer = (externalConfig?: AppConfig) => {
     identity: asClass(TelegramIdentityPort, { lifetime: Lifetime.SINGLETON }),
     notifier: asFunction(
       ({ bot, config }: BaseCradle) => new TelegramNotifier(bot, config.botUsername),
+      { lifetime: Lifetime.SINGLETON },
+    ),
+    queryService: asFunction(({ repository }: { repository: GameRepository }) => new GameQueryService(repository), {
+      lifetime: Lifetime.SINGLETON,
+    }),
+    commandResolver: asClass(ChatCommandResolver, { lifetime: Lifetime.SINGLETON }),
+    commandSync: asFunction(
+      ({ bot, queryService, commandResolver, logger }: CommandsCradle) =>
+        new TelegramCommandSync(bot.api, queryService, commandResolver, logger),
       { lifetime: Lifetime.SINGLETON },
     ),
     gameService: asFunction(

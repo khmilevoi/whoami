@@ -1,11 +1,12 @@
 import { AwilixContainer } from "awilix";
 import { Bot } from "grammy";
-import { buildContainer } from "./container";
-import { registerTelegramHandlers } from "./adapters/telegram/telegram-bot";
 import { buildHttpServer } from "./adapters/http/server";
+import { registerTelegramHandlers } from "./adapters/telegram/telegram-bot";
+import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync";
 import { GameService } from "./application/game-service";
 import { LoggerPort } from "./application/ports";
 import { loadConfig } from "./config";
+import { buildContainer } from "./container";
 
 const start = async (): Promise<void> => {
   const config = loadConfig();
@@ -18,13 +19,25 @@ const start = async (): Promise<void> => {
   const bot = container.resolve<Bot>("bot");
   const logger = container.resolve<LoggerPort>("logger");
   const gameService = container.resolve<GameService>("gameService");
+  const commandSync = container.resolve<TelegramCommandSync>("commandSync");
 
-  registerTelegramHandlers(bot, gameService, logger);
+  registerTelegramHandlers(bot, gameService, logger, commandSync);
 
   const app = buildHttpServer(bot, logger);
 
   app.listen(config.appPort, async () => {
     logger.info("http_started", { port: config.appPort });
+
+    try {
+      await commandSync.syncPrivateCommands();
+      await commandSync.syncActiveChats();
+    } catch (error) {
+      logger.error("commands_sync_failed", {
+        chatId: "startup",
+        scope: "startup",
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     if (config.webhookUrl) {
       const webhook = `${config.webhookUrl.replace(/\/$/, "")}/telegram/webhook`;
