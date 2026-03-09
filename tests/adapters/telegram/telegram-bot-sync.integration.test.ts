@@ -30,7 +30,17 @@ const createLogger = (): LoggerPort => ({
 
 describe("telegram bot command sync integration", () => {
   it("syncs union of before/after chat ids for private update", async () => {
-    const bot = new Bot("123456:TEST_TOKEN");
+    const bot = new Bot("123456:TEST_TOKEN", {
+      botInfo: {
+        id: 123456,
+        is_bot: true,
+        first_name: "TestBot",
+        username: "test_bot",
+        can_join_groups: true,
+        can_read_all_group_messages: false,
+        supports_inline_queries: false,
+      },
+    });
     const gameService = createGameServiceStub();
     const logger = createLogger();
 
@@ -73,3 +83,4 @@ describe("telegram bot command sync integration", () => {
     expect(syncChat).toHaveBeenNthCalledWith(2, "-1002");
   });
 });
+

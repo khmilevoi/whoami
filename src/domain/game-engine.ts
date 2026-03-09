@@ -456,13 +456,14 @@ export class GameEngine {
         createdAt: input.now,
       });
 
-      if (!game.inProgress.pendingVote && this.resolveCurrentAsker(game) === input.playerId) {
-        this.advanceNormalTurn(game);
-      }
-
       if (this.allNormalPlayersFinished(game)) {
         game.stage = "FINISHED";
         game.result = buildGameResult(game, input.now);
+        return this.touch(game, input.now);
+      }
+
+      if (!game.inProgress.pendingVote && this.resolveCurrentAsker(game) === input.playerId) {
+        this.advanceNormalTurn(game);
       }
 
       return this.touch(game, input.now);

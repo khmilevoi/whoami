@@ -6,16 +6,25 @@ import { LoggerPort } from "../../application/ports";
 type TelegramScope =
   | { type: "all_private_chats" }
   | { type: "chat"; chat_id: number | string }
-  | { type: "chat_member"; chat_id: number | string; user_id: number | string };
+  | { type: "chat_member"; chat_id: number | string; user_id: number };
 
 interface TelegramCommandsApi {
-  setMyCommands(commands: BotCommandDef[], options?: { scope?: TelegramScope }): Promise<unknown>;
+  setMyCommands(commands: readonly BotCommandDef[], options?: { scope?: TelegramScope }): Promise<unknown>;
   deleteMyCommands(options?: { scope?: TelegramScope }): Promise<unknown>;
 }
 
-const toNumericId = (id: string): number | string => {
+const toNumericChatId = (id: string): number | string => {
   const parsed = Number(id);
   return Number.isSafeInteger(parsed) ? parsed : id;
+};
+
+const toNumericUserId = (id: string): number => {
+  const parsed = Number(id);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new Error(`Telegram user id must be numeric, got: ${id}`);
+  }
+
+  return parsed;
 };
 
 const scopeKey = (scope: TelegramScope): string => {
@@ -42,7 +51,7 @@ const scopeLabel = (scope: TelegramScope): string => {
   return `chat_member:${scope.chat_id}:${scope.user_id}`;
 };
 
-const commandsSignature = (commands: BotCommandDef[]): string => JSON.stringify(commands);
+const commandsSignature = (commands: readonly BotCommandDef[]): string => JSON.stringify(commands);
 
 export class TelegramCommandSync {
   private readonly appliedScopeCommands = new Map<string, string>();
@@ -80,7 +89,7 @@ export class TelegramCommandSync {
     await this.applyScope(
       {
         type: "chat",
-        chat_id: toNumericId(chatId),
+        chat_id: toNumericChatId(chatId),
       },
       resolution.chatCommands,
       chatId,
@@ -95,8 +104,8 @@ export class TelegramCommandSync {
       await this.applyScope(
         {
           type: "chat_member",
-          chat_id: toNumericId(chatId),
-          user_id: toNumericId(telegramUserId),
+          chat_id: toNumericChatId(chatId),
+          user_id: toNumericUserId(telegramUserId),
         },
         commands,
         chatId,
@@ -114,8 +123,8 @@ export class TelegramCommandSync {
       await this.deleteScope(
         {
           type: "chat_member",
-          chat_id: toNumericId(chatId),
-          user_id: toNumericId(staleMember),
+          chat_id: toNumericChatId(chatId),
+          user_id: toNumericUserId(staleMember),
         },
         chatId,
         "stale_member_scope",
@@ -129,7 +138,7 @@ export class TelegramCommandSync {
     }
   }
 
-  private async applyScope(scope: TelegramScope, commands: BotCommandDef[], chatId: string): Promise<void> {
+  private async applyScope(scope: TelegramScope, commands: readonly BotCommandDef[], chatId: string): Promise<void> {
     const key = scopeKey(scope);
 
     if (commands.length === 0) {
