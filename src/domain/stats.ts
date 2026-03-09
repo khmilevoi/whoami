@@ -1,4 +1,4 @@
-import { FinalScore, GameMode, GameResult, GameState, ReverseSummary } from "./types";
+import { FinalScore, GameResult, GameState, ReverseSummary } from "./types";
 
 const addCrowns = (scores: FinalScore[]): FinalScore[] => {
   if (scores.length === 0) {
@@ -88,8 +88,4 @@ export const buildGameResult = (game: GameState, now: string): GameResult => {
     ...base,
     reverse: computeReverseScores(game),
   };
-};
-
-export const gameModeLabel = (mode: GameMode): string => {
-  return mode === "NORMAL" ? "обычный" : "обратный";
 };

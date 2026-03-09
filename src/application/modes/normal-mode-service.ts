@@ -16,13 +16,13 @@ export class NormalModeService extends BaseGameModeService {
     }
 
     const label = this.context.playerLabel(game, currentAskerId);
-    await this.context.notifier.sendGroupMessage(game.chatId, `Ход игрока ${label}.`);
+    await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.currentTurn(label));
 
     if (game.config?.playMode === "OFFLINE") {
       await this.context.notifier.sendGroupKeyboard(
         game.chatId,
-        `${label}, нажмите, когда хотите запустить опрос по вопросу.`,
-        [[{ text: "Запустить опрос", data: `ask:${game.id}` }]],
+        this.context.texts.askOfflinePrompt(label),
+        [[{ text: this.context.texts.startPollButton(), data: `ask:${game.id}` }]],
       );
     }
   }
@@ -34,16 +34,13 @@ export class NormalModeService extends BaseGameModeService {
         .map((entry) => `- ${entry.word}${entry.clue ? ` (${entry.clue})` : ""}`)
         .join("\n");
 
-      await this.context.notifier.sendPrivateMessage(
-        player.telegramUserId,
-        `Список слов других игроков:\n${visibleWords || "(нет данных)"}`,
-      );
+      await this.context.notifier.sendPrivateMessage(player.telegramUserId, this.context.texts.otherPlayersWordsList(visibleWords));
     }
   }
 
   async sendFinalSummary(game: GameState): Promise<void> {
     if (!game.result) {
-      await this.context.notifier.sendGroupMessage(game.chatId, "Игра завершена.");
+      await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.gameFinished());
       return;
     }
 
@@ -52,7 +49,7 @@ export class NormalModeService extends BaseGameModeService {
       return `- ${this.context.playerLabel(game, row.playerId)}: ${row.rounds}/${row.questions}${crown}`;
     });
 
-    await this.context.notifier.sendGroupMessage(game.chatId, `Сводка (обычный режим):\n${lines.join("\n")}`);
+    await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.normalSummary(lines));
   }
 
   protected async startQuestion(gameId: string, actorPlayerId: string, questionText?: string): Promise<void> {
@@ -75,11 +72,11 @@ export class NormalModeService extends BaseGameModeService {
 
     await this.context.notifier.sendGroupKeyboard(
       updated.chatId,
-      `${this.context.playerLabel(updated, pending.askerPlayerId)} задал вопрос. Голосуем:`,
+      this.context.texts.votePrompt(this.context.playerLabel(updated, pending.askerPlayerId)),
       [[
-        { text: "Да", data: `vote:YES:${updated.id}` },
-        { text: "Нет", data: `vote:NO:${updated.id}` },
-        { text: "Угадал", data: `vote:GUESSED:${updated.id}` },
+        { text: this.context.texts.voteDecisionButton("YES"), data: `vote:YES:${updated.id}` },
+        { text: this.context.texts.voteDecisionButton("NO"), data: `vote:NO:${updated.id}` },
+        { text: this.context.texts.voteDecisionButton("GUESSED"), data: `vote:GUESSED:${updated.id}` },
       ]],
     );
   }

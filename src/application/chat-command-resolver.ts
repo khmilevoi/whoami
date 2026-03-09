@@ -1,5 +1,6 @@
 import { GameState } from "../domain/types";
-import { BOT_COMMANDS, ChatCommandResolution, noGameResolution } from "./bot-commands";
+import { createBotCommands, ChatCommandResolution } from "./bot-commands";
+import { TextService } from "./text-service";
 
 const toPlayerTelegramUserId = (game: GameState, playerId: string | undefined): string | null => {
   if (!playerId) {
@@ -11,18 +12,24 @@ const toPlayerTelegramUserId = (game: GameState, playerId: string | undefined): 
 };
 
 export class ChatCommandResolver {
+  private readonly commands;
+
+  constructor(texts: TextService) {
+    this.commands = createBotCommands(texts);
+  }
+
   resolve(game: GameState | null): ChatCommandResolution {
     if (!game) {
-      return noGameResolution();
+      return this.commands.noGameResolution();
     }
 
     if (game.stage === "LOBBY_OPEN") {
       return {
-        chatCommands: [BOT_COMMANDS.JOIN],
+        chatCommands: [this.commands.BOT_COMMANDS.JOIN],
         memberOverrides: [
           {
             telegramUserId: game.creatorTelegramUserId,
-            commands: [BOT_COMMANDS.CONFIG, BOT_COMMANDS.CANCEL],
+            commands: [this.commands.BOT_COMMANDS.CONFIG, this.commands.BOT_COMMANDS.CANCEL],
           },
         ],
       };
@@ -34,14 +41,14 @@ export class ChatCommandResolver {
         memberOverrides: [
           {
             telegramUserId: game.creatorTelegramUserId,
-            commands: [BOT_COMMANDS.CANCEL],
+            commands: [this.commands.BOT_COMMANDS.CANCEL],
           },
         ],
       };
     }
 
     if (game.stage === "IN_PROGRESS") {
-      const chatCommands = [BOT_COMMANDS.GIVEUP];
+      const chatCommands = [this.commands.BOT_COMMANDS.GIVEUP];
       const memberOverrides = [] as ChatCommandResolution["memberOverrides"];
 
       if (game.config?.playMode === "OFFLINE") {
@@ -50,7 +57,7 @@ export class ChatCommandResolver {
         if (askerTelegramUserId) {
           memberOverrides.push({
             telegramUserId: askerTelegramUserId,
-            commands: [BOT_COMMANDS.GIVEUP, BOT_COMMANDS.ASK],
+            commands: [this.commands.BOT_COMMANDS.GIVEUP, this.commands.BOT_COMMANDS.ASK],
           });
         }
       }
@@ -61,6 +68,6 @@ export class ChatCommandResolver {
       };
     }
 
-    return noGameResolution();
+    return this.commands.noGameResolution();
   }
 }

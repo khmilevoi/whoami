@@ -1,7 +1,8 @@
 import { ChatCommandResolver } from "../../application/chat-command-resolver";
-import { BotCommandDef, GROUP_COMMANDS, PRIVATE_COMMANDS } from "../../application/bot-commands";
+import { BotCommandDef, createBotCommands } from "../../application/bot-commands";
 import { GameQueryService } from "../../application/game-query-service";
 import { LoggerPort } from "../../application/ports";
+import { TextService } from "../../application/text-service";
 
 type TelegramScope =
   | { type: "all_private_chats" }
@@ -65,24 +66,28 @@ const commandsSignature = (commands: readonly BotCommandDef[]): string => JSON.s
 export class TelegramCommandSync {
   private readonly appliedScopeCommands = new Map<string, string>();
   private readonly appliedChatMembers = new Map<string, Set<string>>();
+  private readonly commands;
 
   constructor(
     private readonly api: TelegramCommandsApi,
     private readonly queryService: GameQueryService,
     private readonly resolver: ChatCommandResolver,
     private readonly logger: LoggerPort,
-  ) {}
+    texts: TextService,
+  ) {
+    this.commands = createBotCommands(texts);
+  }
 
   listActiveChatIdsByTelegramUser(telegramUserId: string): string[] {
     return this.queryService.listActiveChatIdsByTelegramUser(telegramUserId);
   }
 
   async syncPrivateCommands(): Promise<void> {
-    await this.applyScope({ type: "all_private_chats" }, PRIVATE_COMMANDS, "global");
+    await this.applyScope({ type: "all_private_chats" }, this.commands.PRIVATE_COMMANDS, "global");
   }
 
   async syncGroupCommands(): Promise<void> {
-    await this.applyScope({ type: "all_group_chats" }, GROUP_COMMANDS, "global");
+    await this.applyScope({ type: "all_group_chats" }, this.commands.GROUP_COMMANDS, "global");
   }
 
   async syncActiveChats(): Promise<void> {

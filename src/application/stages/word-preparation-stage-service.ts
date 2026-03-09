@@ -24,7 +24,7 @@ export class WordPreparationStageService {
     }
 
     if (!game.words[player.id]) {
-      await this.context.notifier.sendPrivateMessage(telegramUserId, "Ожидайте завершения распределения пар.");
+      await this.context.notifier.sendPrivateMessage(telegramUserId, this.context.texts.waitForPairingCompletion());
       return;
     }
 
@@ -50,8 +50,11 @@ export class WordPreparationStageService {
 
     await this.context.notifier.sendPrivateKeyboard(
       telegramUserId,
-      `Подтвердите слово: "${updated.words[player.id].word}"`,
-      [[{ text: "Да", data: `word:confirm:YES:${game.id}` }, { text: "Нет", data: `word:confirm:NO:${game.id}` }]],
+      this.context.texts.confirmWordPrompt(updated.words[player.id].word ?? ""),
+      [[
+        { text: this.context.texts.yesButton(), data: `word:confirm:YES:${game.id}` },
+        { text: this.context.texts.noButton(), data: `word:confirm:NO:${game.id}` },
+      ]],
     );
   }
 
@@ -74,14 +77,17 @@ export class WordPreparationStageService {
 
       if (value === "NO") {
         this.expectationStore.set(gameId, player.id, "WORD");
-        await this.context.notifier.sendPrivateMessage(telegramUserId, "Введите слово заново:");
+        await this.context.notifier.sendPrivateMessage(telegramUserId, this.context.texts.reenterWordPrompt());
         return;
       }
 
       await this.context.notifier.sendPrivateKeyboard(
         telegramUserId,
-        "Добавить пояснение к слову?",
-        [[{ text: "Да", data: `word:clue:YES:${gameId}` }, { text: "Нет", data: `word:clue:NO:${gameId}` }]],
+        this.context.texts.addCluePrompt(),
+        [[
+          { text: this.context.texts.yesButton(), data: `word:clue:YES:${gameId}` },
+          { text: this.context.texts.noButton(), data: `word:clue:NO:${gameId}` },
+        ]],
       );
 
       await this.sendWordSummary(updated, player.id, false);
@@ -91,7 +97,7 @@ export class WordPreparationStageService {
     if (action === "clue") {
       if (value === "YES") {
         this.expectationStore.set(gameId, player.id, "CLUE");
-        await this.context.notifier.sendPrivateMessage(telegramUserId, "Введите пояснение:");
+        await this.context.notifier.sendPrivateMessage(telegramUserId, this.context.texts.enterCluePrompt());
         return;
       }
 
@@ -116,18 +122,18 @@ export class WordPreparationStageService {
 
     if (value === "NO") {
       this.expectationStore.set(gameId, player.id, "WORD");
-      await this.context.notifier.sendPrivateMessage(telegramUserId, "Ок, заполним слово заново. Введите слово:");
+      await this.context.notifier.sendPrivateMessage(telegramUserId, this.context.texts.restartWordPrompt());
       return;
     }
 
     this.expectationStore.delete(gameId, player.id);
-    await this.context.notifier.sendPrivateMessage(telegramUserId, "Готово. Ожидаем остальных игроков.");
+    await this.context.notifier.sendPrivateMessage(telegramUserId, this.context.texts.readyWaitingOthers());
     await this.readyStartStage.tryStartGame(updated.id);
   }
 
   async promptWordCollection(game: GameState): Promise<void> {
     for (const player of game.players) {
-      const ok = await this.context.notifier.sendPrivateMessage(player.telegramUserId, "Введите слово для игры:");
+      const ok = await this.context.notifier.sendPrivateMessage(player.telegramUserId, this.context.texts.enterWordPrompt());
       if (!ok) {
         this.context.transactionRunner.runInTransaction(() => {
           const current = this.context.requireGameById(game.id);
@@ -137,7 +143,7 @@ export class WordPreparationStageService {
 
         await this.context.notifier.sendGroupMessage(
           game.chatId,
-          `${this.context.playerLabel(game, player.id)} не открыл ЛС. Ссылка: ${this.context.notifier.buildBotDeepLink()}`,
+          this.context.texts.dmLinkWithLabel(this.context.playerLabel(game, player.id), this.context.notifier.buildBotDeepLink()),
         );
       }
 
@@ -156,11 +162,7 @@ export class WordPreparationStageService {
       return;
     }
 
-    const text = [
-      `Слово: ${entry.word ?? "-"}`,
-      `Пояснение: ${entry.clue ?? "(нет)"}`,
-      "Подтвердить?",
-    ].join("\n");
+    const text = this.context.texts.wordSummary(entry.word, entry.clue);
 
     if (!includeButtons) {
       await this.context.notifier.sendPrivateMessage(player.telegramUserId, text);
@@ -170,7 +172,10 @@ export class WordPreparationStageService {
     await this.context.notifier.sendPrivateKeyboard(
       player.telegramUserId,
       text,
-      [[{ text: "Подтвердить", data: `word:final:YES:${game.id}` }, { text: "Редактировать", data: `word:final:NO:${game.id}` }]],
+      [[
+        { text: this.context.texts.confirmButton(), data: `word:final:YES:${game.id}` },
+        { text: this.context.texts.editButton(), data: `word:final:NO:${game.id}` },
+      ]],
     );
   }
 }

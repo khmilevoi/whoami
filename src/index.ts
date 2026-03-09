@@ -5,6 +5,7 @@ import { registerTelegramHandlers } from "./adapters/telegram/telegram-bot";
 import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync";
 import { GameService } from "./application/game-service";
 import { LoggerPort } from "./application/ports";
+import { TextService } from "./application/text-service";
 import { loadConfig } from "./config";
 import { buildContainer } from "./container";
 import { runStartupTasks } from "./startup";
@@ -19,10 +20,11 @@ const start = async (): Promise<void> => {
   const container: AwilixContainer = buildContainer(config);
   const bot = container.resolve<Bot>("bot");
   const logger = container.resolve<LoggerPort>("logger");
+  const texts = container.resolve<TextService>("texts");
   const gameService = container.resolve<GameService>("gameService");
   const commandSync = container.resolve<TelegramCommandSync>("commandSync");
 
-  registerTelegramHandlers(bot, gameService, logger, commandSync);
+  registerTelegramHandlers(bot, gameService, logger, texts, commandSync);
 
   const app = buildHttpServer(bot, logger);
 
@@ -51,4 +53,3 @@ start().catch((error) => {
   console.error(error);
   process.exit(1);
 });
-

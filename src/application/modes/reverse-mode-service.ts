@@ -19,19 +19,16 @@ export class ReverseModeService extends BaseGameModeService {
 
     if (game.inProgress.currentTargetPlayerId) {
       const targetLabel = this.context.playerLabel(game, game.inProgress.currentTargetPlayerId);
-      await this.context.notifier.sendGroupMessage(
-        game.chatId,
-        `Сейчас угадываем слово игрока ${targetLabel}. Ход задавать вопрос у ${label}.`,
-      );
+      await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.reverseTargetTurn(targetLabel, label));
     } else {
-      await this.context.notifier.sendGroupMessage(game.chatId, `Ход игрока ${label}.`);
+      await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.currentTurn(label));
     }
 
     if (game.config?.playMode === "OFFLINE") {
       await this.context.notifier.sendGroupKeyboard(
         game.chatId,
-        `${label}, нажмите, когда хотите запустить опрос по вопросу.`,
-        [[{ text: "Запустить опрос", data: `ask:${game.id}` }]],
+        this.context.texts.askOfflinePrompt(label),
+        [[{ text: this.context.texts.startPollButton(), data: `ask:${game.id}` }]],
       );
     }
   }
@@ -40,7 +37,7 @@ export class ReverseModeService extends BaseGameModeService {
 
   async sendFinalSummary(game: GameState): Promise<void> {
     if (!game.result) {
-      await this.context.notifier.sendGroupMessage(game.chatId, "Игра завершена.");
+      await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.gameFinished());
       return;
     }
 
@@ -59,10 +56,7 @@ export class ReverseModeService extends BaseGameModeService {
       })
       .join("\n");
 
-    await this.context.notifier.sendGroupMessage(
-      game.chatId,
-      `Сводка (обратный режим):\nЗагадывали:\n${ownerText || "-"}\n\nУгадывали:\n${guesserText || "-"}`,
-    );
+    await this.context.notifier.sendGroupMessage(game.chatId, this.context.texts.reverseSummary(ownerText, guesserText));
   }
 
   protected async startQuestion(gameId: string, actorPlayerId: string, questionText?: string): Promise<void> {
@@ -90,13 +84,15 @@ export class ReverseModeService extends BaseGameModeService {
 
     await this.context.notifier.sendGroupKeyboard(
       updated.chatId,
-      `${this.context.playerLabel(updated, pending.askerPlayerId)} задал вопрос. Отвечает ${this.context.playerLabel(updated, target.id)}:`,
+      this.context.texts.reverseVotePrompt(
+        this.context.playerLabel(updated, pending.askerPlayerId),
+        this.context.playerLabel(updated, target.id),
+      ),
       [[
-        { text: "Да", data: `vote:YES:${updated.id}` },
-        { text: "Нет", data: `vote:NO:${updated.id}` },
-        { text: "Угадал", data: `vote:GUESSED:${updated.id}` },
+        { text: this.context.texts.voteDecisionButton("YES"), data: `vote:YES:${updated.id}` },
+        { text: this.context.texts.voteDecisionButton("NO"), data: `vote:NO:${updated.id}` },
+        { text: this.context.texts.voteDecisionButton("GUESSED"), data: `vote:GUESSED:${updated.id}` },
       ]],
     );
   }
 }
-

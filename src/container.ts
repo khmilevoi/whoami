@@ -6,6 +6,7 @@ import { ChatCommandResolver } from "./application/chat-command-resolver";
 import { GameQueryService } from "./application/game-query-service";
 import { GameService } from "./application/game-service";
 import { GameServiceContext } from "./application/game-service-context";
+import { TextService } from "./application/text-service";
 import { ClockPort, GameRepository, IdentityPort, LoggerPort, NotifierPort, TransactionRunner } from "./application/ports";
 import { NormalModeService } from "./application/modes/normal-mode-service";
 import { ReverseModeService } from "./application/modes/reverse-mode-service";
@@ -30,6 +31,7 @@ interface BaseCradle {
   config: AppConfig;
   bot: Bot;
   db: Database.Database;
+  texts: TextService;
 }
 
 interface ServiceCradle extends BaseCradle {
@@ -73,6 +75,7 @@ export const buildContainer = (externalConfig?: AppConfig) => {
     config: asValue(config),
     db: asValue(db),
     bot: asValue(bot),
+    texts: asValue(new TextService("ru")),
     logger: asClass(ConsoleLogger, { lifetime: Lifetime.SINGLETON }),
     engine: asClass(GameEngine, { lifetime: Lifetime.SINGLETON }),
     repository: asFunction(({ db }: BaseCradle) => new SqliteGameRepository(db), {
@@ -89,7 +92,7 @@ export const buildContainer = (externalConfig?: AppConfig) => {
       { lifetime: Lifetime.SINGLETON },
     ),
     gameServiceContext: asFunction(
-      ({ engine, repository, transactionRunner, notifier, identity, idPort, clock, logger, config }: ServiceCradle) =>
+      ({ engine, repository, transactionRunner, notifier, identity, idPort, clock, logger, texts, config }: ServiceCradle) =>
         new GameServiceContext({
           engine,
           repository,
@@ -99,6 +102,7 @@ export const buildContainer = (externalConfig?: AppConfig) => {
           idPort,
           clock,
           logger,
+          texts,
           limits: {
             minPlayers: config.minPlayers,
             maxPlayers: config.maxPlayers,
@@ -139,15 +143,17 @@ export const buildContainer = (externalConfig?: AppConfig) => {
     queryService: asFunction(({ repository }: { repository: GameRepository }) => new GameQueryService(repository), {
       lifetime: Lifetime.SINGLETON,
     }),
-    commandResolver: asClass(ChatCommandResolver, { lifetime: Lifetime.SINGLETON }),
+    commandResolver: asFunction(({ texts }: BaseCradle) => new ChatCommandResolver(texts), {
+      lifetime: Lifetime.SINGLETON,
+    }),
     commandSync: asFunction(
-      ({ bot, queryService, commandResolver, logger }: CommandsCradle) =>
-        new TelegramCommandSync(bot.api, queryService, commandResolver, logger),
+      ({ bot, queryService, commandResolver, logger, texts }: CommandsCradle) =>
+        new TelegramCommandSync(bot.api, queryService, commandResolver, logger, texts),
       { lifetime: Lifetime.SINGLETON },
     ),
     gameService: asFunction(
-      ({ engine, repository, transactionRunner, notifier, identity, idPort, clock, logger, config }: ServiceCradle) =>
-        new GameService(engine, repository, transactionRunner, notifier, identity, idPort, clock, logger, {
+      ({ engine, repository, transactionRunner, notifier, identity, idPort, clock, logger, texts, config }: ServiceCradle) =>
+        new GameService(engine, repository, transactionRunner, notifier, identity, idPort, clock, logger, texts, {
           minPlayers: config.minPlayers,
           maxPlayers: config.maxPlayers,
         }),

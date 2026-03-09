@@ -1,7 +1,8 @@
-import { GameEngine } from "../domain/game-engine";
 import { DomainError } from "../domain/errors";
+import { GameState, TurnRecord } from "../domain/types";
+import { TextService } from "./text-service";
 import { ClockPort, GameRepository, IdPort, IdentityPort, LoggerPort, NotifierPort, TransactionRunner } from "./ports";
-import { GameState } from "../domain/types";
+import { GameEngine } from "../domain/game-engine";
 
 export interface GameServiceDeps {
   engine: GameEngine;
@@ -12,6 +13,7 @@ export interface GameServiceDeps {
   idPort: IdPort;
   clock: ClockPort;
   logger: LoggerPort;
+  texts: TextService;
   limits: { minPlayers: number; maxPlayers: number };
 }
 
@@ -50,6 +52,10 @@ export class GameServiceContext {
     return this.deps.logger;
   }
 
+  get texts(): TextService {
+    return this.deps.texts;
+  }
+
   get limits(): { minPlayers: number; maxPlayers: number } {
     return this.deps.limits;
   }
@@ -57,7 +63,7 @@ export class GameServiceContext {
   requireGameByChat(chatId: string): GameState {
     const game = this.repository.findActiveByChatId(chatId);
     if (!game) {
-      throw new DomainError("Активная игра в этом чате не найдена");
+      throw new DomainError({ code: "ACTIVE_GAME_NOT_FOUND_BY_CHAT" });
     }
     return game;
   }
@@ -65,7 +71,7 @@ export class GameServiceContext {
   requireGameById(gameId: string): GameState {
     const game = this.repository.findById(gameId);
     if (!game) {
-      throw new DomainError("Игра не найдена");
+      throw new DomainError({ code: "GAME_NOT_FOUND" });
     }
     return game;
   }
@@ -78,7 +84,7 @@ export class GameServiceContext {
   requirePlayerByTelegram(game: GameState, telegramUserId: string) {
     const player = game.players.find((candidate) => candidate.telegramUserId === telegramUserId);
     if (!player) {
-      throw new DomainError("Игрок не найден в этой игре");
+      throw new DomainError({ code: "PLAYER_NOT_FOUND_IN_GAME" });
     }
     return player;
   }
@@ -92,16 +98,7 @@ export class GameServiceContext {
     return `${player.displayName}${player.username ? ` (@${player.username})` : ""}`;
   }
 
-  outcomeLabel(outcome: string): string {
-    if (outcome === "YES") {
-      return "Да";
-    }
-    if (outcome === "NO") {
-      return "Нет";
-    }
-    if (outcome === "GUESSED") {
-      return "Угадал";
-    }
-    return "Сдался";
+  outcomeLabel(outcome: TurnRecord["outcome"]): string {
+    return this.texts.voteOutcome(outcome);
   }
 }

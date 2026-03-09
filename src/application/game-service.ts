@@ -12,6 +12,7 @@ import { ReadyStartStageService } from "./stages/ready-start-stage-service";
 import { WordPreparationStageService } from "./stages/word-preparation-stage-service";
 import { ConfigDraftStore } from "./stores/config-draft-store";
 import { PrivateExpectationStore } from "./stores/private-expectation-store";
+import { TextService } from "./text-service";
 
 interface ActorInput {
   telegramUserId: string;
@@ -36,6 +37,7 @@ export class GameService {
     private readonly idPort: IdPort,
     private readonly clock: ClockPort,
     private readonly logger: LoggerPort,
+    private readonly texts: TextService,
     private readonly limits: { minPlayers: number; maxPlayers: number },
   ) {
     this.context = new GameServiceContext({
@@ -47,6 +49,7 @@ export class GameService {
       idPort,
       clock,
       logger,
+      texts,
       limits,
     });
 
@@ -84,7 +87,7 @@ export class GameService {
     const game = this.transactionRunner.runInTransaction(() => {
       const existing = this.repository.findActiveByChatId(chatId);
       if (existing) {
-        throw new DomainError("В этом чате уже идет активная игра. Завершите ее перед стартом новой.");
+        throw new DomainError({ code: "ACTIVE_GAME_ALREADY_EXISTS_IN_CHAT" });
       }
 
       const next = this.engine.createGame({
@@ -98,10 +101,7 @@ export class GameService {
       return next;
     });
 
-    await this.notifier.sendGroupMessage(
-      chatId,
-      `Игра запущена. Создатель: ${player.displayName}. Для входа используйте /join.`,
-    );
+    await this.notifier.sendGroupMessage(chatId, this.texts.gameStarted(player.displayName));
 
     this.logger.info("game_started", { gameId: game.id, chatId, creator: player.id });
   }
@@ -121,10 +121,7 @@ export class GameService {
       return updated;
     });
 
-    await this.notifier.sendGroupMessage(
-      chatId,
-      `${player.displayName} присоединился. Игроков: ${game.players.length}.`,
-    );
+    await this.notifier.sendGroupMessage(chatId, this.texts.playerJoined(player.displayName, game.players.length));
   }
 
   async beginConfiguration(chatId: string, actorTelegramUserId: string): Promise<void> {
@@ -143,12 +140,15 @@ export class GameService {
       return;
     }
 
-    await this.notifier.sendGroupMessage(chatId, "Набор игроков закрыт. Создатель настраивает режим в ЛС бота.");
+    await this.notifier.sendGroupMessage(chatId, this.texts.lobbyClosedConfiguringInPrivate());
 
     const ok = await this.notifier.sendPrivateKeyboard(
       creator.telegramUserId,
-      "Выберите режим игры:",
-      [[{ text: "Обычный", data: `cfg:mode:NORMAL:${game.id}` }], [{ text: "Обратный", data: `cfg:mode:REVERSE:${game.id}` }]],
+      this.texts.chooseGameModePrompt(),
+      [
+        [{ text: this.texts.gameModeButton("NORMAL"), data: `cfg:mode:NORMAL:${game.id}` }],
+        [{ text: this.texts.gameModeButton("REVERSE"), data: `cfg:mode:REVERSE:${game.id}` }],
+      ],
     );
 
     if (!ok) {
@@ -158,10 +158,7 @@ export class GameService {
         this.repository.update(current);
       });
 
-      await this.notifier.sendGroupMessage(
-        chatId,
-        `Создатель не открыл ЛС с ботом. Откройте: ${this.notifier.buildBotDeepLink()}`,
-      );
+      await this.notifier.sendGroupMessage(chatId, this.texts.creatorDmRequired(this.notifier.buildBotDeepLink()));
     }
   }
 
@@ -200,11 +197,11 @@ export class GameService {
     }
 
     if (matched.length === 0) {
-      await this.notifier.sendPrivateMessage(telegramUserId, "Активных игр для вас не найдено.");
+      await this.notifier.sendPrivateMessage(telegramUserId, this.texts.noActiveGamesForUser());
       return;
     }
 
-    await this.notifier.sendPrivateMessage(telegramUserId, "ЛС активирован. Если вы в игре, продолжайте шаги здесь.");
+    await this.notifier.sendPrivateMessage(telegramUserId, this.texts.privateChatActivated());
   }
 
   async recoverManualPairingPromptsOnStartup(): Promise<void> {
@@ -232,7 +229,7 @@ export class GameService {
   async handleVote(gameId: string, telegramUserId: string, decision: VoteDecision): Promise<void> {
     const game = this.context.requireGameById(gameId);
     if (!game.config?.mode) {
-      throw new DomainError("Конфигурация игры не задана");
+      throw new DomainError({ code: "GAME_CONFIGURATION_NOT_SET" });
     }
 
     await this.getModeService(game.config.mode).handleVote(gameId, telegramUserId, decision);
@@ -245,7 +242,7 @@ export class GameService {
     }
 
     if (game.stage !== "IN_PROGRESS") {
-      await this.notifier.sendGroupMessage(chatId, "Команда /giveup доступна только во время игрового этапа.");
+      await this.notifier.sendGroupMessage(chatId, this.texts.giveUpOnlyDuringGame());
       return;
     }
 
@@ -264,7 +261,7 @@ export class GameService {
 
     const actor = this.context.requirePlayerByTelegram(game, telegramUserId);
     if (actor.id !== game.creatorPlayerId) {
-      throw new DomainError("Только создатель игры может отменить игру");
+      throw new DomainError({ code: "ONLY_GAME_CREATOR_CAN_CANCEL" });
     }
 
     const updated = this.transactionRunner.runInTransaction(() => {
@@ -274,13 +271,13 @@ export class GameService {
       return next;
     });
 
-    await this.notifier.sendGroupMessage(updated.chatId, "Игра отменена создателем.");
+    await this.notifier.sendGroupMessage(updated.chatId, this.texts.gameCancelledByCreator());
   }
 
   private getModeService(mode: GameMode): GameModeService {
     const service = this.modeServices.get(mode);
     if (!service) {
-      throw new DomainError(`Неизвестный режим игры: ${mode}`);
+      throw new DomainError({ code: "UNKNOWN_GAME_MODE", params: { mode } });
     }
     return service;
   }

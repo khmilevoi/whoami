@@ -2,8 +2,6 @@ import { GameState } from "../../domain/types";
 import { GameServiceContext } from "../game-service-context";
 import { WordPreparationStageService } from "./word-preparation-stage-service";
 
-export const MANUAL_PAIR_PROMPT_TEXT = "Выберите игрока, которому загадываете слово:";
-
 export class NormalPairingStageService {
   constructor(
     private readonly context: GameServiceContext,
@@ -24,7 +22,7 @@ export class NormalPairingStageService {
       return;
     }
 
-    await this.context.notifier.sendGroupMessage(updated.chatId, "Ручное распределение завершено. Переходим к вводу слов.");
+    await this.context.notifier.sendGroupMessage(updated.chatId, this.context.texts.manualPairingCompleted());
     await this.wordPreparationStage.promptWordCollection(updated);
   }
 
@@ -61,11 +59,11 @@ export class NormalPairingStageService {
       .filter((player) => !usedTargets.has(player.id))
       .map((player) => [{ text: this.context.playerLabel(game, player.id), data: `pair:${player.id}:${game.id}` }]);
 
-    const ok = await this.context.notifier.sendPrivateKeyboard(chooser.telegramUserId, MANUAL_PAIR_PROMPT_TEXT, buttons);
+    const ok = await this.context.notifier.sendPrivateKeyboard(chooser.telegramUserId, this.context.texts.manualPairPrompt(), buttons);
     if (!ok) {
       await this.context.notifier.sendGroupMessage(
         game.chatId,
-        `${this.context.playerLabel(game, chooser.id)} не открыл ЛС. Откройте: ${this.context.notifier.buildBotDeepLink()}`,
+        this.context.texts.dmLinkRequired(this.context.playerLabel(game, chooser.id), this.context.notifier.buildBotDeepLink()),
       );
     }
   }

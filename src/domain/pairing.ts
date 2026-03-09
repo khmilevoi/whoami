@@ -2,7 +2,7 @@ import { DomainError } from "./errors";
 
 export const buildRandomDerangement = (playerIds: string[]): Record<string, string> => {
   if (playerIds.length < 2) {
-    throw new DomainError("Need at least two players to build pairings");
+    throw new DomainError({ code: "NEED_AT_LEAST_TWO_PLAYERS_FOR_PAIRINGS" });
   }
 
   const shuffled = [...playerIds];
@@ -35,17 +35,17 @@ export const validateManualPairChoice = (
   allPlayerIds: string[],
 ): void => {
   if (!allPlayerIds.includes(chooserId) || !allPlayerIds.includes(targetId)) {
-    throw new DomainError("Unknown player in manual pairing");
+    throw new DomainError({ code: "UNKNOWN_PLAYER_IN_MANUAL_PAIRING" });
   }
   if (chooserId === targetId) {
-    throw new DomainError("Player cannot pair with self");
+    throw new DomainError({ code: "PLAYER_CANNOT_PAIR_WITH_SELF" });
   }
   if (existingPairings[chooserId]) {
-    throw new DomainError("Player has already selected a pair");
+    throw new DomainError({ code: "PLAYER_HAS_ALREADY_SELECTED_A_PAIR" });
   }
 
   const selectedTargets = new Set(Object.values(existingPairings));
   if (selectedTargets.has(targetId)) {
-    throw new DomainError("Selected target is already taken");
+    throw new DomainError({ code: "SELECTED_TARGET_IS_ALREADY_TAKEN" });
   }
 };

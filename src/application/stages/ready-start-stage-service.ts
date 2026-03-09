@@ -33,7 +33,7 @@ export class ReadyStartStageService {
     }
 
     await modeService.beforeFirstTurn(started.game);
-    await this.context.notifier.sendGroupMessage(started.game.chatId, "Все готовы. Игра начинается.");
+    await this.context.notifier.sendGroupMessage(started.game.chatId, this.context.texts.allReadyGameStarts());
     await modeService.announceCurrentTurn(started.game);
   }
 }

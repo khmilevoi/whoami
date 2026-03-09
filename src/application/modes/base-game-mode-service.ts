@@ -58,7 +58,7 @@ export abstract class BaseGameModeService implements GameModeService {
 
     const lastTurn = updated.turns[updated.turns.length - 1];
     if (lastTurn) {
-      await this.context.notifier.sendGroupMessage(updated.chatId, `Итог голосования: ${this.context.outcomeLabel(lastTurn.outcome)}.`);
+      await this.context.notifier.sendGroupMessage(updated.chatId, this.context.texts.voteSummary(lastTurn.outcome));
     }
 
     if (updated.stage === "FINISHED") {
@@ -76,7 +76,7 @@ export abstract class BaseGameModeService implements GameModeService {
     }
 
     if (game.stage !== "IN_PROGRESS") {
-      await this.context.notifier.sendGroupMessage(chatId, "Команда /giveup доступна только во время игрового этапа.");
+      await this.context.notifier.sendGroupMessage(chatId, this.context.texts.giveUpOnlyDuringGame());
       return;
     }
 
@@ -93,7 +93,7 @@ export abstract class BaseGameModeService implements GameModeService {
       return next;
     });
 
-    await this.context.notifier.sendGroupMessage(chatId, `${player.displayName} сдался.`);
+    await this.context.notifier.sendGroupMessage(chatId, this.context.texts.playerGaveUp(player.displayName));
 
     if (updated.stage === "FINISHED") {
       await this.sendFinalSummary(updated);

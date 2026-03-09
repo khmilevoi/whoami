@@ -2,21 +2,11 @@ import { Bot, Context } from "grammy";
 import { TelegramCommandSync } from "./telegram-command-sync";
 import { GameService } from "../../application/game-service";
 import { LoggerPort } from "../../application/ports";
+import { TextService } from "../../application/text-service";
 import { DomainError } from "../../domain/errors";
 import { parseManualPairPayload } from "./manual-pair-payload";
 
 type GroupMessageReadStatus = "enabled" | "disabled" | "unknown";
-
-const ONLINE_DISABLED_MESSAGE = [
-  "Онлайн-режим недоступен: у бота включен privacy mode, поэтому он не видит обычные сообщения в группе.",
-  "Отключите его в @BotFather: /mybots -> ваш бот -> Bot Settings -> Group Privacy -> Turn off.",
-  "После этого повторите выбор онлайн-режима.",
-].join("\n");
-
-const ONLINE_UNKNOWN_MESSAGE = [
-  "Онлайн-режим временно недоступен: не удалось проверить, может ли бот читать сообщения в группе.",
-  "Проверьте настройки в @BotFather (Group Privacy: Turn off) и повторите попытку.",
-].join("\n");
 
 const asActor = (ctx: Context) => ({
   telegramUserId: String(ctx.from?.id ?? ""),
@@ -93,6 +83,7 @@ const createSyncFinalizer = (
 const execute = async (
   ctx: Context,
   logger: LoggerPort,
+  texts: TextService,
   action: () => Promise<void>,
   onFinally?: () => Promise<void>,
 ): Promise<void> => {
@@ -100,7 +91,7 @@ const execute = async (
     await action();
   } catch (error) {
     if (error instanceof DomainError) {
-      await safeReply(ctx, error.message);
+      await safeReply(ctx, texts.renderError(error.error));
       return;
     }
 
@@ -109,7 +100,7 @@ const execute = async (
       updateId: ctx.update.update_id,
     });
 
-    await safeReply(ctx, "Произошла ошибка. Попробуйте еще раз.");
+    await safeReply(ctx, texts.genericErrorRetry());
   } finally {
     if (onFinally) {
       await onFinally();
@@ -170,6 +161,7 @@ export const registerTelegramHandlers = (
   bot: Bot,
   gameService: GameService,
   logger: LoggerPort,
+  texts: TextService,
   commandSync?: TelegramCommandSync,
 ): void => {
   const resolveGroupMessageReadStatus = createGroupMessageReadStatusResolver(bot, logger);
@@ -179,6 +171,7 @@ export const registerTelegramHandlers = (
     await execute(
       ctx,
       logger,
+      texts,
       async () => {
         if (isPrivate(ctx)) {
           await gameService.handlePrivateStart(String(ctx.from!.id));
@@ -193,14 +186,15 @@ export const registerTelegramHandlers = (
     await execute(
       ctx,
       logger,
+      texts,
       async () => {
         if (!isGroupChat(ctx)) {
-          await safeReply(ctx, "Эта команда доступна только в групповом чате.");
+          await safeReply(ctx, texts.groupOnlyCommand());
           return;
         }
 
         await gameService.startGame(String(ctx.chat!.id), asActor(ctx));
-        await safeReply(ctx, "Игра создана.");
+        await safeReply(ctx, texts.gameCreatedAck());
       },
       finalizeSync,
     );
@@ -211,13 +205,14 @@ export const registerTelegramHandlers = (
     await execute(
       ctx,
       logger,
+      texts,
       async () => {
         if (!isGroupChat(ctx)) {
           return;
         }
 
         await gameService.joinGame(String(ctx.chat!.id), asActor(ctx));
-        await safeReply(ctx, "Вы в игре.");
+        await safeReply(ctx, texts.joinedGameAck());
       },
       finalizeSync,
     );
@@ -228,13 +223,14 @@ export const registerTelegramHandlers = (
     await execute(
       ctx,
       logger,
+      texts,
       async () => {
         if (!isGroupChat(ctx)) {
           return;
         }
 
         await gameService.beginConfiguration(String(ctx.chat!.id), String(ctx.from!.id));
-        await safeReply(ctx, "Настройка отправлена в ЛС создателю.");
+        await safeReply(ctx, texts.configSentToCreatorAck());
       },
       finalizeSync,
     );
@@ -245,13 +241,14 @@ export const registerTelegramHandlers = (
     await execute(
       ctx,
       logger,
+      texts,
       async () => {
         if (!isGroupChat(ctx)) {
           return;
         }
 
         await gameService.cancel(String(ctx.chat!.id), String(ctx.from!.id));
-        await safeReply(ctx, "Игра отменена.");
+        await safeReply(ctx, texts.gameCancelledAck());
       },
       finalizeSync,
     );
@@ -262,6 +259,7 @@ export const registerTelegramHandlers = (
     await execute(
       ctx,
       logger,
+      texts,
       async () => {
         if (!isGroupChat(ctx)) {
           return;
@@ -277,6 +275,7 @@ export const registerTelegramHandlers = (
     await execute(
       ctx,
       logger,
+      texts,
       async () => {
         if (!isGroupChat(ctx)) {
           return;
@@ -292,6 +291,7 @@ export const registerTelegramHandlers = (
     await execute(
       ctx,
       logger,
+      texts,
       async () => {
         const text = ctx.message.text.trim();
         if (text.startsWith("/")) {
@@ -313,6 +313,7 @@ export const registerTelegramHandlers = (
     await execute(
       ctx,
       logger,
+      texts,
       async () => {
         const payload = ctx.callbackQuery.data;
         const fromUser = String(ctx.from!.id);
@@ -323,18 +324,18 @@ export const registerTelegramHandlers = (
           if (key === "play" && value === "ONLINE") {
             const status = await resolveGroupMessageReadStatus();
             if (status === "disabled") {
-              await safeReply(ctx, ONLINE_DISABLED_MESSAGE);
+              await safeReply(ctx, texts.onlineModeDisabledMessage());
               await ctx.answerCallbackQuery({
-                text: "Онлайн недоступен: отключите Group Privacy",
+                text: texts.onlineModeDisabledAlert(),
                 show_alert: true,
               });
               return;
             }
 
             if (status === "unknown") {
-              await safeReply(ctx, ONLINE_UNKNOWN_MESSAGE);
+              await safeReply(ctx, texts.onlineModeUnknownMessage());
               await ctx.answerCallbackQuery({
-                text: "Онлайн недоступен: не удалось проверить настройки",
+                text: texts.onlineModeUnknownAlert(),
                 show_alert: true,
               });
               return;

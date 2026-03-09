@@ -1,6 +1,5 @@
 import { DomainError } from "../../domain/errors";
 import { ConfigureGameInput, GameMode, PairingMode, PlayMode } from "../../domain/types";
-import { gameModeLabel } from "../../domain/stats";
 import { GameServiceContext } from "../game-service-context";
 import { ConfigDraftStore } from "../stores/config-draft-store";
 import { NormalPairingStageService } from "./normal-pairing-stage-service";
@@ -19,7 +18,7 @@ export class ConfigurationStageService {
     const actor = this.context.requirePlayerByTelegram(game, actorTelegramUserId);
 
     if (actor.id !== game.creatorPlayerId) {
-      throw new DomainError("Только создатель игры может настраивать режим");
+      throw new DomainError({ code: "ONLY_GAME_CREATOR_CAN_CONFIGURE" });
     }
 
     const draft = this.configDraftStore.get(gameId);
@@ -43,8 +42,11 @@ export class ConfigurationStageService {
     if (!draft.playMode) {
       await this.context.notifier.sendPrivateKeyboard(
         actorTelegramUserId,
-        "Выберите формат:",
-        [[{ text: "Онлайн", data: `cfg:play:ONLINE:${gameId}` }], [{ text: "Оффлайн", data: `cfg:play:OFFLINE:${gameId}` }]],
+        this.context.texts.choosePlayModePrompt(),
+        [
+          [{ text: this.context.texts.playModeButton("ONLINE"), data: `cfg:play:ONLINE:${gameId}` }],
+          [{ text: this.context.texts.playModeButton("OFFLINE"), data: `cfg:play:OFFLINE:${gameId}` }],
+        ],
       );
       return;
     }
@@ -52,8 +54,11 @@ export class ConfigurationStageService {
     if (draft.mode === "NORMAL" && !draft.pairingMode) {
       await this.context.notifier.sendPrivateKeyboard(
         actorTelegramUserId,
-        "Выберите распределение пар:",
-        [[{ text: "Случайно", data: `cfg:pair:RANDOM:${gameId}` }], [{ text: "Ручной", data: `cfg:pair:MANUAL:${gameId}` }]],
+        this.context.texts.choosePairingModePrompt(),
+        [
+          [{ text: this.context.texts.pairingModeButton("RANDOM"), data: `cfg:pair:RANDOM:${gameId}` }],
+          [{ text: this.context.texts.pairingModeButton("MANUAL"), data: `cfg:pair:MANUAL:${gameId}` }],
+        ],
       );
       return;
     }
@@ -76,9 +81,11 @@ export class ConfigurationStageService {
 
     await this.context.notifier.sendGroupMessage(
       configured.chatId,
-      `Конфигурация сохранена: ${gameModeLabel(configured.config!.mode)}, ${
-        configured.config!.playMode === "ONLINE" ? "онлайн" : "оффлайн"
-      }${configured.config!.pairingMode ? `, пары: ${configured.config!.pairingMode === "RANDOM" ? "случайно" : "ручной"}` : ""}.`,
+      this.context.texts.configSaved({
+        mode: configured.config!.mode,
+        playMode: configured.config!.playMode,
+        pairingMode: configured.config!.pairingMode,
+      }),
     );
 
     if (configured.config?.mode === "NORMAL" && configured.config.pairingMode === "MANUAL" && Object.keys(configured.words).length === 0) {

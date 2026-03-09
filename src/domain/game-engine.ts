@@ -96,7 +96,7 @@ export class GameEngine {
 
   joinGame(game: GameState, player: PlayerIdentity, limits: LobbyLimits, now: string): GameState {
     if (game.stage !== "LOBBY_OPEN") {
-      throw new DomainError("Join is allowed only while lobby is open");
+      throw new DomainError({ code: "JOIN_ALLOWED_ONLY_WHEN_LOBBY_OPEN" });
     }
 
     const existing = game.players.find((p) => p.id === player.id || p.telegramUserId === player.telegramUserId);
@@ -105,7 +105,7 @@ export class GameEngine {
     }
 
     if (game.players.length >= limits.maxPlayers) {
-      throw new DomainError(`Maximum players reached (${limits.maxPlayers})`);
+      throw new DomainError({ code: "MAX_PLAYERS_REACHED", params: { maxPlayers: limits.maxPlayers } });
     }
 
     const next = this.toPlayerState(player, now);
@@ -122,13 +122,13 @@ export class GameEngine {
 
   closeLobby(game: GameState, actorPlayerId: string, limits: LobbyLimits, now: string): GameState {
     if (game.stage !== "LOBBY_OPEN") {
-      throw new DomainError("Lobby already closed");
+      throw new DomainError({ code: "LOBBY_ALREADY_CLOSED" });
     }
     if (actorPlayerId !== game.creatorPlayerId) {
-      throw new DomainError("Only game creator can close lobby");
+      throw new DomainError({ code: "ONLY_GAME_CREATOR_CAN_CLOSE_LOBBY" });
     }
     if (game.players.length < limits.minPlayers) {
-      throw new DomainError(`Need at least ${limits.minPlayers} players to start`);
+      throw new DomainError({ code: "MIN_PLAYERS_REQUIRED_TO_START", params: { minPlayers: limits.minPlayers } });
     }
 
     game.stage = "CONFIGURING";
@@ -137,14 +137,14 @@ export class GameEngine {
 
   configureGame(game: GameState, input: ConfigureGameInput, now: string): GameState {
     if (game.stage !== "CONFIGURING") {
-      throw new DomainError("Game can be configured only after lobby is closed");
+      throw new DomainError({ code: "GAME_CAN_BE_CONFIGURED_ONLY_AFTER_LOBBY_CLOSED" });
     }
     if (input.actorPlayerId !== game.creatorPlayerId) {
-      throw new DomainError("Only game creator can configure game");
+      throw new DomainError({ code: "ONLY_GAME_CREATOR_CAN_CONFIGURE" });
     }
 
     if (input.mode === "NORMAL" && !input.pairingMode) {
-      throw new DomainError("Pairing mode is required for normal mode");
+      throw new DomainError({ code: "PAIRING_MODE_REQUIRED_FOR_NORMAL_MODE" });
     }
 
     game.config = {
@@ -188,13 +188,13 @@ export class GameEngine {
   selectManualPair(game: GameState, chooserPlayerId: string, targetPlayerId: string, now: string): GameState {
     this.mustBeStage(game, "PREPARE_WORDS");
     if (!game.config || game.config.mode !== "NORMAL" || game.config.pairingMode !== "MANUAL") {
-      throw new DomainError("Manual pairing is available only for normal/manual mode");
+      throw new DomainError({ code: "MANUAL_PAIRING_AVAILABLE_ONLY_FOR_NORMAL_MANUAL_MODE" });
     }
 
     const queue = game.preparation.manualPairingQueue;
     const current = queue[game.preparation.manualPairingCursor];
     if (chooserPlayerId !== current) {
-      throw new DomainError("It is not this player's turn to pick a pair");
+      throw new DomainError({ code: "NOT_PLAYERS_TURN_TO_PICK_PAIR" });
     }
 
     validateManualPairChoice(chooserPlayerId, targetPlayerId, game.pairings, queue);
@@ -214,7 +214,7 @@ export class GameEngine {
 
     const normalized = word.trim();
     if (normalized.length < 1) {
-      throw new DomainError("Word cannot be empty");
+      throw new DomainError({ code: "WORD_CANNOT_BE_EMPTY" });
     }
 
     const entry = this.mustGetWordEntry(game, playerId);
@@ -245,7 +245,7 @@ export class GameEngine {
     }
 
     if (!entry.word) {
-      throw new DomainError("Word must be submitted before confirmation");
+      throw new DomainError({ code: "WORD_MUST_BE_SUBMITTED_BEFORE_CONFIRMATION" });
     }
 
     entry.wordConfirmed = true;
@@ -259,7 +259,7 @@ export class GameEngine {
 
     const entry = this.mustGetWordEntry(game, playerId);
     if (!entry.wordConfirmed) {
-      throw new DomainError("Word must be confirmed before clue submission");
+      throw new DomainError({ code: "WORD_MUST_BE_CONFIRMED_BEFORE_CLUE_SUBMISSION" });
     }
 
     entry.clue = clue?.trim() || undefined;
@@ -282,7 +282,7 @@ export class GameEngine {
     }
 
     if (!entry.wordConfirmed) {
-      throw new DomainError("Word must be confirmed before finalization");
+      throw new DomainError({ code: "WORD_MUST_BE_CONFIRMED_BEFORE_FINALIZATION" });
     }
 
     entry.finalConfirmed = true;
@@ -301,14 +301,14 @@ export class GameEngine {
     }
 
     if (!this.allWordsReady(game)) {
-      throw new DomainError("Not all players confirmed words");
+      throw new DomainError({ code: "NOT_ALL_PLAYERS_CONFIRMED_WORDS" });
     }
 
     game.stage = "IN_PROGRESS";
     game.inProgress.round = 1;
 
     if (!game.config) {
-      throw new DomainError("Game configuration is missing");
+      throw new DomainError({ code: "GAME_CONFIGURATION_MISSING" });
     }
 
     if (game.config.mode === "NORMAL") {
@@ -331,22 +331,22 @@ export class GameEngine {
     this.mustBeStage(game, "IN_PROGRESS");
 
     if (!game.config) {
-      throw new DomainError("Game configuration is missing");
+      throw new DomainError({ code: "GAME_CONFIGURATION_MISSING" });
     }
 
     if (game.inProgress.pendingVote) {
-      throw new DomainError("Pending vote must be resolved first");
+      throw new DomainError({ code: "PENDING_VOTE_MUST_BE_RESOLVED_FIRST" });
     }
 
     if (game.config.playMode === "ONLINE" && !input.questionText?.trim()) {
-      throw new DomainError("Question text is required in online mode");
+      throw new DomainError({ code: "QUESTION_TEXT_REQUIRED_IN_ONLINE_MODE" });
     }
 
     const round = game.inProgress.round;
     const asker = this.resolveCurrentAsker(game);
 
     if (input.actorPlayerId !== asker) {
-      throw new DomainError("It is not this player's turn");
+      throw new DomainError({ code: "NOT_PLAYERS_TURN" });
     }
 
     game.progress[asker].questionsAsked += 1;
@@ -367,7 +367,7 @@ export class GameEngine {
     } else {
       const targetId = game.inProgress.currentTargetPlayerId;
       if (!targetId) {
-        throw new DomainError("Reverse mode target is missing");
+        throw new DomainError({ code: "REVERSE_MODE_TARGET_MISSING" });
       }
       game.inProgress.pendingVote = {
         id: input.voteId,
@@ -390,11 +390,11 @@ export class GameEngine {
 
     const pending = game.inProgress.pendingVote;
     if (!pending) {
-      throw new DomainError("No pending vote");
+      throw new DomainError({ code: "NO_PENDING_VOTE" });
     }
 
     if (!pending.eligibleVoterIds.includes(input.voterPlayerId)) {
-      throw new DomainError("Player is not allowed to vote in this poll");
+      throw new DomainError({ code: "PLAYER_NOT_ALLOWED_TO_VOTE" });
     }
 
     if (pending.votes[input.voterPlayerId]) {
@@ -415,7 +415,7 @@ export class GameEngine {
     }
 
     if (!game.config) {
-      throw new DomainError("Game configuration is missing");
+      throw new DomainError({ code: "GAME_CONFIGURATION_MISSING" });
     }
 
     if (game.config.mode === "NORMAL") {
@@ -433,7 +433,7 @@ export class GameEngine {
     this.mustBeStage(game, "IN_PROGRESS");
 
     if (!game.config) {
-      throw new DomainError("Game configuration is missing");
+      throw new DomainError({ code: "GAME_CONFIGURATION_MISSING" });
     }
 
     const round = game.inProgress.round;
@@ -536,7 +536,7 @@ export class GameEngine {
   private resolveReverseVote(game: GameState, pending: PendingVote, turnRecordId: string, now: string): void {
     const targetId = pending.targetWordOwnerId;
     if (!targetId) {
-      throw new DomainError("Reverse vote target is missing");
+      throw new DomainError({ code: "REVERSE_VOTE_TARGET_MISSING" });
     }
 
     const targetDecision = pending.votes[targetId] ?? "NO";
@@ -597,13 +597,13 @@ export class GameEngine {
 
   private resolveCurrentAsker(game: GameState): string {
     if (!game.config) {
-      throw new DomainError("Game configuration is missing");
+      throw new DomainError({ code: "GAME_CONFIGURATION_MISSING" });
     }
 
     if (game.config.mode === "NORMAL") {
       const active = new Set(this.getActiveNormalPlayers(game));
       if (active.size === 0) {
-        throw new DomainError("No active players left");
+        throw new DomainError({ code: "NO_ACTIVE_PLAYERS_LEFT" });
       }
 
       let guard = 0;
@@ -616,12 +616,12 @@ export class GameEngine {
         guard += 1;
       }
 
-      throw new DomainError("Unable to resolve current asker");
+      throw new DomainError({ code: "UNABLE_TO_RESOLVE_CURRENT_ASKER" });
     }
 
     const current = game.inProgress.turnOrder[game.inProgress.turnCursor];
     if (!current) {
-      throw new DomainError("Reverse mode asker is missing");
+      throw new DomainError({ code: "REVERSE_MODE_ASKER_MISSING" });
     }
 
     return current;
@@ -781,20 +781,20 @@ export class GameEngine {
 
   private mustBeWordStage(game: GameState): void {
     if (game.stage !== "PREPARE_WORDS" && game.stage !== "READY_WAIT") {
-      throw new DomainError("Word actions are not available in current stage");
+      throw new DomainError({ code: "WORD_ACTIONS_NOT_AVAILABLE_IN_CURRENT_STAGE" });
     }
   }
 
   private mustBeStage(game: GameState, stage: GameState["stage"]): void {
     if (game.stage !== stage) {
-      throw new DomainError(`Expected stage ${stage}, got ${game.stage}`);
+      throw new DomainError({ code: "EXPECTED_STAGE_MISMATCH", params: { expectedStage: stage, actualStage: game.stage } });
     }
   }
 
   private mustGetPlayer(game: GameState, playerId: string): PlayerState {
     const player = game.players.find((p) => p.id === playerId);
     if (!player) {
-      throw new DomainError("Player not found");
+      throw new DomainError({ code: "PLAYER_NOT_FOUND" });
     }
     return player;
   }
@@ -802,7 +802,7 @@ export class GameEngine {
   private mustGetWordEntry(game: GameState, playerId: string): WordEntry {
     const entry = game.words[playerId];
     if (!entry) {
-      throw new DomainError("Word entry for player is missing");
+      throw new DomainError({ code: "WORD_ENTRY_FOR_PLAYER_MISSING" });
     }
 
     return entry;
@@ -825,4 +825,3 @@ export class GameEngine {
     return game;
   }
 }
-
