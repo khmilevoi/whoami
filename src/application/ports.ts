@@ -6,6 +6,8 @@ export interface GameRepository {
   findById(gameId: string): GameState | null;
   findActiveByChatId(chatId: string): GameState | null;
   listActiveGames(): GameState[];
+  listKnownChatIds(): string[];
+  listKnownTelegramUserIdsByChatId(chatId: string): string[];
 }
 
 export interface TransactionRunner {
@@ -42,4 +44,3 @@ export interface LoggerPort {
   warn(event: string, payload?: Record<string, unknown>): void;
   error(event: string, payload?: Record<string, unknown>): void;
 }
-

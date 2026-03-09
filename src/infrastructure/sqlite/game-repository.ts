@@ -52,6 +52,39 @@ export class SqliteGameRepository implements GameRepository {
     const rows = this.db.prepare(sql).all(...activeStages) as Array<{ state_json: string }>;
     return rows.map((row) => JSON.parse(row.state_json) as GameState);
   }
+
+  listKnownChatIds(): string[] {
+    const rows = this.db
+      .prepare(
+        `
+        SELECT chat_id
+        FROM games
+        GROUP BY chat_id
+        ORDER BY MAX(updated_at) DESC, chat_id ASC
+      `,
+      )
+      .all() as Array<{ chat_id: string }>;
+
+    return rows.map((row) => row.chat_id);
+  }
+
+  listKnownTelegramUserIdsByChatId(chatId: string): string[] {
+    const rows = this.db
+      .prepare(
+        `
+        SELECT DISTINCT p.telegram_user_id
+        FROM games g
+        INNER JOIN game_players gp ON gp.game_id = g.id
+        INNER JOIN players p ON p.id = gp.player_id
+        WHERE g.chat_id = ?
+        ORDER BY p.telegram_user_id ASC
+      `,
+      )
+      .all(chatId) as Array<{ telegram_user_id: string }>;
+
+    return rows.map((row) => row.telegram_user_id);
+  }
+
   private save(game: GameState, isUpdate: boolean): void {
     const snapshot = JSON.stringify(game);
 
@@ -328,4 +361,3 @@ export class SqliteGameRepository implements GameRepository {
     }
   }
 }
-

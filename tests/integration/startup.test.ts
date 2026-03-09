@@ -15,7 +15,7 @@ describe("startup tasks", () => {
     const commandSync = {
       syncPrivateCommands: vi.fn(async () => undefined),
       syncGroupCommands: vi.fn(async () => undefined),
-      syncActiveChats: vi.fn(async () => undefined),
+      syncKnownChats: vi.fn(async () => undefined),
     } as unknown as TelegramCommandSync;
 
     const gameService = {
@@ -32,7 +32,7 @@ describe("startup tasks", () => {
 
     expect(commandSync.syncPrivateCommands).toHaveBeenCalledTimes(1);
     expect(commandSync.syncGroupCommands).toHaveBeenCalledTimes(1);
-    expect(commandSync.syncActiveChats).toHaveBeenCalledTimes(1);
+    expect(commandSync.syncKnownChats).toHaveBeenCalledTimes(1);
     expect(gameService.recoverManualPairingPromptsOnStartup).toHaveBeenCalledTimes(1);
     expect(logger.error).not.toHaveBeenCalled();
   });
@@ -43,7 +43,7 @@ describe("startup tasks", () => {
         throw new Error("sync failed");
       }),
       syncGroupCommands: vi.fn(async () => undefined),
-      syncActiveChats: vi.fn(async () => undefined),
+      syncKnownChats: vi.fn(async () => undefined),
     } as unknown as TelegramCommandSync;
 
     const gameService = {
@@ -68,4 +68,3 @@ describe("startup tasks", () => {
     );
   });
 });
-

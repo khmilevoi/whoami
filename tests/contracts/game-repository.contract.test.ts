@@ -119,6 +119,28 @@ const defineRepositoryContract = (factory: RepoFactory): void => {
     const activeForChat = repo.findActiveByChatId("chat-order");
     expect(activeForChat?.id).toBe("g-older");
   });
+
+  it("returns known chat ids and known users per chat from history", () => {
+    const canceledOld = createGame("g-known-1", "chat-known-a", "2026-01-01T00:00:00.000Z", "11");
+    canceledOld.stage = "CANCELED";
+    canceledOld.updatedAt = "2026-01-01T00:05:00.000Z";
+
+    const activeNew = createGame("g-known-2", "chat-known-a", "2026-01-01T00:10:00.000Z", "22");
+    activeNew.updatedAt = "2026-01-01T00:10:00.000Z";
+
+    const finished = createGame("g-known-3", "chat-known-b", "2026-01-01T00:20:00.000Z", "33");
+    finished.stage = "FINISHED";
+    finished.updatedAt = "2026-01-01T00:20:00.000Z";
+
+    repo.create(canceledOld);
+    repo.create(activeNew);
+    repo.create(finished);
+
+    expect(repo.listKnownChatIds()).toEqual(["chat-known-b", "chat-known-a"]);
+    expect(repo.listKnownTelegramUserIdsByChatId("chat-known-a")).toEqual(["11", "22"]);
+    expect(repo.listKnownTelegramUserIdsByChatId("chat-known-b")).toEqual(["33"]);
+    expect(repo.listKnownTelegramUserIdsByChatId("chat-missing")).toEqual([]);
+  });
 };
 
 describe("game repository contract: fake", () => {

@@ -24,4 +24,12 @@ export class GameQueryService {
   listActiveChatIds(): string[] {
     return [...new Set(this.repository.listActiveGames().map((game) => game.chatId))];
   }
+
+  listKnownChatIds(): string[] {
+    return this.repository.listKnownChatIds();
+  }
+
+  listKnownTelegramUserIdsByChatId(chatId: string): string[] {
+    return this.repository.listKnownTelegramUserIdsByChatId(chatId);
+  }
 }

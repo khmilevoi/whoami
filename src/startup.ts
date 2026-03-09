@@ -12,7 +12,7 @@ export const runStartupTasks = async ({ commandSync, gameService, logger }: Star
   try {
     await commandSync.syncPrivateCommands();
     await commandSync.syncGroupCommands();
-    await commandSync.syncActiveChats();
+    await commandSync.syncKnownChats();
   } catch (error) {
     logger.error("commands_sync_failed", {
       chatId: "startup",
@@ -30,4 +30,3 @@ export const runStartupTasks = async ({ commandSync, gameService, logger }: Star
     });
   }
 };
-

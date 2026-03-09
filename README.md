@@ -34,10 +34,15 @@ Telegram bot for "Кто я?" game.
 - `GET /health`
 - `POST /telegram/webhook`
 
+## ONLINE Mode Requirement
+
+- Online mode requires disabled Telegram Group Privacy (`can_read_all_group_messages = true`).
+- Disable it in @BotFather: `/mybots` -> your bot -> `Bot Settings` -> `Group Privacy` -> `Turn off`.
+- If this setting is enabled (or cannot be verified), ONLINE selection is blocked and OFFLINE remains available.
+
 ## Notes
 
 - Only one active game per group chat is allowed.
 - Game state and history are saved in SQLite.
 - Sensitive steps (word input) run via bot private chat.
 - Group chats always show `/whoami_start` as default command, even before first game.
-

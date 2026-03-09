@@ -89,6 +89,10 @@ export class TelegramCommandSync {
     await this.syncChats(this.queryService.listActiveChatIds());
   }
 
+  async syncKnownChats(): Promise<void> {
+    await this.syncChats(this.queryService.listKnownChatIds());
+  }
+
   async syncChats(chatIds: Iterable<string>): Promise<void> {
     for (const chatId of chatIds) {
       await this.syncChat(chatId);
@@ -128,20 +132,38 @@ export class TelegramCommandSync {
     const previousMembers = this.appliedChatMembers.get(chatId) ?? new Set<string>();
     const nextMembers = new Set([...nextOverrides.keys()].filter((telegramUserId) => (nextOverrides.get(telegramUserId)?.length ?? 0) > 0));
 
-    for (const staleMember of previousMembers) {
+    const cleanupCandidates = new Set(previousMembers);
+    const forceDeleteStaleMemberScopes = game === null;
+
+    if (forceDeleteStaleMemberScopes) {
+      for (const telegramUserId of this.queryService.listKnownTelegramUserIdsByChatId(chatId)) {
+        cleanupCandidates.add(telegramUserId);
+      }
+    }
+
+    for (const staleMember of cleanupCandidates) {
       if (nextMembers.has(staleMember)) {
         continue;
       }
 
-      await this.deleteScope(
-        {
-          type: "chat_member",
-          chat_id: toNumericChatId(chatId),
-          user_id: toNumericUserId(staleMember),
-        },
-        chatId,
-        "stale_member_scope",
-      );
+      try {
+        await this.deleteScope(
+          {
+            type: "chat_member",
+            chat_id: toNumericChatId(chatId),
+            user_id: toNumericUserId(staleMember),
+          },
+          chatId,
+          "stale_member_scope",
+          forceDeleteStaleMemberScopes,
+        );
+      } catch (error) {
+        this.logger.warn("commands_sync_failed_non_blocking", {
+          chatId,
+          scope: `chat_member:${chatId}:${staleMember}`,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     if (nextMembers.size > 0) {
@@ -189,9 +211,9 @@ export class TelegramCommandSync {
     }
   }
 
-  private async deleteScope(scope: TelegramScope, chatId: string, reason: string): Promise<void> {
+  private async deleteScope(scope: TelegramScope, chatId: string, reason: string, force = false): Promise<void> {
     const key = scopeKey(scope);
-    if (!this.appliedScopeCommands.has(key)) {
+    if (!force && !this.appliedScopeCommands.has(key)) {
       this.logger.info("commands_sync_skipped_no_changes", {
         chatId,
         scope: scopeLabel(scope),

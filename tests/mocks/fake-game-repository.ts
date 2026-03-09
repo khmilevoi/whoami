@@ -54,6 +54,44 @@ export class FakeGameRepository implements GameRepository {
       .map((game) => clone(game));
   }
 
+  listKnownChatIds(): string[] {
+    const latestByChat = new Map<string, string>();
+
+    for (const game of this.games.values()) {
+      const previous = latestByChat.get(game.chatId);
+      if (!previous || game.updatedAt > previous) {
+        latestByChat.set(game.chatId, game.updatedAt);
+      }
+    }
+
+    return [...latestByChat.entries()]
+      .sort((left, right) => {
+        const byUpdatedAt = right[1].localeCompare(left[1]);
+        if (byUpdatedAt !== 0) {
+          return byUpdatedAt;
+        }
+
+        return left[0].localeCompare(right[0]);
+      })
+      .map(([chatId]) => chatId);
+  }
+
+  listKnownTelegramUserIdsByChatId(chatId: string): string[] {
+    const userIds = new Set<string>();
+
+    for (const game of this.games.values()) {
+      if (game.chatId !== chatId) {
+        continue;
+      }
+
+      for (const player of game.players) {
+        userIds.add(player.telegramUserId);
+      }
+    }
+
+    return [...userIds].sort((left, right) => left.localeCompare(right));
+  }
+
   private ensureActiveChatConstraint(next: GameState, currentId: string): void {
     if (!activeStages.has(next.stage)) {
       return;

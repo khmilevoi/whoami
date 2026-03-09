@@ -5,6 +5,19 @@ import { LoggerPort } from "../../application/ports";
 import { DomainError } from "../../domain/errors";
 import { parseManualPairPayload } from "./manual-pair-payload";
 
+type GroupMessageReadStatus = "enabled" | "disabled" | "unknown";
+
+const ONLINE_DISABLED_MESSAGE = [
+  "Онлайн-режим недоступен: у бота включен privacy mode, поэтому он не видит обычные сообщения в группе.",
+  "Отключите его в @BotFather: /mybots -> ваш бот -> Bot Settings -> Group Privacy -> Turn off.",
+  "После этого повторите выбор онлайн-режима.",
+].join("\n");
+
+const ONLINE_UNKNOWN_MESSAGE = [
+  "Онлайн-режим временно недоступен: не удалось проверить, может ли бот читать сообщения в группе.",
+  "Проверьте настройки в @BotFather (Group Privacy: Turn off) и повторите попытку.",
+].join("\n");
+
 const asActor = (ctx: Context) => ({
   telegramUserId: String(ctx.from?.id ?? ""),
   username: ctx.from?.username,
@@ -104,12 +117,63 @@ const execute = async (
   }
 };
 
+const createGroupMessageReadStatusResolver = (
+  bot: Bot,
+  logger: LoggerPort,
+): (() => Promise<GroupMessageReadStatus>) => {
+  let cached: GroupMessageReadStatus | null = null;
+  let inFlight: Promise<GroupMessageReadStatus> | null = null;
+
+  return async () => {
+    if (cached) {
+      return cached;
+    }
+
+    if (inFlight) {
+      return inFlight;
+    }
+
+    inFlight = (async () => {
+      try {
+        const me = await bot.api.getMe();
+        if (me.can_read_all_group_messages === true) {
+          cached = "enabled";
+          return cached;
+        }
+
+        if (me.can_read_all_group_messages === false) {
+          cached = "disabled";
+          return cached;
+        }
+
+        logger.warn("telegram_group_read_capability_unknown", {
+          reason: "missing_can_read_all_group_messages_flag",
+        });
+        cached = "unknown";
+        return cached;
+      } catch (error) {
+        logger.error("telegram_group_read_capability_check_failed", {
+          reason: error instanceof Error ? error.message : String(error),
+        });
+        cached = "unknown";
+        return cached;
+      } finally {
+        inFlight = null;
+      }
+    })();
+
+    return inFlight;
+  };
+};
+
 export const registerTelegramHandlers = (
   bot: Bot,
   gameService: GameService,
   logger: LoggerPort,
   commandSync?: TelegramCommandSync,
 ): void => {
+  const resolveGroupMessageReadStatus = createGroupMessageReadStatusResolver(bot, logger);
+
   bot.command("start", async (ctx) => {
     const finalizeSync = createSyncFinalizer(ctx, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
     await execute(
@@ -256,6 +320,27 @@ export const registerTelegramHandlers = (
         const parts = payload.split(":");
         if (parts[0] === "cfg") {
           const [, key, value, gameId] = parts;
+          if (key === "play" && value === "ONLINE") {
+            const status = await resolveGroupMessageReadStatus();
+            if (status === "disabled") {
+              await safeReply(ctx, ONLINE_DISABLED_MESSAGE);
+              await ctx.answerCallbackQuery({
+                text: "Онлайн недоступен: отключите Group Privacy",
+                show_alert: true,
+              });
+              return;
+            }
+
+            if (status === "unknown") {
+              await safeReply(ctx, ONLINE_UNKNOWN_MESSAGE);
+              await ctx.answerCallbackQuery({
+                text: "Онлайн недоступен: не удалось проверить настройки",
+                show_alert: true,
+              });
+              return;
+            }
+          }
+
           await gameService.applyConfigStep(gameId, fromUser, key as "mode" | "play" | "pair", value);
           await ctx.answerCallbackQuery();
           return;
@@ -299,6 +384,3 @@ export const registerTelegramHandlers = (
     );
   });
 };
-
-
-
