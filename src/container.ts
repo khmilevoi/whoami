@@ -5,7 +5,16 @@ import { AppConfig, loadConfig } from "./config";
 import { ChatCommandResolver } from "./application/chat-command-resolver";
 import { GameQueryService } from "./application/game-query-service";
 import { GameService } from "./application/game-service";
+import { GameServiceContext } from "./application/game-service-context";
 import { ClockPort, GameRepository, IdentityPort, LoggerPort, NotifierPort, TransactionRunner } from "./application/ports";
+import { NormalModeService } from "./application/modes/normal-mode-service";
+import { ReverseModeService } from "./application/modes/reverse-mode-service";
+import { ConfigurationStageService } from "./application/stages/configuration-stage-service";
+import { NormalPairingStageService } from "./application/stages/normal-pairing-stage-service";
+import { ReadyStartStageService } from "./application/stages/ready-start-stage-service";
+import { WordPreparationStageService } from "./application/stages/word-preparation-stage-service";
+import { ConfigDraftStore } from "./application/stores/config-draft-store";
+import { PrivateExpectationStore } from "./application/stores/private-expectation-store";
 import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync";
 import { TelegramNotifier } from "./adapters/telegram/telegram-notifier";
 import { GameEngine } from "./domain/game-engine";
@@ -32,6 +41,17 @@ interface ServiceCradle extends BaseCradle {
   idPort: NanoIdPort;
   clock: ClockPort;
   logger: LoggerPort;
+}
+
+interface InternalCradle extends ServiceCradle {
+  gameServiceContext: GameServiceContext;
+  configDraftStore: ConfigDraftStore;
+  expectationStore: PrivateExpectationStore;
+  normalModeService: NormalModeService;
+  reverseModeService: ReverseModeService;
+  readyStartStage: ReadyStartStageService;
+  wordPreparationStage: WordPreparationStageService;
+  normalPairingStage: NormalPairingStageService;
 }
 
 interface CommandsCradle extends BaseCradle {
@@ -66,6 +86,54 @@ export const buildContainer = (externalConfig?: AppConfig) => {
     identity: asClass(TelegramIdentityPort, { lifetime: Lifetime.SINGLETON }),
     notifier: asFunction(
       ({ bot, config }: BaseCradle) => new TelegramNotifier(bot, config.botUsername),
+      { lifetime: Lifetime.SINGLETON },
+    ),
+    gameServiceContext: asFunction(
+      ({ engine, repository, transactionRunner, notifier, identity, idPort, clock, logger, config }: ServiceCradle) =>
+        new GameServiceContext({
+          engine,
+          repository,
+          transactionRunner,
+          notifier,
+          identity,
+          idPort,
+          clock,
+          logger,
+          limits: {
+            minPlayers: config.minPlayers,
+            maxPlayers: config.maxPlayers,
+          },
+        }),
+      { lifetime: Lifetime.SINGLETON },
+    ),
+    configDraftStore: asClass(ConfigDraftStore, { lifetime: Lifetime.SINGLETON }),
+    expectationStore: asClass(PrivateExpectationStore, { lifetime: Lifetime.SINGLETON }),
+    normalModeService: asFunction(
+      ({ gameServiceContext }: { gameServiceContext: GameServiceContext }) => new NormalModeService(gameServiceContext),
+      { lifetime: Lifetime.SINGLETON },
+    ),
+    reverseModeService: asFunction(
+      ({ gameServiceContext }: { gameServiceContext: GameServiceContext }) => new ReverseModeService(gameServiceContext),
+      { lifetime: Lifetime.SINGLETON },
+    ),
+    readyStartStage: asFunction(
+      ({ gameServiceContext, normalModeService, reverseModeService }: InternalCradle) =>
+        new ReadyStartStageService(gameServiceContext, [normalModeService, reverseModeService]),
+      { lifetime: Lifetime.SINGLETON },
+    ),
+    wordPreparationStage: asFunction(
+      ({ gameServiceContext, expectationStore, readyStartStage }: InternalCradle) =>
+        new WordPreparationStageService(gameServiceContext, expectationStore, readyStartStage),
+      { lifetime: Lifetime.SINGLETON },
+    ),
+    normalPairingStage: asFunction(
+      ({ gameServiceContext, wordPreparationStage }: InternalCradle) =>
+        new NormalPairingStageService(gameServiceContext, wordPreparationStage),
+      { lifetime: Lifetime.SINGLETON },
+    ),
+    configurationStage: asFunction(
+      ({ gameServiceContext, configDraftStore, normalPairingStage, wordPreparationStage }: InternalCradle) =>
+        new ConfigurationStageService(gameServiceContext, configDraftStore, normalPairingStage, wordPreparationStage),
       { lifetime: Lifetime.SINGLETON },
     ),
     queryService: asFunction(({ repository }: { repository: GameRepository }) => new GameQueryService(repository), {

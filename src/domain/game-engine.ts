@@ -628,7 +628,7 @@ export class GameEngine {
   }
 
   private getNormalEligibleVoters(game: GameState, askerPlayerId: string): string[] {
-    return this.getActiveNormalPlayers(game).filter((id) => id !== askerPlayerId);
+    return game.players.filter((player) => player.id !== askerPlayerId && player.stage !== "GAVE_UP").map((player) => player.id);
   }
 
   private getActiveNormalPlayers(game: GameState): string[] {
