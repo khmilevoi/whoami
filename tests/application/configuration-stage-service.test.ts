@@ -1,41 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { createGameServiceComponentHarness } from "./game-service-components.harness.js";
-import {
-  SentPrivateKeyboard,
-  SentPrivateMessage,
-} from "../mocks/fake-notifier.js";
-import { mustBeDefined, mustGetAt } from "../support/strict-helpers.js";
+
+const setupLobby = async () => {
+  const components = createGameServiceComponentHarness();
+  const actors = components.game.createActors(3);
+  const creator = actors[0]!;
+
+  await components.game.service.startGame("chat-config", creator);
+  await components.game.service.joinGame("chat-config", actors[1]!);
+  await components.game.service.joinGame("chat-config", actors[2]!);
+  await components.game.service.beginConfiguration(
+    "chat-config",
+    creator.telegramUserId,
+  );
+
+  return {
+    components,
+    actors,
+    game: components.game.getGameByChat("chat-config"),
+  };
+};
 
 describe("configuration stage service", () => {
-  it("requests play mode, then pairing mode, then configures normal random game", async () => {
-    const components = createGameServiceComponentHarness();
-    const chatId = "chat-config-normal";
-    const actors = [
-      components.game.createActor(1),
-      components.game.createActor(2),
-      components.game.createActor(3),
-    ];
-    const creator = mustGetAt(actors, 0, "Expected configuration creator");
-    const secondActor = mustGetAt(
-      actors,
-      1,
-      "Expected second configuration actor",
-    );
-    const thirdActor = mustGetAt(
-      actors,
-      2,
-      "Expected third configuration actor",
-    );
-
-    await components.game.service.startGame(chatId, creator);
-    await components.game.service.joinGame(chatId, secondActor);
-    await components.game.service.joinGame(chatId, thirdActor);
-    await components.game.service.beginConfiguration(
-      chatId,
-      creator.telegramUserId,
-    );
-
-    const game = components.game.getGameByChat(chatId);
+  it("stores NORMAL draft choices until the final pairing step and then configures random pairings", async () => {
+    const { components, actors, game } = await setupLobby();
+    const creator = actors[0]!;
 
     await components.configurationStage.applyConfigStep(
       game.id,
@@ -44,17 +33,8 @@ describe("configuration stage service", () => {
       "NORMAL",
     );
 
-    const playPrompt = mustBeDefined(
-      components.game.notifier.sent
-        .filter(
-          (entry): entry is SentPrivateKeyboard =>
-            entry.kind === "private-keyboard" &&
-            entry.userId === creator.telegramUserId,
-        )
-        .at(-1),
-      "Expected play mode prompt",
-    );
-    expect(playPrompt.text).toBe("Выберите формат:");
+    expect(components.configDraftStore.get(game.id)).toEqual({ mode: "NORMAL" });
+    expect(components.game.getGameById(game.id).config).toBeUndefined();
 
     await components.configurationStage.applyConfigStep(
       game.id,
@@ -63,17 +43,11 @@ describe("configuration stage service", () => {
       "ONLINE",
     );
 
-    const pairPrompt = mustBeDefined(
-      components.game.notifier.sent
-        .filter(
-          (entry): entry is SentPrivateKeyboard =>
-            entry.kind === "private-keyboard" &&
-            entry.userId === creator.telegramUserId,
-        )
-        .at(-1),
-      "Expected pairing prompt",
-    );
-    expect(pairPrompt.text).toBe("Выберите распределение пар:");
+    expect(components.configDraftStore.get(game.id)).toEqual({
+      mode: "NORMAL",
+      playMode: "ONLINE",
+    });
+    expect(components.game.getGameById(game.id).config).toBeUndefined();
 
     await components.configurationStage.applyConfigStep(
       game.id,
@@ -83,45 +57,20 @@ describe("configuration stage service", () => {
     );
 
     const configured = components.game.getGameById(game.id);
+    expect(components.configDraftStore.get(game.id)).toEqual({});
     expect(configured.config).toEqual({
       mode: "NORMAL",
       playMode: "ONLINE",
       pairingMode: "RANDOM",
     });
-
-    const wordPrompts = components.game.notifier.sent.filter(
-      (entry): entry is SentPrivateMessage =>
-        entry.kind === "private-message" &&
-        entry.text === "Введите слово для игры:",
-    );
-    expect(wordPrompts).toHaveLength(actors.length);
+    expect(configured.stage).toBe("PREPARE_WORDS");
+    expect(Object.keys(configured.pairings)).toHaveLength(configured.players.length);
+    expect(Object.keys(configured.words)).toHaveLength(configured.players.length);
   });
 
-  it("skips pairing step for reverse mode and starts word collection immediately", async () => {
-    const components = createGameServiceComponentHarness();
-    const chatId = "chat-config-reverse";
-    const actors = [
-      components.game.createActor(1),
-      components.game.createActor(2),
-      components.game.createActor(3),
-    ];
-    const creator = mustGetAt(
-      actors,
-      0,
-      "Expected reverse configuration creator",
-    );
-    const secondActor = mustGetAt(actors, 1, "Expected second reverse actor");
-    const thirdActor = mustGetAt(actors, 2, "Expected third reverse actor");
-
-    await components.game.service.startGame(chatId, creator);
-    await components.game.service.joinGame(chatId, secondActor);
-    await components.game.service.joinGame(chatId, thirdActor);
-    await components.game.service.beginConfiguration(
-      chatId,
-      creator.telegramUserId,
-    );
-
-    const game = components.game.getGameByChat(chatId);
+  it("configures REVERSE mode immediately after the play-mode step without manual pairing state", async () => {
+    const { components, actors, game } = await setupLobby();
+    const creator = actors[0]!;
 
     await components.configurationStage.applyConfigStep(
       game.id,
@@ -137,19 +86,21 @@ describe("configuration stage service", () => {
     );
 
     const configured = components.game.getGameById(game.id);
+    expect(components.configDraftStore.get(game.id)).toEqual({});
     expect(configured.config).toEqual({
       mode: "REVERSE",
       playMode: "OFFLINE",
       pairingMode: undefined,
     });
-    expect(Object.keys(configured.words)).toHaveLength(actors.length);
-
-    expect(
-      components.game.notifier.sent.some(
-        (entry) =>
-          entry.kind === "private-keyboard" &&
-          entry.text === "Выберите распределение пар:",
-      ),
-    ).toBe(false);
+    expect(configured.preparation.manualPairingQueue).toEqual([]);
+    expect(Object.keys(configured.words)).toEqual(
+      configured.players.map((player) => player.id),
+    );
+    for (const player of configured.players) {
+      expect(configured.words[player.id]).toMatchObject({
+        ownerPlayerId: player.id,
+        targetPlayerId: player.id,
+      });
+    }
   });
 });

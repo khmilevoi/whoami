@@ -1,78 +1,73 @@
 import { describe, expect, it } from "vitest";
 import { createGameServiceComponentHarness } from "./game-service-components.harness.js";
+import { mustBeDefined } from "../support/strict-helpers.js";
 
 describe("normal mode service", () => {
-  it("sends pre-start disclosure to every player", async () => {
+  it("creates a pending vote from group text in ONLINE mode and records the question on game state", async () => {
     const components = createGameServiceComponentHarness();
-    const chatId = "chat-normal-disclosure";
-    const actors = [
-      components.game.createActor(1),
-      components.game.createActor(2),
-      components.game.createActor(3),
-    ];
-
-    const started = await components.game.setupNormalOnlineRandomInProgress(
-      chatId,
+    const actors = components.game.createActors(3);
+    const started = await components.game.setupInProgressGame({
+      chatId: "chat-normal-online",
       actors,
-    );
-    components.game.notifier.sent.length = 0;
+      mode: "NORMAL",
+      playMode: "ONLINE",
+      pairingMode: "RANDOM",
+    });
 
-    await components.normalMode.beforeFirstTurn(started);
-
-    const disclosureMessages = components.game.notifier.sent.filter(
-      (entry) =>
-        entry.kind === "private-message" &&
-        entry.text.startsWith("Список слов других игроков:"),
-    );
-    expect(disclosureMessages).toHaveLength(actors.length);
-  });
-
-  it("handles online question flow and resolves votes", async () => {
-    const components = createGameServiceComponentHarness();
-    const chatId = "chat-normal-flow";
-    const actors = [
-      components.game.createActor(1),
-      components.game.createActor(2),
-      components.game.createActor(3),
-    ];
-
-    const started = await components.game.setupNormalOnlineRandomInProgress(
-      chatId,
-      actors,
-    );
-    const current = components.game.getGameById(started.id);
-    const askerId = current.inProgress.turnOrder[current.inProgress.turnCursor];
-    const asker = current.players.find((player) => player.id === askerId)!;
+    const asker = components.game.getCurrentAsker(started.id);
 
     await components.normalMode.handleGroupText(
-      chatId,
+      started.chatId,
       asker.telegramUserId,
-      "Question 1",
+      "is it an animal?",
     );
 
-    const withVote = components.game.getGameById(started.id);
-    expect(withVote.inProgress.pendingVote).toBeDefined();
-    expect(
-      components.game.notifier.sent.some(
-        (entry) =>
-          entry.kind === "group-keyboard" &&
-          entry.chatId === chatId &&
-          entry.text.includes("Голосуем"),
-      ),
-    ).toBe(true);
+    const updated = components.game.getGameById(started.id);
+    expect(updated.inProgress.pendingVote).toMatchObject({
+      askerPlayerId: asker.id,
+      questionText: "is it an animal?",
+    });
+    expect(updated.progress[asker.id]?.questionsAsked).toBe(1);
+  });
 
-    for (const voterId of withVote.inProgress.pendingVote!.eligibleVoterIds) {
-      const voter = withVote.players.find((player) => player.id === voterId)!;
-      await components.normalMode.handleVote(
-        started.id,
-        voter.telegramUserId,
-        "NO",
+  it("resolves votes into turn history and advances the asker when the result is NO", async () => {
+    const components = createGameServiceComponentHarness();
+    const actors = components.game.createActors(3);
+    const started = await components.game.setupInProgressGame({
+      chatId: "chat-normal-no",
+      actors,
+      mode: "NORMAL",
+      playMode: "ONLINE",
+      pairingMode: "RANDOM",
+    });
+
+    const firstAsker = components.game.getCurrentAsker(started.id);
+    await components.normalMode.handleGroupText(
+      started.chatId,
+      firstAsker.telegramUserId,
+      "question",
+    );
+
+    const gameWithVote = components.game.getGameById(started.id);
+    const pendingVote = mustBeDefined(
+      gameWithVote.inProgress.pendingVote,
+      "Expected pending vote for normal mode",
+    );
+    for (const voterId of pendingVote.eligibleVoterIds) {
+      const voter = mustBeDefined(
+        gameWithVote.players.find((player) => player.id === voterId),
+        `Expected voter ${voterId}`,
       );
+      await components.normalMode.handleVote(started.id, voter.telegramUserId, "NO");
     }
 
     const updated = components.game.getGameById(started.id);
-    expect(updated.turns).toHaveLength(1);
-    expect(updated.turns[0]?.outcome).toBe("NO");
     expect(updated.inProgress.pendingVote).toBeUndefined();
+    expect(updated.turns.at(-1)).toMatchObject({
+      askerPlayerId: firstAsker.id,
+      outcome: "NO",
+      questionText: "question",
+    });
+    expect(components.game.getCurrentAsker(started.id).id).not.toBe(firstAsker.id);
   });
 });

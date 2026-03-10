@@ -1,216 +1,106 @@
 import { describe, expect, it } from "vitest";
 import { createGameServiceComponentHarness } from "./game-service-components.harness.js";
-import {
-  SentPrivateKeyboard,
-  SentPrivateMessage,
-} from "../mocks/fake-notifier.js";
-import { TextService } from "../../src/application/text-service.js";
-import { mustBeDefined, mustGetAt } from "../support/strict-helpers.js";
 
-const MANUAL_PAIR_PROMPT_TEXT = new TextService("ru").manualPairPrompt();
+const setupManualPairingGame = async () => {
+  const components = createGameServiceComponentHarness();
+  const actors = components.game.createActors(4);
+  const creator = actors[0]!;
 
-const extractPairTargetIds = (
-  buttons: Array<Array<{ text: string; data: string }>>,
-  gameId: string,
-): string[] => {
-  const suffix = `:${gameId}`;
-  return buttons
-    .flat()
-    .map((button) => button.data.slice("pair:".length, -suffix.length));
+  await components.game.service.startGame("chat-pair", creator);
+  await components.game.service.joinGame("chat-pair", actors[1]!);
+  await components.game.service.joinGame("chat-pair", actors[2]!);
+  await components.game.service.joinGame("chat-pair", actors[3]!);
+  await components.game.service.beginConfiguration(
+    "chat-pair",
+    creator.telegramUserId,
+  );
+
+  const game = components.game.getGameByChat("chat-pair");
+  await components.configurationStage.applyConfigStep(
+    game.id,
+    creator.telegramUserId,
+    "mode",
+    "NORMAL",
+  );
+  await components.configurationStage.applyConfigStep(
+    game.id,
+    creator.telegramUserId,
+    "play",
+    "ONLINE",
+  );
+  await components.configurationStage.applyConfigStep(
+    game.id,
+    creator.telegramUserId,
+    "pair",
+    "MANUAL",
+  );
+
+  return {
+    components,
+    gameId: game.id,
+    actors,
+  };
 };
 
 describe("normal pairing stage service", () => {
-  it("prompts choosers sequentially and starts word collection after the final selection", async () => {
-    const components = createGameServiceComponentHarness();
-    const chatId = "chat-pairing-sequence";
-    const actors = [
-      components.game.createActor(1),
-      components.game.createActor(2),
-      components.game.createActor(3),
-      components.game.createActor(4),
-    ];
-    const actor1 = mustGetAt(actors, 0, "Expected first manual pairing actor");
-    const actor2 = mustGetAt(actors, 1, "Expected second manual pairing actor");
-    const actor3 = mustGetAt(actors, 2, "Expected third manual pairing actor");
-    const actor4 = mustGetAt(actors, 3, "Expected fourth manual pairing actor");
-
-    await components.game.service.startGame(chatId, actor1);
-    for (const actor of actors.slice(1)) {
-      await components.game.service.joinGame(chatId, actor);
-    }
-    await components.game.service.beginConfiguration(
-      chatId,
-      actor1.telegramUserId,
-    );
-
-    const game = components.game.getGameByChat(chatId);
-    await components.configurationStage.applyConfigStep(
-      game.id,
-      actor1.telegramUserId,
-      "mode",
-      "NORMAL",
-    );
-    await components.configurationStage.applyConfigStep(
-      game.id,
-      actor1.telegramUserId,
-      "play",
-      "ONLINE",
-    );
-    await components.configurationStage.applyConfigStep(
-      game.id,
-      actor1.telegramUserId,
-      "pair",
-      "MANUAL",
-    );
-
-    const players = components.game.getGameById(game.id).players;
-    const player1 = mustBeDefined(
-      players.find((player) => player.telegramUserId === actor1.telegramUserId),
-      "Expected first player",
-    );
-    const player2 = mustBeDefined(
-      players.find((player) => player.telegramUserId === actor2.telegramUserId),
-      "Expected second player",
-    );
-    const player3 = mustBeDefined(
-      players.find((player) => player.telegramUserId === actor3.telegramUserId),
-      "Expected third player",
-    );
-    const player4 = mustBeDefined(
-      players.find((player) => player.telegramUserId === actor4.telegramUserId),
-      "Expected fourth player",
-    );
-
-    const prompts = components.game.notifier.sent.filter(
-      (entry): entry is SentPrivateKeyboard =>
-        entry.kind === "private-keyboard" &&
-        entry.text === MANUAL_PAIR_PROMPT_TEXT,
-    );
-    const firstPrompt = mustGetAt(
-      prompts,
-      0,
-      "Expected first manual pairing prompt",
-    );
-    expect(prompts).toHaveLength(1);
-    expect(firstPrompt.userId).toBe(player1.telegramUserId);
-    expect(extractPairTargetIds(firstPrompt.buttons, game.id)).not.toContain(
-      player1.id,
-    );
+  it("updates pairings sequentially and initializes words only after the final manual choice", async () => {
+    const { components, gameId, actors } = await setupManualPairingGame();
 
     await components.normalPairingStage.applyManualPair(
-      game.id,
-      player1.telegramUserId,
-      player2.id,
+      gameId,
+      actors[0]!.telegramUserId,
+      "tg:2",
     );
-    await components.normalPairingStage.applyManualPair(
-      game.id,
-      player2.telegramUserId,
-      player3.id,
-    );
-    await components.normalPairingStage.applyManualPair(
-      game.id,
-      player3.telegramUserId,
-      player4.id,
-    );
-    await components.normalPairingStage.applyManualPair(
-      game.id,
-      player4.telegramUserId,
-      player1.id,
-    );
+    let game = components.game.getGameById(gameId);
+    expect(game.pairings).toEqual({ "tg:1": "tg:2" });
+    expect(game.preparation.manualPairingCursor).toBe(1);
+    expect(game.words).toEqual({});
 
-    expect(
-      components.game.notifier.sent.some(
-        (entry) =>
-          entry.kind === "group-message" &&
-          entry.chatId === chatId &&
-          entry.text.includes(
-            "Ручное распределение завершено. Переходим к вводу слов.",
-          ),
-      ),
-    ).toBe(true);
-
-    const wordPrompts = components.game.notifier.sent.filter(
-      (entry): entry is SentPrivateMessage =>
-        entry.kind === "private-message" &&
-        entry.text === "Введите слово для игры:",
+    await components.normalPairingStage.applyManualPair(
+      gameId,
+      actors[1]!.telegramUserId,
+      "tg:3",
     );
-    expect(wordPrompts).toHaveLength(actors.length);
+    await components.normalPairingStage.applyManualPair(
+      gameId,
+      actors[2]!.telegramUserId,
+      "tg:4",
+    );
+    game = components.game.getGameById(gameId);
+    expect(game.preparation.manualPairingCursor).toBe(3);
+    expect(game.words).toEqual({});
+
+    await components.normalPairingStage.applyManualPair(
+      gameId,
+      actors[3]!.telegramUserId,
+      "tg:1",
+    );
+    game = components.game.getGameById(gameId);
+
+    expect(game.pairings).toEqual({
+      "tg:1": "tg:2",
+      "tg:2": "tg:3",
+      "tg:3": "tg:4",
+      "tg:4": "tg:1",
+    });
+    expect(game.preparation.manualPairingCursor).toBe(4);
+    expect(Object.keys(game.words)).toHaveLength(4);
+    expect(game.stage).toBe("PREPARE_WORDS");
   });
 
-  it("re-sends the current chooser prompt during recovery", async () => {
-    const components = createGameServiceComponentHarness();
-    const chatId = "chat-pairing-recovery";
-    const actors = [
-      components.game.createActor(1),
-      components.game.createActor(2),
-      components.game.createActor(3),
-      components.game.createActor(4),
-    ];
-    const actor1 = mustGetAt(actors, 0, "Expected first recovery actor");
-    const actor2 = mustGetAt(actors, 1, "Expected second recovery actor");
-
-    await components.game.service.startGame(chatId, actor1);
-    for (const actor of actors.slice(1)) {
-      await components.game.service.joinGame(chatId, actor);
-    }
-    await components.game.service.beginConfiguration(
-      chatId,
-      actor1.telegramUserId,
-    );
-
-    const game = components.game.getGameByChat(chatId);
-    await components.configurationStage.applyConfigStep(
-      game.id,
-      actor1.telegramUserId,
-      "mode",
-      "NORMAL",
-    );
-    await components.configurationStage.applyConfigStep(
-      game.id,
-      actor1.telegramUserId,
-      "play",
-      "ONLINE",
-    );
-    await components.configurationStage.applyConfigStep(
-      game.id,
-      actor1.telegramUserId,
-      "pair",
-      "MANUAL",
-    );
-
-    const players = components.game.getGameById(game.id).players;
-    const player1 = mustBeDefined(
-      players.find((player) => player.telegramUserId === actor1.telegramUserId),
-      "Expected recovery player one",
-    );
-    const player2 = mustBeDefined(
-      players.find((player) => player.telegramUserId === actor2.telegramUserId),
-      "Expected recovery player two",
-    );
+  it("does not mutate manual pairing state during startup recovery", async () => {
+    const { components, gameId, actors } = await setupManualPairingGame();
 
     await components.normalPairingStage.applyManualPair(
-      game.id,
-      player1.telegramUserId,
-      player2.id,
+      gameId,
+      actors[0]!.telegramUserId,
+      "tg:2",
     );
-    components.game.notifier.sent.length = 0;
+    const beforeRecovery = components.game.getGameById(gameId);
 
     await components.normalPairingStage.recoverPromptsOnStartup();
 
-    const prompts = components.game.notifier.sent.filter(
-      (entry): entry is SentPrivateKeyboard =>
-        entry.kind === "private-keyboard" &&
-        entry.text === MANUAL_PAIR_PROMPT_TEXT,
-    );
-    const restoredPrompt = mustGetAt(
-      prompts,
-      0,
-      "Expected restored pairing prompt",
-    );
-    expect(prompts).toHaveLength(1);
-    expect(restoredPrompt.userId).toBe(player2.telegramUserId);
-    expect(extractPairTargetIds(restoredPrompt.buttons, game.id)).not.toContain(
-      player2.id,
-    );
+    const afterRecovery = components.game.getGameById(gameId);
+    expect(afterRecovery).toEqual(beforeRecovery);
   });
 });

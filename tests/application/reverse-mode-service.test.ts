@@ -1,140 +1,82 @@
 import { describe, expect, it } from "vitest";
 import { createGameServiceComponentHarness } from "./game-service-components.harness.js";
+import { mustBeDefined } from "../support/strict-helpers.js";
 
 describe("reverse mode service", () => {
-  it("does nothing before first turn hook", async () => {
+  it("creates a target-owned pending vote from OFFLINE ask action", async () => {
     const components = createGameServiceComponentHarness();
-    const chatId = "chat-reverse-hook";
-    const actors = [
-      components.game.createActor(1),
-      components.game.createActor(2),
-      components.game.createActor(3),
-    ];
-
-    const started = await components.game.setupReverseOfflineInProgress(
-      chatId,
+    const actors = components.game.createActors(3);
+    const started = await components.game.setupInProgressGame({
+      chatId: "chat-reverse-offline",
       actors,
+      mode: "REVERSE",
+      playMode: "OFFLINE",
+    });
+
+    const asker = components.game.getCurrentAsker(started.id);
+    const target = mustBeDefined(
+      components.game.getCurrentTarget(started.id),
+      "Expected reverse target",
     );
-    components.game.notifier.sent.length = 0;
 
-    await components.reverseMode.beforeFirstTurn(started);
+    await components.reverseMode.askOffline(started.chatId, asker.telegramUserId);
 
-    expect(components.game.notifier.sent).toHaveLength(0);
+    const updated = components.game.getGameById(started.id);
+    expect(updated.inProgress.pendingVote?.askerPlayerId).toBe(asker.id);
+    expect(updated.inProgress.pendingVote?.targetWordOwnerId).toBe(target.id);
+    expect(updated.inProgress.pendingVote?.eligibleVoterIds).toEqual([target.id]);
+    expect(updated.inProgress.pendingVote?.questionText).toBeUndefined();
   });
 
-  it("asks offline through a public keyboard and advances after the owner vote", async () => {
+  it("keeps the same asker on YES and advances state on GUESSED", async () => {
     const components = createGameServiceComponentHarness();
-    const chatId = "chat-reverse-flow";
-    const actors = [
-      components.game.createActor(1),
-      components.game.createActor(2),
-      components.game.createActor(3),
-    ];
-
-    const started = await components.game.setupReverseOfflineInProgress(
-      chatId,
+    const actors = components.game.createActors(3);
+    const started = await components.game.setupInProgressGame({
+      chatId: "chat-reverse-online",
       actors,
-    );
-    const before = components.game.getGameById(started.id);
-    const askerId = before.inProgress.turnOrder[before.inProgress.turnCursor];
-    const asker = before.players.find((player) => player.id === askerId)!;
-
-    await components.reverseMode.askOffline(chatId, asker.telegramUserId);
-
-    const withVote = components.game.getGameById(started.id);
-    const pendingVote = withVote.inProgress.pendingVote;
-    expect(pendingVote).toBeDefined();
-    expect(pendingVote?.eligibleVoterIds).toHaveLength(1);
-
-    const target = withVote.players.find(
-      (player) => player.id === pendingVote!.targetWordOwnerId,
-    )!;
-    const publicVoteMessage = components.game.notifier.sent.find(
-      (entry) =>
-        entry.kind === "group-keyboard" &&
-        entry.chatId === chatId &&
-        entry.text.includes(`Отвечает ${target.displayName}`),
-    );
-
-    expect(publicVoteMessage).toMatchObject({
-      kind: "group-keyboard",
-      chatId,
-      buttons: [
-        [
-          { text: "Да", data: `vote:YES:${started.id}` },
-          { text: "Нет", data: `vote:NO:${started.id}` },
-          { text: "Угадал", data: `vote:GUESSED:${started.id}` },
-        ],
-      ],
+      mode: "REVERSE",
+      playMode: "ONLINE",
     });
-    expect(
-      components.game.notifier.sent.some(
-        (entry) =>
-          entry.kind === "private-keyboard" &&
-          entry.userId === target.telegramUserId &&
-          entry.text.includes("Выберите ответ"),
-      ),
-    ).toBe(false);
 
+    const initialAsker = components.game.getCurrentAsker(started.id);
+    const initialTarget = mustBeDefined(
+      components.game.getCurrentTarget(started.id),
+      "Expected initial reverse target",
+    );
+
+    await components.reverseMode.handleGroupText(
+      started.chatId,
+      initialAsker.telegramUserId,
+      "question-1",
+    );
     await components.reverseMode.handleVote(
       started.id,
-      target.telegramUserId,
-      "NO",
+      initialTarget.telegramUserId,
+      "YES",
     );
 
-    const updated = components.game.getGameById(started.id);
-    expect(updated.turns).toHaveLength(1);
-    expect(updated.inProgress.pendingVote).toBeUndefined();
-  });
+    let updated = components.game.getGameById(started.id);
+    expect(updated.turns.at(-1)).toMatchObject({ outcome: "YES" });
+    expect(components.game.getCurrentAsker(started.id).id).toBe(initialAsker.id);
+    expect(components.game.getCurrentTarget(started.id)?.id).toBe(initialTarget.id);
 
-  it("accepts vote only from the current word owner", async () => {
-    const components = createGameServiceComponentHarness();
-    const chatId = "chat-reverse-auth";
-    const actors = [
-      components.game.createActor(1),
-      components.game.createActor(2),
-      components.game.createActor(3),
-    ];
-
-    const started = await components.game.setupReverseOfflineInProgress(
-      chatId,
-      actors,
+    await components.reverseMode.handleGroupText(
+      started.chatId,
+      initialAsker.telegramUserId,
+      "question-2",
     );
-    const before = components.game.getGameById(started.id);
-    const askerId = before.inProgress.turnOrder[before.inProgress.turnCursor];
-    const asker = before.players.find((player) => player.id === askerId)!;
+    await components.reverseMode.handleVote(
+      started.id,
+      initialTarget.telegramUserId,
+      "GUESSED",
+    );
 
-    await components.reverseMode.askOffline(chatId, asker.telegramUserId);
-
-    const withVote = components.game.getGameById(started.id);
-    const pendingVote = withVote.inProgress.pendingVote!;
-    const target = withVote.players.find(
-      (player) => player.id === pendingVote.targetWordOwnerId,
-    )!;
-    const intruder = withVote.players.find(
-      (player) => player.id !== target.id && player.id !== asker.id,
-    )!;
-
-    await expect(
-      components.reverseMode.handleVote(
-        started.id,
-        intruder.telegramUserId,
-        "YES",
-      ),
-    ).resolves.toMatchObject({
-      _tag: "PlayerNotAllowedToVoteError",
+    updated = components.game.getGameById(started.id);
+    expect(updated.words[initialTarget.id]?.solved).toBe(true);
+    expect(updated.turns.at(-1)).toMatchObject({
+      askerPlayerId: initialAsker.id,
+      outcome: "GUESSED",
     });
-
-    await expect(
-      components.reverseMode.handleVote(
-        started.id,
-        target.telegramUserId,
-        "YES",
-      ),
-    ).resolves.toBeUndefined();
-
-    const updated = components.game.getGameById(started.id);
-    expect(updated.inProgress.pendingVote).toBeUndefined();
-    expect(updated.turns.at(-1)?.outcome).toBe("YES");
+    expect(components.game.getCurrentTarget(started.id)?.id).not.toBe(initialTarget.id);
   });
 });

@@ -1,11 +1,11 @@
 import { GameService } from "../../src/application/game-service.js";
-import { mustBeDefined, mustGetAt } from "../support/strict-helpers.js";
 import { TextService } from "../../src/application/text-service.js";
 import { GameEngine } from "../../src/domain/game-engine.js";
 import {
   GameMode,
   GameState,
   PairingMode,
+  PlayerState,
   PlayMode,
   VoteDecision,
 } from "../../src/domain/types.js";
@@ -18,12 +18,31 @@ import {
   FakeNotifier,
   FakeTransactionRunner,
 } from "../mocks/index.js";
+import { mustBeDefined, mustGetAt } from "../support/strict-helpers.js";
 
 export interface TestActor {
   telegramUserId: string;
   username?: string;
   firstName?: string;
   lastName?: string;
+}
+
+interface WordInput {
+  word: string;
+  clue?: string;
+}
+
+interface SetupConfiguredGameOptions {
+  chatId: string;
+  actors: TestActor[];
+  mode: GameMode;
+  playMode: PlayMode;
+  pairingMode?: PairingMode;
+}
+
+interface SetupInProgressGameOptions extends SetupConfiguredGameOptions {
+  manualPairsByChooser?: Record<string, string>;
+  wordsByTelegramUserId?: Record<string, WordInput>;
 }
 
 interface HarnessOptions {
@@ -49,15 +68,22 @@ export interface GameServiceHarness {
   readonly logger: FakeLogger;
   readonly limits: { minPlayers: number; maxPlayers: number };
   createActor: (index: number) => TestActor;
+  createActors: (count: number, startIndex?: number) => TestActor[];
   getGameByChat: (chatId: string) => GameState;
   getGameById: (gameId: string) => GameState;
-  setupNormalOnlineRandomInProgress: (
-    chatId: string,
-    actors: TestActor[],
+  getPlayerByTelegram: (gameId: string, telegramUserId: string) => PlayerState;
+  getCurrentAsker: (gameId: string) => PlayerState;
+  getCurrentTarget: (gameId: string) => PlayerState | null;
+  setupConfiguredGame: (options: SetupConfiguredGameOptions) => Promise<GameState>;
+  setupInProgressGame: (options: SetupInProgressGameOptions) => Promise<GameState>;
+  completeManualPairing: (
+    gameId: string,
+    chooserToTarget: Record<string, string>,
   ) => Promise<GameState>;
-  setupReverseOfflineInProgress: (
-    chatId: string,
+  completeWordCollection: (
+    gameId: string,
     actors: TestActor[],
+    wordsByTelegramUserId?: Record<string, WordInput>,
   ) => Promise<GameState>;
   completeWordFlow: (
     gameId: string,
@@ -72,10 +98,22 @@ export interface GameServiceHarness {
     playMode: PlayMode,
     pairingMode?: PairingMode,
   ) => Promise<void>;
+  resolvePendingVote: (
+    gameId: string,
+    decisionByPlayerId?: Record<string, VoteDecision>,
+  ) => Promise<GameState>;
   castVoteForAllEligible: (
     gameId: string,
     decisionByPlayerId: Record<string, VoteDecision>,
   ) => Promise<void>;
+  setupNormalOnlineRandomInProgress: (
+    chatId: string,
+    actors: TestActor[],
+  ) => Promise<GameState>;
+  setupReverseOfflineInProgress: (
+    chatId: string,
+    actors: TestActor[],
+  ) => Promise<GameState>;
 }
 
 const defaultFirstNames = ["Alice", "Bob", "Carol", "Dave", "Erin", "Frank"];
@@ -85,6 +123,18 @@ export const createActor = (index: number): TestActor => ({
   username: `user${index}`,
   firstName: defaultFirstNames[index - 1] ?? `User${index}`,
 });
+
+const defaultManualPairs = (actors: TestActor[]): Record<string, string> =>
+  Object.fromEntries(
+    actors.map((actor, index) => [
+      actor.telegramUserId,
+      mustGetAt(
+        actors,
+        (index + 1) % actors.length,
+        "Expected default manual target actor",
+      ).telegramUserId,
+    ]),
+  );
 
 export const createGameServiceHarness = (
   options: HarnessOptions = {},
@@ -125,6 +175,9 @@ export const createGameServiceHarness = (
     limits,
   );
 
+  const createActors = (count: number, startIndex = 1): TestActor[] =>
+    Array.from({ length: count }, (_, index) => createActor(startIndex + index));
+
   const getGameByChat = (chatId: string): GameState => {
     const game = repository.findActiveByChatId(chatId);
     if (!game) {
@@ -140,6 +193,50 @@ export const createGameServiceHarness = (
     }
     return game;
   };
+
+  const getPlayerByTelegram = (
+    gameId: string,
+    telegramUserId: string,
+  ): PlayerState => {
+    const game = getGameById(gameId);
+    return mustBeDefined(
+      game.players.find((player) => player.telegramUserId === telegramUserId),
+      `Player ${telegramUserId} not found in ${gameId}`,
+    );
+  };
+
+  const getCurrentAsker = (gameId: string): PlayerState => {
+    const game = getGameById(gameId);
+    const askerId = mustBeDefined(
+      game.inProgress.turnOrder[game.inProgress.turnCursor],
+      `Current asker missing in ${gameId}`,
+    );
+    return mustBeDefined(
+      game.players.find((player) => player.id === askerId),
+      `Asker ${askerId} not found in ${gameId}`,
+    );
+  };
+
+  const getCurrentTarget = (gameId: string): PlayerState | null => {
+    const game = getGameById(gameId);
+    const targetId = game.inProgress.currentTargetPlayerId;
+    if (!targetId) {
+      return null;
+    }
+
+    return mustBeDefined(
+      game.players.find((player) => player.id === targetId),
+      `Target ${targetId} not found in ${gameId}`,
+    );
+  };
+
+  const resolvePlayerId = (game: GameState, ref: string): string =>
+    mustBeDefined(
+      game.players.find(
+        (player) => player.id === ref || player.telegramUserId === ref,
+      ),
+      `Player reference ${ref} not found in ${game.id}`,
+    ).id;
 
   const configureGame = async (
     gameId: string,
@@ -164,6 +261,67 @@ export const createGameServiceHarness = (
         pairingMode ?? "RANDOM",
       );
     }
+  };
+
+  const setupConfiguredGame = async ({
+    chatId,
+    actors,
+    mode,
+    playMode,
+    pairingMode,
+  }: SetupConfiguredGameOptions): Promise<GameState> => {
+    const creator = mustGetAt(actors, 0, "Expected setup creator");
+
+    await service.startGame(chatId, creator);
+
+    for (const actor of actors.slice(1)) {
+      await service.joinGame(chatId, actor);
+    }
+
+    await service.beginConfiguration(chatId, creator.telegramUserId);
+
+    const gameAfterBegin = getGameByChat(chatId);
+    await configureGame(
+      gameAfterBegin.id,
+      creator.telegramUserId,
+      mode,
+      playMode,
+      pairingMode,
+    );
+
+    return getGameById(gameAfterBegin.id);
+  };
+
+  const completeManualPairing = async (
+    gameId: string,
+    chooserToTarget: Record<string, string>,
+  ): Promise<GameState> => {
+    let game = getGameById(gameId);
+
+    while (Object.keys(game.words).length < game.players.length) {
+      const chooserId = mustBeDefined(
+        game.preparation.manualPairingQueue[game.preparation.manualPairingCursor],
+        `Expected current chooser in ${gameId}`,
+      );
+      const chooser = mustBeDefined(
+        game.players.find((player) => player.id === chooserId),
+        `Chooser ${chooserId} not found in ${gameId}`,
+      );
+      const targetRef =
+        chooserToTarget[chooser.telegramUserId] ?? chooserToTarget[chooser.id];
+      const targetId = resolvePlayerId(
+        game,
+        mustBeDefined(
+          targetRef,
+          `Target is missing for chooser ${chooser.telegramUserId}`,
+        ),
+      );
+
+      await service.applyManualPair(gameId, chooser.telegramUserId, targetId);
+      game = getGameById(gameId);
+    }
+
+    return game;
   };
 
   const completeWordFlow = async (
@@ -205,81 +363,25 @@ export const createGameServiceHarness = (
     );
   };
 
-  const setupNormalOnlineRandomInProgress = async (
-    chatId: string,
-    actors: TestActor[],
-  ): Promise<GameState> => {
-    const creator = mustGetAt(actors, 0, "Expected normal flow creator");
-
-    await service.startGame(chatId, creator);
-
-    for (const actor of actors.slice(1)) {
-      await service.joinGame(chatId, actor);
-    }
-
-    await service.beginConfiguration(chatId, creator.telegramUserId);
-
-    const gameAfterBegin = getGameByChat(chatId);
-    await configureGame(
-      gameAfterBegin.id,
-      creator.telegramUserId,
-      "NORMAL",
-      "ONLINE",
-      "RANDOM",
-    );
-
-    const configured = getGameById(gameAfterBegin.id);
-
-    for (const actor of actors) {
-      await completeWordFlow(
-        configured.id,
-        actor,
-        `word-${actor.telegramUserId}`,
-      );
-    }
-
-    return getGameById(configured.id);
-  };
-
-  const setupReverseOfflineInProgress = async (
-    chatId: string,
-    actors: TestActor[],
-  ): Promise<GameState> => {
-    const creator = mustGetAt(actors, 0, "Expected reverse flow creator");
-
-    await service.startGame(chatId, creator);
-
-    for (const actor of actors.slice(1)) {
-      await service.joinGame(chatId, actor);
-    }
-
-    await service.beginConfiguration(chatId, creator.telegramUserId);
-
-    const gameAfterBegin = getGameByChat(chatId);
-    await configureGame(
-      gameAfterBegin.id,
-      creator.telegramUserId,
-      "REVERSE",
-      "OFFLINE",
-    );
-
-    const configured = getGameById(gameAfterBegin.id);
-
-    for (const actor of actors) {
-      await completeWordFlow(
-        configured.id,
-        actor,
-        `word-${actor.telegramUserId}`,
-      );
-    }
-
-    return getGameById(configured.id);
-  };
-
-  const castVoteForAllEligible = async (
+  const completeWordCollection = async (
     gameId: string,
-    decisionByPlayerId: Record<string, VoteDecision>,
-  ): Promise<void> => {
+    actors: TestActor[],
+    wordsByTelegramUserId: Record<string, WordInput> = {},
+  ): Promise<GameState> => {
+    for (const actor of actors) {
+      const input = wordsByTelegramUserId[actor.telegramUserId] ?? {
+        word: `word-${actor.telegramUserId}`,
+      };
+      await completeWordFlow(gameId, actor, input.word, input.clue);
+    }
+
+    return getGameById(gameId);
+  };
+
+  const resolvePendingVote = async (
+    gameId: string,
+    decisionByPlayerId: Record<string, VoteDecision> = {},
+  ): Promise<GameState> => {
     const game = getGameById(gameId);
     const pending = game.inProgress.pendingVote;
     if (!pending) {
@@ -291,11 +393,75 @@ export const createGameServiceHarness = (
         game.players.find((player) => player.id === voterPlayerId),
         `Player ${voterPlayerId} not found`,
       );
-
       const decision = decisionByPlayerId[voterPlayerId] ?? "NO";
       await service.handleVote(gameId, voter.telegramUserId, decision);
     }
+
+    return getGameById(gameId);
   };
+
+  const castVoteForAllEligible = async (
+    gameId: string,
+    decisionByPlayerId: Record<string, VoteDecision>,
+  ): Promise<void> => {
+    await resolvePendingVote(gameId, decisionByPlayerId);
+  };
+
+  const setupInProgressGame = async ({
+    chatId,
+    actors,
+    mode,
+    playMode,
+    pairingMode,
+    manualPairsByChooser,
+    wordsByTelegramUserId,
+  }: SetupInProgressGameOptions): Promise<GameState> => {
+    const configured = await setupConfiguredGame({
+      chatId,
+      actors,
+      mode,
+      playMode,
+      pairingMode,
+    });
+
+    const readyForWords =
+      configured.config?.mode === "NORMAL" &&
+      configured.config.pairingMode === "MANUAL"
+        ? await completeManualPairing(
+            configured.id,
+            manualPairsByChooser ?? defaultManualPairs(actors),
+          )
+        : configured;
+
+    return completeWordCollection(
+      readyForWords.id,
+      actors,
+      wordsByTelegramUserId,
+    );
+  };
+
+  const setupNormalOnlineRandomInProgress = async (
+    chatId: string,
+    actors: TestActor[],
+  ): Promise<GameState> =>
+    setupInProgressGame({
+      chatId,
+      actors,
+      mode: "NORMAL",
+      playMode: "ONLINE",
+      pairingMode: "RANDOM",
+    });
+
+  const setupReverseOfflineInProgress = async (
+    chatId: string,
+    actors: TestActor[],
+  ): Promise<GameState> =>
+    setupInProgressGame({
+      chatId,
+      actors,
+      mode: "REVERSE",
+      playMode: "OFFLINE",
+    });
 
   return {
     service,
@@ -310,12 +476,21 @@ export const createGameServiceHarness = (
     logger,
     limits,
     createActor,
+    createActors,
     getGameByChat,
     getGameById,
-    setupNormalOnlineRandomInProgress,
-    setupReverseOfflineInProgress,
+    getPlayerByTelegram,
+    getCurrentAsker,
+    getCurrentTarget,
+    setupConfiguredGame,
+    setupInProgressGame,
+    completeManualPairing,
+    completeWordCollection,
     completeWordFlow,
     configureGame,
+    resolvePendingVote,
     castVoteForAllEligible,
+    setupNormalOnlineRandomInProgress,
+    setupReverseOfflineInProgress,
   };
 };
