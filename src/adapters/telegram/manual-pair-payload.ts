@@ -9,12 +9,12 @@ interface ManualPairPayload {
 export const parseManualPairPayload = (
   payload: string,
 ): ManualPairPayload | ManualPairPayloadError => {
-  const parts = payload.split(":");
-  if (parts.length !== 3 || parts[0] !== "pair") {
+  const matched = /^pair:(.+):([^:]+)$/.exec(payload);
+  if (!matched) {
     return new InvalidManualPairPayloadError();
   }
 
-  const [, targetPlayerId, gameId] = parts;
+  const [, targetPlayerId, gameId] = matched;
   if (!targetPlayerId || !gameId) {
     return new InvalidManualPairPayloadError();
   }

@@ -5,6 +5,7 @@ import {
 } from "../../src/domain/errors.js";
 import { PairingMode, PlayMode, VoteDecision } from "../../src/domain/types.js";
 import { createGameServiceHarness } from "./game-service.harness.js";
+import { parseManualPairPayload } from "../../src/adapters/telegram/manual-pair-payload.js";
 import { mustBeDefined } from "../support/strict-helpers.js";
 
 const askCurrentQuestion = async ({
@@ -479,4 +480,50 @@ describe("game service", () => {
       harness.getPlayerByTelegram(gameTwo.id, sharedActor.telegramUserId).dmOpened,
     ).toBe(true);
   });
+
+  it("parses manual pair callback with colon-delimited player id and advances 2-player OFFLINE game", async () => {
+    const harness = createGameServiceHarness({ minPlayers: 2 });
+    const actors = harness.createActors(2);
+    const configured = await harness.setupConfiguredGame({
+      chatId: "chat-manual-offline-two-players",
+      actors,
+      mode: "NORMAL",
+      playMode: "OFFLINE",
+      pairingMode: "MANUAL",
+    });
+
+    expect(configured.stage).toBe("PREPARE_WORDS");
+    expect(configured.words).toEqual({});
+
+    const parsed = parseManualPairPayload(`pair:tg:${actors[1]!.telegramUserId}:${configured.id}`);
+    expect(parsed).not.toBeInstanceOf(Error);
+    if (parsed instanceof Error) {
+      return;
+    }
+
+    await harness.service.applyManualPair(
+      parsed.gameId,
+      actors[0]!.telegramUserId,
+      parsed.targetPlayerId,
+    );
+    await harness.service.applyManualPair(
+      configured.id,
+      actors[1]!.telegramUserId,
+      "tg:1",
+    );
+
+    const paired = harness.getGameById(configured.id);
+    expect(paired.pairings).toEqual({
+      "tg:1": "tg:2",
+      "tg:2": "tg:1",
+    });
+    expect(Object.keys(paired.words)).toHaveLength(2);
+    expect(Object.values(paired.words)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ ownerPlayerId: "tg:1", targetPlayerId: "tg:2" }),
+        expect.objectContaining({ ownerPlayerId: "tg:2", targetPlayerId: "tg:1" }),
+      ]),
+    );
+  });
 });
+
