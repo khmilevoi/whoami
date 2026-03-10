@@ -70,14 +70,18 @@ describe("chat command resolver", () => {
   it("returns start command when no active game", () => {
     const resolution = resolver.resolve(null);
 
-    expect(resolution.chatCommands.map((command) => command.command)).toEqual(["whoami_start"]);
+    expect(resolution.chatCommands.map((command) => command.command)).toEqual([
+      "whoami_start",
+    ]);
     expect(resolution.memberOverrides).toEqual([]);
   });
 
   it("returns lobby commands for creator and players", () => {
     const resolution = resolver.resolve(createGame("LOBBY_OPEN"));
 
-    expect(resolution.chatCommands.map((command) => command.command)).toEqual(["join"]);
+    expect(resolution.chatCommands.map((command) => command.command)).toEqual([
+      "join",
+    ]);
     expect(resolution.memberOverrides).toEqual([
       {
         telegramUserId: "101",
@@ -90,7 +94,12 @@ describe("chat command resolver", () => {
   });
 
   it("returns creator cancel only for pre-game locked stages", () => {
-    const stages: GameStage[] = ["LOBBY_CLOSED", "CONFIGURING", "PREPARE_WORDS", "READY_WAIT"];
+    const stages: GameStage[] = [
+      "LOBBY_CLOSED",
+      "CONFIGURING",
+      "PREPARE_WORDS",
+      "READY_WAIT",
+    ];
 
     for (const stage of stages) {
       const resolution = resolver.resolve(createGame(stage));
@@ -114,7 +123,9 @@ describe("chat command resolver", () => {
 
     const resolution = resolver.resolve(game);
 
-    expect(resolution.chatCommands.map((command) => command.command)).toEqual(["giveup"]);
+    expect(resolution.chatCommands.map((command) => command.command)).toEqual([
+      "giveup",
+    ]);
     expect(resolution.memberOverrides).toEqual([]);
   });
 
@@ -130,7 +141,9 @@ describe("chat command resolver", () => {
 
     const resolution = resolver.resolve(game);
 
-    expect(resolution.chatCommands.map((command) => command.command)).toEqual(["giveup"]);
+    expect(resolution.chatCommands.map((command) => command.command)).toEqual([
+      "giveup",
+    ]);
     expect(resolution.memberOverrides).toEqual([
       {
         telegramUserId: "202",
@@ -146,7 +159,11 @@ describe("chat command resolver", () => {
     const finished = resolver.resolve(createGame("FINISHED"));
     const canceled = resolver.resolve(createGame("CANCELED"));
 
-    expect(finished.chatCommands.map((command) => command.command)).toEqual(["whoami_start"]);
-    expect(canceled.chatCommands.map((command) => command.command)).toEqual(["whoami_start"]);
+    expect(finished.chatCommands.map((command) => command.command)).toEqual([
+      "whoami_start",
+    ]);
+    expect(canceled.chatCommands.map((command) => command.command)).toEqual([
+      "whoami_start",
+    ]);
   });
 });

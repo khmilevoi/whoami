@@ -32,7 +32,10 @@ export type GameServiceContextError =
   | GameNotFoundError
   | PlayerNotFoundInGameError;
 
-export type StartQuestionError = GameNotFoundError | AskQuestionError | NotificationError;
+export type StartQuestionError =
+  | GameNotFoundError
+  | AskQuestionError
+  | NotificationError;
 
 export type VoteHandlingError =
   | GameNotFoundError
@@ -46,11 +49,20 @@ export type GiveUpHandlingError =
   | GiveUpError
   | NotificationError;
 
-export type ModeServiceError = StartQuestionError | VoteHandlingError | GiveUpHandlingError;
+export type ModeServiceError =
+  | StartQuestionError
+  | VoteHandlingError
+  | GiveUpHandlingError;
 
-export type ReadyStartError = GameNotFoundError | StartGameIfReadyError | NotificationError;
+export type ReadyStartError =
+  | GameNotFoundError
+  | StartGameIfReadyError
+  | NotificationError;
 
-export type PromptWordCollectionError = GameNotFoundError | MarkDmError | NotificationError;
+export type PromptWordCollectionError =
+  | GameNotFoundError
+  | MarkDmError
+  | NotificationError;
 
 export type WordPreparationStageError =
   | GameNotFoundError
@@ -96,4 +108,7 @@ export type GameServiceError =
 export type RecoveryStartupError = NormalPairingStageError;
 export type TelegramHandlerError = GameServiceError | ManualPairPayloadError;
 export type AppBoundaryError = StartupAppError | WebhookAppError;
-export type KnownAppError = DomainAppError | GameServiceError | CommandSyncAppError;
+export type KnownAppError =
+  | DomainAppError
+  | GameServiceError
+  | CommandSyncAppError;

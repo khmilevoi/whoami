@@ -1,8 +1,12 @@
 import * as errore from "errore";
-import express from "express";
-import { Bot } from "grammy";
+import express, { type Request, type Response } from "express";
+import { Bot, type Update } from "grammy";
 import { LoggerPort } from "../../application/ports";
 import { WebhookAppError, WebhookHandlingError } from "../../domain/errors";
+
+type HealthResponse = { ok: boolean };
+
+const toUpdate = (payload: unknown): Update => payload as Update;
 
 const logWebhookError = (logger: LoggerPort, error: WebhookAppError): void => {
   errore.matchError(error, {
@@ -24,20 +28,25 @@ export const buildHttpServer = (bot: Bot, logger: LoggerPort) => {
 
   app.use(express.json());
 
-  app.get("/health", (_req, res) => {
+  app.get("/health", (_req: Request, res: Response<HealthResponse>) => {
     res.status(200).json({ ok: true });
   });
 
-  app.post("/telegram/webhook", async (req, res) => {
-    const result = await bot.handleUpdate(req.body).catch((cause) => new WebhookHandlingError({ cause }));
-    if (result instanceof Error) {
-      logWebhookError(logger, result);
-      res.status(500).json({ ok: false });
-      return;
-    }
+  app.post(
+    "/telegram/webhook",
+    async (req: Request, res: Response<HealthResponse>) => {
+      const result = await bot
+        .handleUpdate(toUpdate(req.body))
+        .catch((cause) => new WebhookHandlingError({ cause }));
+      if (result instanceof Error) {
+        logWebhookError(logger, result);
+        res.status(500).json({ ok: false });
+        return;
+      }
 
-    res.status(200).json({ ok: true });
-  });
+      res.status(200).json({ ok: true });
+    },
+  );
 
   return app;
 };

@@ -20,9 +20,9 @@ version: 0.11.0
 Go-style error handling for TypeScript. Functions return errors instead of throwing them — but instead of Go's two-value tuple (`val, err`), you return a single `Error | T` union. Instead of checking `err != nil`, you check `instanceof Error`. TypeScript narrows the type automatically. No wrapper types, no Result monads, just unions and `instanceof`.
 
 ```ts
-const user = await getUser(id)
-if (user instanceof Error) return user // early return, like Go
-console.log(user.name) // TypeScript knows: User
+const user = await getUser(id);
+if (user instanceof Error) return user; // early return, like Go
+console.log(user.name); // TypeScript knows: User
 ```
 
 ## Rules
@@ -49,32 +49,32 @@ console.log(user.name) // TypeScript knows: User
     ```ts
     const result = await fetchData({ signal }).catch(
       (e) => new FetchError({ cause: e }),
-    )
-    if (errore.isAbortError(result)) return 'Request timed out'
-    if (result instanceof Error) return `Failed: ${result.message}`
+    );
+    if (errore.isAbortError(result)) return "Request timed out";
+    if (result instanceof Error) return `Failed: ${result.message}`;
     ```
 
 19. Don't reassign after error early returns — TypeScript narrows the original variable automatically after `instanceof Error` checks return. A `const narrowed = result` alias is redundant:
 
     ```ts
-    const result = await fetch(url).catch((e) => new FetchError({ cause: e }))
-    if (result instanceof Error) return `Failed: ${result.message}`
-    await result.json() // TS knows result is Response here
+    const result = await fetch(url).catch((e) => new FetchError({ cause: e }));
+    if (result instanceof Error) return `Failed: ${result.message}`;
+    await result.json(); // TS knows result is Response here
     ```
 
 20. Always log errors that are not propagated — when an error branch doesn't `return` or `throw` the error (i.e. the error is intentionally swallowed), add a `console.warn` or `console.error` so failures are visible during debugging. Silent error swallowing makes bugs invisible:
 
     ```ts
     // BAD: error silently ignored — if sync fails you'll never know
-    const result = await syncToCloud(data)
+    const result = await syncToCloud(data);
     if (result instanceof Error) {
       // nothing here — silent failure
     }
 
     // GOOD: log before continuing — error is visible in logs
-    const result = await syncToCloud(data)
+    const result = await syncToCloud(data);
     if (result instanceof Error) {
-      console.warn('Cloud sync failed:', result.message)
+      console.warn("Cloud sync failed:", result.message);
     }
     ```
 
@@ -95,9 +95,9 @@ console.log(user.name) // TypeScript knows: User
   ```ts
   // let inference do its job
   function getUser(id: string) {
-    const user = await db.find(id)
-    if (!user) return new NotFoundError({ id })
-    return user
+    const user = await db.find(id);
+    if (!user) return new NotFoundError({ id });
+    return user;
   }
 
   // explicit annotation when it adds clarity on a complex public API
@@ -112,20 +112,20 @@ console.log(user.name) // TypeScript knows: User
 
   ```ts
   function isTruthy<T>(value: T): value is NonNullable<T> {
-    return Boolean(value)
+    return Boolean(value);
   }
-  const items = results.filter(isTruthy)
+  const items = results.filter(isTruthy);
   ```
 
 - **`controller.abort()` must use typed errors** — `abort(reason)` throws `reason` as-is. MUST pass a tagged error extending `errore.AbortError`, NEVER `new Error()` or a string — otherwise `isAbortError` can't detect it in the cause chain:
 
   ```ts
   class TimeoutError extends errore.createTaggedError({
-    name: 'TimeoutError',
-    message: 'Request timed out for $operation',
+    name: "TimeoutError",
+    message: "Request timed out for $operation",
     extends: errore.AbortError,
   }) {}
-  controller.abort(new TimeoutError({ operation: 'fetch' }))
+  controller.abort(new TimeoutError({ operation: "fetch" }));
   ```
 
 - **Never silently suppress errors** — empty `catch {}` and unlogged error branches hide failures. With errore you rarely need catch at all, but at any boundary where an error is not propagated, always log it (see rule 20):
@@ -133,9 +133,9 @@ console.log(user.name) // TypeScript knows: User
   ```ts
   const emailResult = await sendEmail(user.email).catch(
     (e) => new EmailError({ email: user.email, cause: e }),
-  )
+  );
   if (emailResult instanceof Error) {
-    console.warn('Failed to send email:', emailResult.message)
+    console.warn("Failed to send email:", emailResult.message);
   }
   ```
 
@@ -166,13 +166,13 @@ return render(user, posts)
 **errore (identical structure):**
 
 ```ts
-const user = await getUser(id)
-if (user instanceof Error) return user
+const user = await getUser(id);
+if (user instanceof Error) return user;
 
-const posts = await getPosts(user.id)
-if (posts instanceof Error) return posts
+const posts = await getPosts(user.id);
+if (posts instanceof Error) return posts;
 
-return render(user, posts)
+return render(user, posts);
 ```
 
 The reader scans the left edge of the function to follow the happy path — just like reading a Go function where `if err != nil` blocks are speed bumps you skip over.
@@ -183,10 +183,10 @@ The reader scans the left edge of the function to follow the happy path — just
 
 ```ts
 function getStatus(code: number): string {
-  if (code === 200) return 'ok'
-  if (code === 404) return 'not found'
-  if (code >= 500) return 'server error'
-  return 'unknown'
+  if (code === 200) return "ok";
+  if (code === 404) return "not found";
+  if (code >= 500) return "server error";
+  return "unknown";
 }
 ```
 
@@ -197,19 +197,19 @@ function getStatus(code: number): string {
 ```ts
 async function loadConfig(): Promise<Config> {
   const raw = await fs
-    .readFile('config.json', 'utf-8')
-    .catch((e) => new ConfigError({ reason: 'Read failed', cause: e }))
-  if (raw instanceof Error) return { port: 3000 }
+    .readFile("config.json", "utf-8")
+    .catch((e) => new ConfigError({ reason: "Read failed", cause: e }));
+  if (raw instanceof Error) return { port: 3000 };
 
   const parsed = errore.try({
     try: () => JSON.parse(raw) as Config,
-    catch: (e) => new ConfigError({ reason: 'Invalid JSON', cause: e }),
-  })
-  if (parsed instanceof Error) return { port: 3000 }
+    catch: (e) => new ConfigError({ reason: "Invalid JSON", cause: e }),
+  });
+  if (parsed instanceof Error) return { port: 3000 };
 
-  if (!parsed.port) return { port: 3000 }
+  if (!parsed.port) return { port: 3000 };
 
-  return parsed
+  return parsed;
 }
 ```
 
@@ -219,19 +219,19 @@ async function loadConfig(): Promise<Config> {
 
 ```ts
 async function handleRequest(req: Request): Promise<AppError | Response> {
-  const body = await parseBody(req)
-  if (body instanceof Error) return body
+  const body = await parseBody(req);
+  if (body instanceof Error) return body;
 
-  const user = await authenticate(req.headers)
-  if (user instanceof Error) return user
+  const user = await authenticate(req.headers);
+  if (user instanceof Error) return user;
 
-  const permission = checkPermission(user, body.resource)
-  if (permission instanceof Error) return permission
+  const permission = checkPermission(user, body.resource);
+  if (permission instanceof Error) return permission;
 
-  const result = await execute(body.action, body.resource)
-  if (result instanceof Error) return result
+  const result = await execute(body.action, body.resource);
+  if (result instanceof Error) return result;
 
-  return new Response(JSON.stringify(result), { status: 200 })
+  return new Response(JSON.stringify(result), { status: 200 });
 }
 ```
 
@@ -239,13 +239,13 @@ Same in loops — error in `if` + `continue`, happy path flat:
 
 ```ts
 for (const id of ids) {
-  const item = await fetchItem(id)
+  const item = await fetchItem(id);
   if (item instanceof Error) {
-    console.warn('Skipping', id, item.message)
-    continue
+    console.warn("Skipping", id, item.message);
+    continue;
   }
-  await processItem(item)
-  results.push(item)
+  await processItem(item);
+  results.push(item);
 }
 ```
 
@@ -258,19 +258,19 @@ Always prefer `const` with an expression over `let` assigned later. This elimina
 **Simple: ternary**
 
 ```ts
-const user = fetchResult instanceof Error ? fallbackUser : fetchResult
+const user = fetchResult instanceof Error ? fallbackUser : fetchResult;
 ```
 
 **Medium: IIFE with early returns** — when a ternary gets too nested or involves multiple checks, use an IIFE. It scopes all intermediate variables and uses early returns for clarity:
 
 ```ts
 const config: Config = (() => {
-  const envResult = loadFromEnv()
-  if (!(envResult instanceof Error)) return envResult
-  const fileResult = loadFromFile()
-  if (!(fileResult instanceof Error)) return fileResult
-  return defaultConfig
-})()
+  const envResult = loadFromEnv();
+  if (!(envResult instanceof Error)) return envResult;
+  const fileResult = loadFromFile();
+  if (!(fileResult instanceof Error)) return fileResult;
+  return defaultConfig;
+})();
 ```
 
 > Every `let x; if (...) { x = ... }` can be rewritten as `const x = ternary` or `const x: T = (() => { ... })()`. The IIFE pattern is idiomatic in errore code — it keeps error handling flat with early returns while producing a single immutable binding.
@@ -278,11 +278,11 @@ const config: Config = (() => {
 ### Defining Errors
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 class NotFoundError extends errore.createTaggedError({
-  name: 'NotFoundError',
-  message: 'User $id not found in $database',
+  name: "NotFoundError",
+  message: "User $id not found in $database",
 }) {}
 ```
 
@@ -293,25 +293,25 @@ class NotFoundError extends errore.createTaggedError({
 **Instance properties:**
 
 ```ts
-err._tag // 'NotFoundError'
-err.id // 'abc' (from $id)
-err.database // 'users' (from $database)
-err.message // 'User abc not found in users'
-err.messageTemplate // 'User $id not found in $database'
-err.fingerprint // ['NotFoundError', 'User $id not found in $database']
-err.cause // original error if wrapped
-err.toJSON() // structured JSON with all properties
-err.findCause(DbError) // walks .cause chain, returns typed match or undefined
-NotFoundError.is(val) // static type guard
+err._tag; // 'NotFoundError'
+err.id; // 'abc' (from $id)
+err.database; // 'users' (from $database)
+err.message; // 'User abc not found in users'
+err.messageTemplate; // 'User $id not found in $database'
+err.fingerprint; // ['NotFoundError', 'User $id not found in $database']
+err.cause; // original error if wrapped
+err.toJSON(); // structured JSON with all properties
+err.findCause(DbError); // walks .cause chain, returns typed match or undefined
+NotFoundError.is(val); // static type guard
 ```
 
 ### Returning Errors
 
 ```ts
 async function getUser(id: string) {
-  const user = await db.findUser(id)
-  if (!user) return new NotFoundError({ id, database: 'users' })
-  return user
+  const user = await db.findUser(id);
+  if (!user) return new NotFoundError({ id, database: "users" });
+  return user;
 }
 ```
 
@@ -320,13 +320,13 @@ async function getUser(id: string) {
 ### Handling Errors (Early Return)
 
 ```ts
-const user = await getUser(id)
-if (user instanceof Error) return user
+const user = await getUser(id);
+if (user instanceof Error) return user;
 
-const posts = await getPosts(user.id)
-if (posts instanceof Error) return posts
+const posts = await getPosts(user.id);
+if (posts instanceof Error) return posts;
 
-return posts
+return posts;
 ```
 
 > Each error is checked at the point it occurs. TypeScript narrows the type after each check.
@@ -336,18 +336,18 @@ return posts
 ```ts
 async function fetchJson<T>(url: string): Promise<NetworkError | T> {
   const response = await fetch(url).catch(
-    (e) => new NetworkError({ url, reason: 'Fetch failed', cause: e }),
-  )
-  if (response instanceof Error) return response
+    (e) => new NetworkError({ url, reason: "Fetch failed", cause: e }),
+  );
+  if (response instanceof Error) return response;
 
   if (!response.ok) {
-    return new NetworkError({ url, reason: `HTTP ${response.status}` })
+    return new NetworkError({ url, reason: `HTTP ${response.status}` });
   }
 
   const data = await (response.json() as Promise<T>).catch(
-    (e) => new NetworkError({ url, reason: 'Invalid JSON', cause: e }),
-  )
-  return data
+    (e) => new NetworkError({ url, reason: "Invalid JSON", cause: e }),
+  );
+  return data;
 }
 ```
 
@@ -363,16 +363,16 @@ For **async** boundaries: use `.catch((e) => new MyError({ cause: e }))` directl
 async function getUser(id: string) {
   const res = await fetch(`/users/${id}`).catch(
     (e) => new NetworkError({ url: `/users/${id}`, cause: e }),
-  )
-  if (res instanceof Error) return res
+  );
+  if (res instanceof Error) return res;
 
   const data = await (res.json() as Promise<UserPayload>).catch(
     (e) => new NetworkError({ url: `/users/${id}`, cause: e }),
-  )
-  if (data instanceof Error) return data
+  );
+  if (data instanceof Error) return data;
 
-  if (!data.active) return new InactiveUserError({ id })
-  return { ...data, displayName: `${data.first} ${data.last}` }
+  if (!data.active) return new InactiveUserError({ id });
+  return { ...data, displayName: `${data.first} ${data.last}` };
 }
 ```
 
@@ -384,16 +384,16 @@ async function getUser(id: string) {
 async function findUser(email: string): Promise<DbError | User | null> {
   const result = await db
     .query(email)
-    .catch((e) => new DbError({ message: 'Query failed', cause: e }))
-  if (result instanceof Error) return result
-  return result ?? null
+    .catch((e) => new DbError({ message: "Query failed", cause: e }));
+  if (result instanceof Error) return result;
+  return result ?? null;
 }
 
 // Caller: three-way narrowing
-const user = await findUser('alice@example.com')
-if (user instanceof Error) return user
-if (user === null) return
-console.log(user.name) // User
+const user = await findUser("alice@example.com");
+if (user instanceof Error) return user;
+if (user === null) return;
+console.log(user.name); // User
 ```
 
 > `Error | T | null` gives you three distinct states without nesting Result and Option types.
@@ -405,13 +405,13 @@ const [userResult, postsResult, statsResult] = await Promise.all([
   getUser(id),
   getPosts(id),
   getStats(id),
-])
+]);
 
-if (userResult instanceof Error) return userResult
-if (postsResult instanceof Error) return postsResult
-if (statsResult instanceof Error) return statsResult
+if (userResult instanceof Error) return userResult;
+if (postsResult instanceof Error) return postsResult;
+if (statsResult instanceof Error) return statsResult;
 
-return { user: userResult, posts: postsResult, stats: statsResult }
+return { user: userResult, posts: postsResult, stats: statsResult };
 ```
 
 > Each result is checked individually. You know exactly which operation failed.
@@ -424,10 +424,10 @@ const response = errore.matchError(error, {
     status: 404,
     body: { error: `${e.table} ${e.id} not found` },
   }),
-  DbError: (e) => ({ status: 500, body: { error: 'Database error' } }),
-  Error: (e) => ({ status: 500, body: { error: 'Unexpected error' } }),
-})
-return res.status(response.status).json(response.body)
+  DbError: (e) => ({ status: 500, body: { error: "Database error" } }),
+  Error: (e) => ({ status: 500, body: { error: "Unexpected error" } }),
+});
+return res.status(response.status).json(response.body);
 ```
 
 > `matchError` routes by `_tag` and requires an `Error` fallback for plain Error instances. Use `matchErrorPartial` when you only need to handle some cases.
@@ -449,20 +449,20 @@ errore ships `DisposableStack` and `AsyncDisposableStack` polyfills that work in
 Without this, `using`/`await using` declarations and `Symbol.dispose`/`Symbol.asyncDispose` will produce type errors. The errore polyfill handles the runtime side — this setting handles the type side.
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 async function processRequest(id: string): Promise<DbError | Result> {
-  await using cleanup = new errore.AsyncDisposableStack()
+  await using cleanup = new errore.AsyncDisposableStack();
 
-  const db = await connectDb().catch((e) => new DbError({ cause: e }))
-  if (db instanceof Error) return db
-  cleanup.defer(() => db.close())
+  const db = await connectDb().catch((e) => new DbError({ cause: e }));
+  if (db instanceof Error) return db;
+  cleanup.defer(() => db.close());
 
-  const cache = await openCache().catch((e) => new CacheError({ cause: e }))
-  if (cache instanceof Error) return cache
-  cleanup.defer(() => cache.flush())
+  const cache = await openCache().catch((e) => new CacheError({ cause: e }));
+  if (cache instanceof Error) return cache;
+  cleanup.defer(() => cache.flush());
 
-  return result
+  return result;
   // cleanup runs in LIFO order: cache.flush(), then db.close()
 }
 ```
@@ -473,9 +473,9 @@ async function processRequest(id: string): Promise<DbError | Result> {
 
 ```ts
 const result = errore.try(() =>
-  JSON.parse(fs.readFileSync('config.json', 'utf-8')),
-)
-const config = result instanceof Error ? { port: 3000, debug: false } : result
+  JSON.parse(fs.readFileSync("config.json", "utf-8")),
+);
+const config = result instanceof Error ? { port: 3000, debug: false } : result;
 ```
 
 > Ternary on `instanceof Error` replaces `let` + try-catch. Single expression, no mutation, no intermediate state.
@@ -483,13 +483,13 @@ const config = result instanceof Error ? { port: 3000, debug: false } : result
 ### Walking the Cause Chain (findCause)
 
 ```ts
-const dbErr = error.findCause(DbError)
+const dbErr = error.findCause(DbError);
 if (dbErr) {
-  console.log(dbErr.host) // type-safe access
+  console.log(dbErr.host); // type-safe access
 }
 
 // Or standalone function for any Error
-const dbErr = errore.findCause(error, DbError)
+const dbErr = errore.findCause(error, DbError);
 ```
 
 > `findCause` checks the error itself first, then walks `.cause` recursively. Returns the matched error with full type inference, or `undefined`. Safe against circular references.
@@ -498,24 +498,24 @@ const dbErr = errore.findCause(error, DbError)
 
 ```ts
 class AppError extends Error {
-  statusCode = 500
+  statusCode = 500;
   toResponse() {
-    return { error: this.message, code: this.statusCode }
+    return { error: this.message, code: this.statusCode };
   }
 }
 
 class NotFoundError extends errore.createTaggedError({
-  name: 'NotFoundError',
-  message: 'Resource $id not found',
+  name: "NotFoundError",
+  message: "Resource $id not found",
   extends: AppError,
 }) {
-  statusCode = 404
+  statusCode = 404;
 }
 
-const err = new NotFoundError({ id: '123' })
-err.toResponse() // { error: 'Resource 123 not found', code: 404 }
-err instanceof AppError // true
-err instanceof Error // true
+const err = new NotFoundError({ id: "123" });
+err.toResponse(); // { error: 'Resource 123 not found', code: 404 }
+err instanceof AppError; // true
+err instanceof Error; // true
 ```
 
 > Use `extends` to inherit shared functionality (HTTP status codes, logging methods, response formatting) across all your domain errors.
@@ -524,10 +524,10 @@ err instanceof Error // true
 
 ```ts
 async function legacyHandler(id: string) {
-  const user = await getUser(id)
+  const user = await getUser(id);
   if (user instanceof Error)
-    throw new Error('Failed to get user', { cause: user })
-  return user
+    throw new Error("Failed to get user", { cause: user });
+  return user;
 }
 ```
 
@@ -536,10 +536,10 @@ async function legacyHandler(id: string) {
 ### Partition: Splitting Successes and Failures
 
 ```ts
-const allResults = await Promise.all(ids.map((id) => fetchItem(id)))
-const [items, errors] = errore.partition(allResults)
+const allResults = await Promise.all(ids.map((id) => fetchItem(id)));
+const [items, errors] = errore.partition(allResults);
 
-errors.forEach((e) => console.warn('Failed:', e.message))
+errors.forEach((e) => console.warn("Failed:", e.message));
 // items contains only successful results, fully typed
 ```
 
@@ -552,27 +552,27 @@ errors.forEach((e) => console.warn('Failed:', e.message))
 Always use `errore.isAbortError(error)` to detect abort errors. It walks the entire `.cause` chain, so it works even when the abort error is wrapped by `.catch()`.
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 class TimeoutError extends errore.createTaggedError({
-  name: 'TimeoutError',
-  message: 'Request timed out for $operation',
+  name: "TimeoutError",
+  message: "Request timed out for $operation",
   extends: errore.AbortError,
 }) {}
 
-const controller = new AbortController()
+const controller = new AbortController();
 const timer = setTimeout(
-  () => controller.abort(new TimeoutError({ operation: 'fetch' })),
+  () => controller.abort(new TimeoutError({ operation: "fetch" })),
   5000,
-)
+);
 
 const res = await fetch(url, { signal: controller.signal }).catch(
   (e) => new NetworkError({ url, cause: e }),
-)
-clearTimeout(timer)
+);
+clearTimeout(timer);
 
-if (errore.isAbortError(res)) return res
-if (res instanceof Error) return res
+if (errore.isAbortError(res)) return res;
+if (res instanceof Error) return res;
 ```
 
 > `isAbortError` detects three kinds of abort: (1) native `DOMException` from bare `controller.abort()`, (2) direct `errore.AbortError` instances, (3) tagged errors that extend `errore.AbortError` — even when wrapped in another error's `.cause` chain.
@@ -583,13 +583,17 @@ Check `signal.aborted` before side effects or async operations — same early-re
 
 ```ts
 for (const item of items) {
-  if (signal.aborted) return                    // before work
-  const data = await fetchData(item.id, { signal })
-    .catch((e) => new FetchError({ id: item.id, cause: e }))
-  if (errore.isAbortError(data)) return         // after async
-  if (data instanceof Error) { console.warn(data.message); continue }
-  if (signal.aborted) return                    // before write
-  await db.save(data)
+  if (signal.aborted) return; // before work
+  const data = await fetchData(item.id, { signal }).catch(
+    (e) => new FetchError({ id: item.id, cause: e }),
+  );
+  if (errore.isAbortError(data)) return; // after async
+  if (data instanceof Error) {
+    console.warn(data.message);
+    continue;
+  }
+  if (signal.aborted) return; // before write
+  await db.save(data);
 }
 ```
 
@@ -601,7 +605,7 @@ for (const item of items) {
 
 ```ts
 // BAD: both sides of the union are Error instances
-type Result = MyCustomError | Error
+type Result = MyCustomError | Error;
 // instanceof Error matches BOTH — can't distinguish success from failure
 // Success types must never extend Error
 ```

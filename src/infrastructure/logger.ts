@@ -1,6 +1,10 @@
 import { LoggerPort } from "../application/ports";
 
-const print = (level: string, event: string, payload?: Record<string, unknown>): void => {
+const print = (
+  level: string,
+  event: string,
+  payload?: Record<string, unknown>,
+): void => {
   const row = {
     level,
     event,

@@ -1,5 +1,8 @@
 import * as appErrors from "../../domain/errors";
-import { BotCommandDef, createBotCommands } from "../../application/bot-commands";
+import {
+  BotCommandDef,
+  createBotCommands,
+} from "../../application/bot-commands";
 import { ChatCommandResolver } from "../../application/chat-command-resolver";
 import { GameQueryService } from "../../application/game-query-service";
 import { LoggerPort } from "../../application/ports";
@@ -12,7 +15,10 @@ type TelegramScope =
   | { type: "chat_member"; chat_id: number | string; user_id: number };
 
 interface TelegramCommandsApi {
-  setMyCommands(commands: readonly BotCommandDef[], options?: { scope?: TelegramScope }): Promise<unknown>;
+  setMyCommands(
+    commands: readonly BotCommandDef[],
+    options?: { scope?: TelegramScope },
+  ): Promise<unknown>;
   deleteMyCommands(options?: { scope?: TelegramScope }): Promise<unknown>;
 }
 
@@ -21,7 +27,9 @@ const toNumericChatId = (id: string): number | string => {
   return Number.isSafeInteger(parsed) ? parsed : id;
 };
 
-const toNumericUserId = (id: string): number | appErrors.CommandSyncAppError => {
+const toNumericUserId = (
+  id: string,
+): number | appErrors.CommandSyncAppError => {
   const parsed = Number(id);
   if (!Number.isSafeInteger(parsed)) {
     return new appErrors.CommandSyncError({ scope: id });
@@ -56,7 +64,8 @@ const scopeLabel = (scope: TelegramScope): string => {
   return `chat_member:${scope.chat_id}:${scope.user_id}`;
 };
 
-const commandsSignature = (commands: readonly BotCommandDef[]): string => JSON.stringify(commands);
+const commandsSignature = (commands: readonly BotCommandDef[]): string =>
+  JSON.stringify(commands);
 
 export class TelegramCommandSync {
   private readonly appliedScopeCommands = new Map<string, string>();
@@ -78,11 +87,19 @@ export class TelegramCommandSync {
   }
 
   async syncPrivateCommands(): Promise<void | appErrors.CommandSyncAppError> {
-    return this.applyScope({ type: "all_private_chats" }, this.commands.PRIVATE_COMMANDS, "global");
+    return this.applyScope(
+      { type: "all_private_chats" },
+      this.commands.PRIVATE_COMMANDS,
+      "global",
+    );
   }
 
   async syncGroupCommands(): Promise<void | appErrors.CommandSyncAppError> {
-    return this.applyScope({ type: "all_group_chats" }, this.commands.GROUP_COMMANDS, "global");
+    return this.applyScope(
+      { type: "all_group_chats" },
+      this.commands.GROUP_COMMANDS,
+      "global",
+    );
   }
 
   async syncActiveChats(): Promise<void | appErrors.CommandSyncAppError> {
@@ -93,14 +110,18 @@ export class TelegramCommandSync {
     return this.syncChats(this.queryService.listKnownChatIds());
   }
 
-  async syncChats(chatIds: Iterable<string>): Promise<void | appErrors.CommandSyncAppError> {
+  async syncChats(
+    chatIds: Iterable<string>,
+  ): Promise<void | appErrors.CommandSyncAppError> {
     for (const chatId of chatIds) {
       const result = await this.syncChat(chatId);
       if (result instanceof Error) return result;
     }
   }
 
-  async syncChat(chatId: string): Promise<void | appErrors.CommandSyncAppError> {
+  async syncChat(
+    chatId: string,
+  ): Promise<void | appErrors.CommandSyncAppError> {
     const game = this.queryService.findActiveGameByChatId(chatId);
     const resolution = this.resolver.resolve(game);
 
@@ -135,14 +156,22 @@ export class TelegramCommandSync {
       if (memberScopeResult instanceof Error) return memberScopeResult;
     }
 
-    const previousMembers = this.appliedChatMembers.get(chatId) ?? new Set<string>();
-    const nextMembers = new Set([...nextOverrides.keys()].filter((telegramUserId) => (nextOverrides.get(telegramUserId)?.length ?? 0) > 0));
+    const previousMembers =
+      this.appliedChatMembers.get(chatId) ?? new Set<string>();
+    const nextMembers = new Set(
+      [...nextOverrides.keys()].filter(
+        (telegramUserId) =>
+          (nextOverrides.get(telegramUserId)?.length ?? 0) > 0,
+      ),
+    );
 
     const cleanupCandidates = new Set(previousMembers);
     const forceDeleteStaleMemberScopes = game === null;
 
     if (forceDeleteStaleMemberScopes) {
-      for (const telegramUserId of this.queryService.listKnownTelegramUserIdsByChatId(chatId)) {
+      for (const telegramUserId of this.queryService.listKnownTelegramUserIdsByChatId(
+        chatId,
+      )) {
         cleanupCandidates.add(telegramUserId);
       }
     }
@@ -214,7 +243,13 @@ export class TelegramCommandSync {
     const result = await this.api
       .setMyCommands(commands, { scope })
       .then(() => undefined)
-      .catch((error): appErrors.CommandSyncAppError => new appErrors.CommandSyncError({ scope: scopeLabel(scope), cause: error }));
+      .catch(
+        (error): appErrors.CommandSyncAppError =>
+          new appErrors.CommandSyncError({
+            scope: scopeLabel(scope),
+            cause: error,
+          }),
+      );
     if (result instanceof Error) {
       this.logger.error("commands_sync_failed", {
         chatId,
@@ -251,7 +286,13 @@ export class TelegramCommandSync {
     const result = await this.api
       .deleteMyCommands({ scope })
       .then(() => undefined)
-      .catch((error): appErrors.CommandSyncAppError => new appErrors.CommandSyncError({ scope: scopeLabel(scope), cause: error }));
+      .catch(
+        (error): appErrors.CommandSyncAppError =>
+          new appErrors.CommandSyncError({
+            scope: scopeLabel(scope),
+            cause: error,
+          }),
+      );
     if (result instanceof Error) {
       this.logger.error("commands_sync_failed", {
         chatId,

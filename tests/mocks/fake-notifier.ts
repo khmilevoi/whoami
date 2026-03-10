@@ -29,9 +29,14 @@ export interface SentPrivateKeyboard {
   buttons: Button[][];
 }
 
-export type SentNotification = SentGroupMessage | SentGroupKeyboard | SentPrivateMessage | SentPrivateKeyboard;
+export type SentNotification =
+  | SentGroupMessage
+  | SentGroupKeyboard
+  | SentPrivateMessage
+  | SentPrivateKeyboard;
 
-const cloneButtons = (buttons: Button[][]): Button[][] => buttons.map((row) => row.map((button) => ({ ...button })));
+const cloneButtons = (buttons: Button[][]): Button[][] =>
+  buttons.map((row) => row.map((button) => ({ ...button })));
 
 export class FakeNotifier implements NotifierPort {
   readonly sent: SentNotification[] = [];
@@ -48,11 +53,18 @@ export class FakeNotifier implements NotifierPort {
     this.failedPrivateKeyboards.add(userId);
   }
 
-  async sendGroupMessage(chatId: string, text: string): Promise<void | NotificationError> {
+  async sendGroupMessage(
+    chatId: string,
+    text: string,
+  ): Promise<void | NotificationError> {
     this.sent.push({ kind: "group-message", chatId, text });
   }
 
-  async sendGroupKeyboard(chatId: string, text: string, buttons: Button[][]): Promise<void | NotificationError> {
+  async sendGroupKeyboard(
+    chatId: string,
+    text: string,
+    buttons: Button[][],
+  ): Promise<void | NotificationError> {
     this.sent.push({
       kind: "group-keyboard",
       chatId,
@@ -70,7 +82,11 @@ export class FakeNotifier implements NotifierPort {
     return true;
   }
 
-  async sendPrivateKeyboard(userId: string, text: string, buttons: Button[][]): Promise<boolean> {
+  async sendPrivateKeyboard(
+    userId: string,
+    text: string,
+    buttons: Button[][],
+  ): Promise<boolean> {
     if (this.failedPrivateKeyboards.has(userId)) {
       return false;
     }

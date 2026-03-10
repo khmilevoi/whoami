@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { PlayerCannotPairWithSelfError } from "../../src/domain/errors";
-import { buildRandomDerangement, validateManualPairChoice } from "../../src/domain/pairing";
+import {
+  buildRandomDerangement,
+  validateManualPairChoice,
+} from "../../src/domain/pairing";
 
 describe("pairing", () => {
   it("builds derangement without self pair", () => {
@@ -23,6 +26,8 @@ describe("pairing", () => {
   });
 
   it("returns error for manual self pair", () => {
-    expect(validateManualPairChoice("a", "a", {}, ["a", "b"])).toBeInstanceOf(PlayerCannotPairWithSelfError);
+    expect(validateManualPairChoice("a", "a", {}, ["a", "b"])).toBeInstanceOf(
+      PlayerCannotPairWithSelfError,
+    );
   });
 });

@@ -17,7 +17,13 @@ export interface ChatCommandResolution {
 
 export interface BotCommandCatalog {
   BOT_COMMANDS: Record<
-    "START_PRIVATE" | "START_GAME" | "JOIN" | "CONFIG" | "CANCEL" | "GIVEUP" | "ASK",
+    | "START_PRIVATE"
+    | "START_GAME"
+    | "JOIN"
+    | "CONFIG"
+    | "CANCEL"
+    | "GIVEUP"
+    | "ASK",
     BotCommandDef
   >;
   PRIVATE_COMMANDS: BotCommandDef[];
@@ -27,12 +33,27 @@ export interface BotCommandCatalog {
 
 export const createBotCommands = (texts: TextService): BotCommandCatalog => {
   const BOT_COMMANDS = {
-    START_PRIVATE: { command: "start", description: texts.commandOpenPrivateChatDescription() },
-    START_GAME: { command: "whoami_start", description: texts.commandCreateGameDescription() },
+    START_PRIVATE: {
+      command: "start",
+      description: texts.commandOpenPrivateChatDescription(),
+    },
+    START_GAME: {
+      command: "whoami_start",
+      description: texts.commandCreateGameDescription(),
+    },
     JOIN: { command: "join", description: texts.commandJoinGameDescription() },
-    CONFIG: { command: "whoami_config", description: texts.commandConfigureGameDescription() },
-    CANCEL: { command: "whoami_cancel", description: texts.commandCancelGameDescription() },
-    GIVEUP: { command: "giveup", description: texts.commandGiveUpDescription() },
+    CONFIG: {
+      command: "whoami_config",
+      description: texts.commandConfigureGameDescription(),
+    },
+    CANCEL: {
+      command: "whoami_cancel",
+      description: texts.commandCancelGameDescription(),
+    },
+    GIVEUP: {
+      command: "giveup",
+      description: texts.commandGiveUpDescription(),
+    },
     ASK: { command: "ask", description: texts.commandAskOfflineDescription() },
   } as const satisfies Record<string, BotCommandDef>;
 

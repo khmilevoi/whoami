@@ -98,7 +98,10 @@ export class FakeGameRepository implements GameRepository {
     }
 
     const conflict = Array.from(this.games.values()).find(
-      (existing) => existing.id !== currentId && existing.chatId === next.chatId && activeStages.has(existing.stage),
+      (existing) =>
+        existing.id !== currentId &&
+        existing.chatId === next.chatId &&
+        activeStages.has(existing.stage),
     );
 
     if (conflict) {

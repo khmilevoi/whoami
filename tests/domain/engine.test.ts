@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { GameEngine } from "../../src/domain/game-engine";
-import { ExpectedStageMismatchError, GameEngineError } from "../../src/domain/errors";
+import {
+  ExpectedStageMismatchError,
+  GameEngineError,
+} from "../../src/domain/errors";
 import { GameState } from "../../src/domain/types";
 
 const engine = new GameEngine();
@@ -58,7 +61,14 @@ describe("game engine", () => {
       ),
     );
 
-    game = unwrap(engine.closeLobby(game, "p1", { minPlayers: 2, maxPlayers: 20 }, "2026-01-01T00:02:00.000Z"));
+    game = unwrap(
+      engine.closeLobby(
+        game,
+        "p1",
+        { minPlayers: 2, maxPlayers: 20 },
+        "2026-01-01T00:02:00.000Z",
+      ),
+    );
     game = unwrap(
       engine.configureGame(
         game,
@@ -73,22 +83,42 @@ describe("game engine", () => {
     );
 
     for (const player of game.players) {
-      game = unwrap(engine.submitWord(game, player.id, `word-${player.id}`, "2026-01-01T00:04:00.000Z"));
-      game = unwrap(engine.confirmWord(game, player.id, true, "2026-01-01T00:05:00.000Z"));
-      game = unwrap(engine.submitClue(game, player.id, undefined, "2026-01-01T00:06:00.000Z"));
-      game = unwrap(engine.finalizeWord(game, player.id, true, "2026-01-01T00:07:00.000Z"));
+      game = unwrap(
+        engine.submitWord(
+          game,
+          player.id,
+          `word-${player.id}`,
+          "2026-01-01T00:04:00.000Z",
+        ),
+      );
+      game = unwrap(
+        engine.confirmWord(game, player.id, true, "2026-01-01T00:05:00.000Z"),
+      );
+      game = unwrap(
+        engine.submitClue(
+          game,
+          player.id,
+          undefined,
+          "2026-01-01T00:06:00.000Z",
+        ),
+      );
+      game = unwrap(
+        engine.finalizeWord(game, player.id, true, "2026-01-01T00:07:00.000Z"),
+      );
     }
 
     game = unwrap(engine.startGameIfReady(game, "2026-01-01T00:08:00.000Z"));
 
     const firstAskerId = game.inProgress.turnOrder[game.inProgress.turnCursor];
-    const firstVoterId = game.players.find((player) => player.id !== firstAskerId)?.id;
+    const firstVoterId = game.players.find(
+      (player) => player.id !== firstAskerId,
+    )?.id;
     expect(firstAskerId).toBeDefined();
     expect(firstVoterId).toBeDefined();
 
     game = unwrap(
       engine.askQuestion(game, {
-        actorPlayerId: firstAskerId!,
+        actorPlayerId: firstAskerId,
         questionText: "q1",
         voteId: "v1",
         now: "2026-01-01T00:09:00.000Z",
@@ -105,7 +135,9 @@ describe("game engine", () => {
       }),
     );
 
-    expect(game.players.find((player) => player.id === firstAskerId)?.stage).toBe("GUESSED");
+    expect(
+      game.players.find((player) => player.id === firstAskerId)?.stage,
+    ).toBe("GUESSED");
 
     const secondAskerId = game.inProgress.turnOrder[game.inProgress.turnCursor];
     expect(secondAskerId).toBe(firstVoterId);
@@ -119,7 +151,9 @@ describe("game engine", () => {
       }),
     );
 
-    expect(game.inProgress.pendingVote?.eligibleVoterIds).toEqual([firstAskerId]);
+    expect(game.inProgress.pendingVote?.eligibleVoterIds).toEqual([
+      firstAskerId,
+    ]);
   });
 
   it("finishes normal game when last active player gives up", () => {
@@ -161,7 +195,14 @@ describe("game engine", () => {
       ),
     );
 
-    game = unwrap(engine.closeLobby(game, "p1", { minPlayers: 3, maxPlayers: 20 }, "2026-01-01T00:03:00.000Z"));
+    game = unwrap(
+      engine.closeLobby(
+        game,
+        "p1",
+        { minPlayers: 3, maxPlayers: 20 },
+        "2026-01-01T00:03:00.000Z",
+      ),
+    );
     game = unwrap(
       engine.configureGame(
         game,
@@ -176,10 +217,28 @@ describe("game engine", () => {
     );
 
     for (const player of game.players) {
-      game = unwrap(engine.submitWord(game, player.id, `word-${player.id}`, "2026-01-01T00:05:00.000Z"));
-      game = unwrap(engine.confirmWord(game, player.id, true, "2026-01-01T00:06:00.000Z"));
-      game = unwrap(engine.submitClue(game, player.id, undefined, "2026-01-01T00:07:00.000Z"));
-      game = unwrap(engine.finalizeWord(game, player.id, true, "2026-01-01T00:08:00.000Z"));
+      game = unwrap(
+        engine.submitWord(
+          game,
+          player.id,
+          `word-${player.id}`,
+          "2026-01-01T00:05:00.000Z",
+        ),
+      );
+      game = unwrap(
+        engine.confirmWord(game, player.id, true, "2026-01-01T00:06:00.000Z"),
+      );
+      game = unwrap(
+        engine.submitClue(
+          game,
+          player.id,
+          undefined,
+          "2026-01-01T00:07:00.000Z",
+        ),
+      );
+      game = unwrap(
+        engine.finalizeWord(game, player.id, true, "2026-01-01T00:08:00.000Z"),
+      );
     }
 
     game = unwrap(engine.startGameIfReady(game, "2026-01-01T00:09:00.000Z"));

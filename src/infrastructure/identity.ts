@@ -8,7 +8,10 @@ export class TelegramIdentityPort implements IdentityPort {
     firstName?: string;
     lastName?: string;
   }): PlayerIdentity {
-    const display = [input.firstName, input.lastName].filter(Boolean).join(" ").trim() || input.username || input.telegramUserId;
+    const display =
+      [input.firstName, input.lastName].filter(Boolean).join(" ").trim() ||
+      input.username ||
+      input.telegramUserId;
 
     return {
       id: `tg:${input.telegramUserId}`,

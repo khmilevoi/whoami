@@ -12,9 +12,9 @@ export function map<V, U>(
   fn: (v: Exclude<V, Error>) => U,
 ): Extract<V, Error> | U {
   if (value instanceof Error) {
-    return value as Extract<V, Error>
+    return value as Extract<V, Error>;
   }
-  return fn(value as Exclude<V, Error>)
+  return fn(value as Exclude<V, Error>);
 }
 
 /**
@@ -30,9 +30,9 @@ export function mapError<V, E2 extends Error>(
   fn: (e: Extract<V, Error>) => E2,
 ): E2 | Exclude<V, Error> {
   if (value instanceof Error) {
-    return fn(value as Extract<V, Error>)
+    return fn(value as Extract<V, Error>);
   }
-  return value as Exclude<V, Error>
+  return value as Exclude<V, Error>;
 }
 
 /**
@@ -50,9 +50,9 @@ export function andThen<V, R>(
   fn: (v: Exclude<V, Error>) => R,
 ): Extract<V, Error> | R {
   if (value instanceof Error) {
-    return value as Extract<V, Error>
+    return value as Extract<V, Error>;
   }
-  return fn(value as Exclude<V, Error>)
+  return fn(value as Exclude<V, Error>);
 }
 
 /**
@@ -69,9 +69,9 @@ export async function andThenAsync<V, R>(
   fn: (v: Exclude<V, Error>) => Promise<R>,
 ): Promise<Extract<V, Error> | R> {
   if (value instanceof Error) {
-    return value as Extract<V, Error>
+    return value as Extract<V, Error>;
   }
-  return fn(value as Exclude<V, Error>)
+  return fn(value as Exclude<V, Error>);
 }
 
 /**
@@ -83,9 +83,9 @@ export async function andThenAsync<V, R>(
  */
 export function tap<V>(value: V, fn: (v: Exclude<V, Error>) => void): V {
   if (!(value instanceof Error)) {
-    fn(value as Exclude<V, Error>)
+    fn(value as Exclude<V, Error>);
   }
-  return value
+  return value;
 }
 
 /**
@@ -101,7 +101,7 @@ export async function tapAsync<V>(
   fn: (v: Exclude<V, Error>) => Promise<void>,
 ): Promise<V> {
   if (!(value instanceof Error)) {
-    await fn(value as Exclude<V, Error>)
+    await fn(value as Exclude<V, Error>);
   }
-  return value
+  return value;
 }

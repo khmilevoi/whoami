@@ -34,4 +34,3 @@ export const loadConfig = (): AppConfig => {
     voteTimeoutSec: toInt(process.env.VOTE_TIMEOUT_SEC, 90),
   };
 };
-

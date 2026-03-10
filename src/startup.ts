@@ -11,7 +11,10 @@ interface StartupDependencies {
   logger: LoggerPort;
 }
 
-const logStartupError = (logger: LoggerPort, error: appErrors.StartupAppError): void => {
+const logStartupError = (
+  logger: LoggerPort,
+  error: appErrors.StartupAppError,
+): void => {
   errore.matchError(error, {
     CommandSyncError: (typedError) => {
       logger.error("commands_sync_failed", {
@@ -40,7 +43,9 @@ const runCommandSyncTask = async (
   action: () => Promise<void | appErrors.CommandSyncAppError>,
   logger: LoggerPort,
 ): Promise<void> => {
-  const result = await action().catch((cause) => new appErrors.StartupTaskError({ task, cause }));
+  const result = await action().catch(
+    (cause) => new appErrors.StartupTaskError({ task, cause }),
+  );
   if (result instanceof Error) {
     logStartupError(logger, result);
   }
@@ -51,19 +56,44 @@ const runRecoveryTask = async (
   action: () => Promise<void | RecoveryStartupError>,
   logger: LoggerPort,
 ): Promise<void> => {
-  const result = await action().catch((cause) => new appErrors.StartupTaskError({ task, cause }));
+  const result = await action().catch(
+    (cause) => new appErrors.StartupTaskError({ task, cause }),
+  );
   if (result instanceof appErrors.StartupTaskError) {
     logStartupError(logger, result);
     return;
   }
   if (result instanceof Error) {
-    logStartupError(logger, new appErrors.StartupTaskError({ task, cause: result }));
+    logStartupError(
+      logger,
+      new appErrors.StartupTaskError({ task, cause: result }),
+    );
   }
 };
 
-export const runStartupTasks = async ({ commandSync, gameService, logger }: StartupDependencies): Promise<void> => {
-  await runCommandSyncTask("syncPrivateCommands", () => commandSync.syncPrivateCommands(), logger);
-  await runCommandSyncTask("syncGroupCommands", () => commandSync.syncGroupCommands(), logger);
-  await runCommandSyncTask("syncKnownChats", () => commandSync.syncKnownChats(), logger);
-  await runRecoveryTask("recoverManualPairingPromptsOnStartup", () => gameService.recoverManualPairingPromptsOnStartup(), logger);
+export const runStartupTasks = async ({
+  commandSync,
+  gameService,
+  logger,
+}: StartupDependencies): Promise<void> => {
+  await runCommandSyncTask(
+    "syncPrivateCommands",
+    () => commandSync.syncPrivateCommands(),
+    logger,
+  );
+  await runCommandSyncTask(
+    "syncGroupCommands",
+    () => commandSync.syncGroupCommands(),
+    logger,
+  );
+  await runCommandSyncTask(
+    "syncKnownChats",
+    () => commandSync.syncKnownChats(),
+    logger,
+  );
+  await runRecoveryTask(
+    "recoverManualPairingPromptsOnStartup",
+    () => gameService.recoverManualPairingPromptsOnStartup(),
+    logger,
+  );
 };

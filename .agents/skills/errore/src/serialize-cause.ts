@@ -3,7 +3,7 @@
  */
 export const serializeCause = (cause: unknown): unknown => {
   if (cause instanceof Error) {
-    return { name: cause.name, message: cause.message, stack: cause.stack }
+    return { name: cause.name, message: cause.message, stack: cause.stack };
   }
-  return cause
-}
+  return cause;
+};

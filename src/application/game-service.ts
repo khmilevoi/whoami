@@ -2,7 +2,15 @@ import * as appErrors from "../domain/errors";
 import { GameEngine } from "../domain/game-engine";
 import { GameMode, VoteDecision } from "../domain/types";
 import type { GameServiceError, RecoveryStartupError } from "./errors";
-import { ClockPort, GameRepository, IdPort, IdentityPort, LoggerPort, NotifierPort, TransactionRunner } from "./ports";
+import {
+  ClockPort,
+  GameRepository,
+  IdPort,
+  IdentityPort,
+  LoggerPort,
+  NotifierPort,
+  TransactionRunner,
+} from "./ports";
 import { GameServiceContext } from "./game-service-context";
 import { GameModeService } from "./modes/game-mode-service";
 import { NormalModeService } from "./modes/normal-mode-service";
@@ -64,9 +72,18 @@ export class GameService {
       [reverseModeService.mode, reverseModeService],
     ]);
 
-    const readyStartStage = new ReadyStartStageService(this.context, [...this.modeServices.values()]);
-    this.wordPreparationStage = new WordPreparationStageService(this.context, expectationStore, readyStartStage);
-    this.normalPairingStage = new NormalPairingStageService(this.context, this.wordPreparationStage);
+    const readyStartStage = new ReadyStartStageService(this.context, [
+      ...this.modeServices.values(),
+    ]);
+    this.wordPreparationStage = new WordPreparationStageService(
+      this.context,
+      expectationStore,
+      readyStartStage,
+    );
+    this.normalPairingStage = new NormalPairingStageService(
+      this.context,
+      this.wordPreparationStage,
+    );
     this.configurationStage = new ConfigurationStageService(
       this.context,
       configDraftStore,
@@ -75,7 +92,10 @@ export class GameService {
     );
   }
 
-  async startGame(chatId: string, actor: ActorInput): Promise<void | GameServiceError> {
+  async startGame(
+    chatId: string,
+    actor: ActorInput,
+  ): Promise<void | GameServiceError> {
     const player = this.identity.toPlayerIdentity({
       telegramUserId: actor.telegramUserId,
       username: actor.username,
@@ -103,12 +123,22 @@ export class GameService {
     });
     if (game instanceof Error) return game;
 
-    const sentStart = await this.notifier.sendGroupMessage(chatId, this.texts.gameStarted(player.displayName));
+    const sentStart = await this.notifier.sendGroupMessage(
+      chatId,
+      this.texts.gameStarted(player.displayName),
+    );
     if (sentStart instanceof Error) return sentStart;
-    this.logger.info("game_started", { gameId: game.id, chatId, creator: player.id });
+    this.logger.info("game_started", {
+      gameId: game.id,
+      chatId,
+      creator: player.id,
+    });
   }
 
-  async joinGame(chatId: string, actor: ActorInput): Promise<void | GameServiceError> {
+  async joinGame(
+    chatId: string,
+    actor: ActorInput,
+  ): Promise<void | GameServiceError> {
     const player = this.identity.toPlayerIdentity({
       telegramUserId: actor.telegramUserId,
       username: actor.username,
@@ -120,7 +150,12 @@ export class GameService {
       const current = this.context.getGameByChatOrError(chatId);
       if (current instanceof Error) return current;
 
-      const updated = this.engine.joinGame(current, player, this.limits, this.clock.nowIso());
+      const updated = this.engine.joinGame(
+        current,
+        player,
+        this.limits,
+        this.clock.nowIso(),
+      );
       if (updated instanceof Error) return updated;
 
       this.repository.update(updated);
@@ -128,21 +163,35 @@ export class GameService {
     });
     if (game instanceof Error) return game;
 
-    const sentJoin = await this.notifier.sendGroupMessage(chatId, this.texts.playerJoined(player.displayName, game.players.length));
+    const sentJoin = await this.notifier.sendGroupMessage(
+      chatId,
+      this.texts.playerJoined(player.displayName, game.players.length),
+    );
     if (sentJoin instanceof Error) return sentJoin;
   }
 
-  async beginConfiguration(chatId: string, actorTelegramUserId: string): Promise<void | GameServiceError> {
+  async beginConfiguration(
+    chatId: string,
+    actorTelegramUserId: string,
+  ): Promise<void | GameServiceError> {
     const now = this.clock.nowIso();
 
     const game = this.transactionRunner.runInTransaction(() => {
       const current = this.context.getGameByChatOrError(chatId);
       if (current instanceof Error) return current;
 
-      const actorPlayer = this.context.getPlayerByTelegramOrError(current, actorTelegramUserId);
+      const actorPlayer = this.context.getPlayerByTelegramOrError(
+        current,
+        actorTelegramUserId,
+      );
       if (actorPlayer instanceof Error) return actorPlayer;
 
-      const updated = this.engine.closeLobby(current, actorPlayer.id, this.limits, now);
+      const updated = this.engine.closeLobby(
+        current,
+        actorPlayer.id,
+        this.limits,
+        now,
+      );
       if (updated instanceof Error) return updated;
 
       this.repository.update(updated);
@@ -150,20 +199,35 @@ export class GameService {
     });
     if (game instanceof Error) return game;
 
-    const creator = game.players.find((player) => player.id === game.creatorPlayerId);
+    const creator = game.players.find(
+      (player) => player.id === game.creatorPlayerId,
+    );
     if (!creator) {
       return;
     }
 
-    const sentConfiguring = await this.notifier.sendGroupMessage(chatId, this.texts.lobbyClosedConfiguringInPrivate());
+    const sentConfiguring = await this.notifier.sendGroupMessage(
+      chatId,
+      this.texts.lobbyClosedConfiguringInPrivate(),
+    );
     if (sentConfiguring instanceof Error) return sentConfiguring;
 
     const ok = await this.notifier.sendPrivateKeyboard(
       creator.telegramUserId,
       this.texts.chooseGameModePrompt(),
       [
-        [{ text: this.texts.gameModeButton("NORMAL"), data: `cfg:mode:NORMAL:${game.id}` }],
-        [{ text: this.texts.gameModeButton("REVERSE"), data: `cfg:mode:REVERSE:${game.id}` }],
+        [
+          {
+            text: this.texts.gameModeButton("NORMAL"),
+            data: `cfg:mode:NORMAL:${game.id}`,
+          },
+        ],
+        [
+          {
+            text: this.texts.gameModeButton("REVERSE"),
+            data: `cfg:mode:REVERSE:${game.id}`,
+          },
+        ],
       ],
     );
 
@@ -172,7 +236,11 @@ export class GameService {
         const current = this.context.getGameByIdOrError(game.id);
         if (current instanceof Error) return current;
 
-        const next = this.engine.markDmBlocked(current, creator.id, this.clock.nowIso());
+        const next = this.engine.markDmBlocked(
+          current,
+          creator.id,
+          this.clock.nowIso(),
+        );
         if (next instanceof Error) return next;
 
         this.repository.update(next);
@@ -180,7 +248,10 @@ export class GameService {
       });
       if (updated instanceof Error) return updated;
 
-      const sentFallback = await this.notifier.sendGroupMessage(chatId, this.texts.creatorDmRequired(this.notifier.buildBotDeepLink()));
+      const sentFallback = await this.notifier.sendGroupMessage(
+        chatId,
+        this.texts.creatorDmRequired(this.notifier.buildBotDeepLink()),
+      );
       if (sentFallback instanceof Error) return sentFallback;
     }
   }
@@ -191,14 +262,30 @@ export class GameService {
     key: "mode" | "play" | "pair",
     value: string,
   ): Promise<void | GameServiceError> {
-    return this.configurationStage.applyConfigStep(gameId, actorTelegramUserId, key, value);
+    return this.configurationStage.applyConfigStep(
+      gameId,
+      actorTelegramUserId,
+      key,
+      value,
+    );
   }
 
-  async applyManualPair(gameId: string, chooserTelegramUserId: string, targetPlayerId: string): Promise<void | GameServiceError> {
-    return this.normalPairingStage.applyManualPair(gameId, chooserTelegramUserId, targetPlayerId);
+  async applyManualPair(
+    gameId: string,
+    chooserTelegramUserId: string,
+    targetPlayerId: string,
+  ): Promise<void | GameServiceError> {
+    return this.normalPairingStage.applyManualPair(
+      gameId,
+      chooserTelegramUserId,
+      targetPlayerId,
+    );
   }
 
-  async handlePrivateText(telegramUserId: string, text: string): Promise<void | GameServiceError> {
+  async handlePrivateText(
+    telegramUserId: string,
+    text: string,
+  ): Promise<void | GameServiceError> {
     return this.wordPreparationStage.handlePrivateText(telegramUserId, text);
   }
 
@@ -208,22 +295,38 @@ export class GameService {
     action: "confirm" | "clue" | "final",
     value: "YES" | "NO",
   ): Promise<void | GameServiceError> {
-    return this.wordPreparationStage.handleWordCallback(gameId, telegramUserId, action, value);
+    return this.wordPreparationStage.handleWordCallback(
+      gameId,
+      telegramUserId,
+      action,
+      value,
+    );
   }
 
-  async handlePrivateStart(telegramUserId: string): Promise<void | GameServiceError> {
+  async handlePrivateStart(
+    telegramUserId: string,
+  ): Promise<void | GameServiceError> {
     const games = this.repository.listActiveGames();
-    const matched = games.filter((game) => game.players.some((player) => player.telegramUserId === telegramUserId));
+    const matched = games.filter((game) =>
+      game.players.some((player) => player.telegramUserId === telegramUserId),
+    );
 
     for (const game of matched) {
       const updated = this.transactionRunner.runInTransaction(() => {
         const current = this.context.getGameByIdOrError(game.id);
         if (current instanceof Error) return current;
 
-        const player = this.context.getPlayerByTelegramOrError(current, telegramUserId);
+        const player = this.context.getPlayerByTelegramOrError(
+          current,
+          telegramUserId,
+        );
         if (player instanceof Error) return player;
 
-        const next = this.engine.markDmOpened(current, player.id, this.clock.nowIso());
+        const next = this.engine.markDmOpened(
+          current,
+          player.id,
+          this.clock.nowIso(),
+        );
         if (next instanceof Error) return next;
 
         this.repository.update(next);
@@ -233,18 +336,28 @@ export class GameService {
     }
 
     if (matched.length === 0) {
-      await this.notifier.sendPrivateMessage(telegramUserId, this.texts.noActiveGamesForUser());
+      await this.notifier.sendPrivateMessage(
+        telegramUserId,
+        this.texts.noActiveGamesForUser(),
+      );
       return;
     }
 
-    await this.notifier.sendPrivateMessage(telegramUserId, this.texts.privateChatActivated());
+    await this.notifier.sendPrivateMessage(
+      telegramUserId,
+      this.texts.privateChatActivated(),
+    );
   }
 
   async recoverManualPairingPromptsOnStartup(): Promise<void | RecoveryStartupError> {
     return this.normalPairingStage.recoverPromptsOnStartup();
   }
 
-  async handleGroupText(chatId: string, telegramUserId: string, text: string): Promise<void | GameServiceError> {
+  async handleGroupText(
+    chatId: string,
+    telegramUserId: string,
+    text: string,
+  ): Promise<void | GameServiceError> {
     const game = this.repository.findActiveByChatId(chatId);
     if (!game?.config?.mode) {
       return;
@@ -255,7 +368,10 @@ export class GameService {
     return modeService.handleGroupText(chatId, telegramUserId, text);
   }
 
-  async askOffline(chatId: string, telegramUserId: string): Promise<void | GameServiceError> {
+  async askOffline(
+    chatId: string,
+    telegramUserId: string,
+  ): Promise<void | GameServiceError> {
     const game = this.repository.findActiveByChatId(chatId);
     if (!game?.config?.mode) {
       return;
@@ -266,7 +382,11 @@ export class GameService {
     return modeService.askOffline(chatId, telegramUserId);
   }
 
-  async handleVote(gameId: string, telegramUserId: string, decision: VoteDecision): Promise<void | GameServiceError> {
+  async handleVote(
+    gameId: string,
+    telegramUserId: string,
+    decision: VoteDecision,
+  ): Promise<void | GameServiceError> {
     const game = this.context.getGameByIdOrError(gameId);
     if (game instanceof Error) return game;
 
@@ -279,14 +399,20 @@ export class GameService {
     return modeService.handleVote(gameId, telegramUserId, decision);
   }
 
-  async giveUp(chatId: string, telegramUserId: string): Promise<void | GameServiceError> {
+  async giveUp(
+    chatId: string,
+    telegramUserId: string,
+  ): Promise<void | GameServiceError> {
     const game = this.repository.findActiveByChatId(chatId);
     if (!game) {
       return;
     }
 
     if (game.stage !== "IN_PROGRESS") {
-      const sentMessage = await this.notifier.sendGroupMessage(chatId, this.texts.giveUpOnlyDuringGame());
+      const sentMessage = await this.notifier.sendGroupMessage(
+        chatId,
+        this.texts.giveUpOnlyDuringGame(),
+      );
       if (sentMessage instanceof Error) return sentMessage;
       return;
     }
@@ -300,7 +426,10 @@ export class GameService {
     return modeService.giveUp(chatId, telegramUserId);
   }
 
-  async cancel(chatId: string, telegramUserId: string): Promise<void | GameServiceError> {
+  async cancel(
+    chatId: string,
+    telegramUserId: string,
+  ): Promise<void | GameServiceError> {
     const game = this.repository.findActiveByChatId(chatId);
     if (!game) {
       return;
@@ -317,17 +446,26 @@ export class GameService {
       const current = this.context.getGameByIdOrError(game.id);
       if (current instanceof Error) return current;
 
-      const next = this.engine.cancelGame(current, "Canceled by creator", this.clock.nowIso());
+      const next = this.engine.cancelGame(
+        current,
+        "Canceled by creator",
+        this.clock.nowIso(),
+      );
       this.repository.update(next);
       return next;
     });
     if (updated instanceof Error) return updated;
 
-    const sentCancel = await this.notifier.sendGroupMessage(updated.chatId, this.texts.gameCancelledByCreator());
+    const sentCancel = await this.notifier.sendGroupMessage(
+      updated.chatId,
+      this.texts.gameCancelledByCreator(),
+    );
     if (sentCancel instanceof Error) return sentCancel;
   }
 
-  private getModeService(mode: GameMode): GameModeService | appErrors.UnknownGameModeError {
+  private getModeService(
+    mode: GameMode,
+  ): GameModeService | appErrors.UnknownGameModeError {
     const service = this.modeServices.get(mode);
     if (!service) {
       return new appErrors.UnknownGameModeError({ mode });
@@ -335,4 +473,3 @@ export class GameService {
     return service;
   }
 }
-

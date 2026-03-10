@@ -6,7 +6,9 @@ interface ManualPairPayload {
   targetPlayerId: string;
 }
 
-export const parseManualPairPayload = (payload: string): ManualPairPayload | ManualPairPayloadError => {
+export const parseManualPairPayload = (
+  payload: string,
+): ManualPairPayload | ManualPairPayloadError => {
   const parts = payload.split(":");
   if (parts.length !== 3 || parts[0] !== "pair") {
     return new InvalidManualPairPayloadError();

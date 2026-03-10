@@ -10,7 +10,12 @@ type RepoFactory = () => { repo: GameRepository; close: () => void };
 
 const engine = new GameEngine();
 
-const createGame = (gameId: string, chatId: string, now: string, creatorId = "1"): GameState =>
+const createGame = (
+  gameId: string,
+  chatId: string,
+  now: string,
+  creatorId = "1",
+): GameState =>
   engine.createGame({
     gameId,
     chatId,
@@ -49,7 +54,11 @@ const defineRepositoryContract = (factory: RepoFactory): void => {
   });
 
   it("saves and updates game snapshots", () => {
-    const original = createGame("g-save", "chat-save", "2026-01-01T00:00:00.000Z");
+    const original = createGame(
+      "g-save",
+      "chat-save",
+      "2026-01-01T00:00:00.000Z",
+    );
     repo.create(original);
 
     const updated: GameState = {
@@ -67,9 +76,24 @@ const defineRepositoryContract = (factory: RepoFactory): void => {
   });
 
   it("returns only active games", () => {
-    const active = createGame("g-active", "chat-active", "2026-01-01T00:00:00.000Z", "1");
-    const canceled = createGame("g-canceled", "chat-canceled", "2026-01-01T00:01:00.000Z", "2");
-    const finished = createGame("g-finished", "chat-finished", "2026-01-01T00:02:00.000Z", "3");
+    const active = createGame(
+      "g-active",
+      "chat-active",
+      "2026-01-01T00:00:00.000Z",
+      "1",
+    );
+    const canceled = createGame(
+      "g-canceled",
+      "chat-canceled",
+      "2026-01-01T00:01:00.000Z",
+      "2",
+    );
+    const finished = createGame(
+      "g-finished",
+      "chat-finished",
+      "2026-01-01T00:02:00.000Z",
+      "3",
+    );
 
     canceled.stage = "CANCELED";
     canceled.updatedAt = "2026-01-01T00:11:00.000Z";
@@ -99,14 +123,29 @@ const defineRepositoryContract = (factory: RepoFactory): void => {
   });
 
   it("orders active list by updatedAt and returns active game for chat with history", () => {
-    const archived = createGame("g-archived", "chat-order", "2026-01-01T00:00:00.000Z", "1");
+    const archived = createGame(
+      "g-archived",
+      "chat-order",
+      "2026-01-01T00:00:00.000Z",
+      "1",
+    );
     archived.stage = "CANCELED";
     archived.updatedAt = "2026-01-01T00:30:00.000Z";
 
-    const activeOlder = createGame("g-older", "chat-order", "2026-01-01T00:10:00.000Z", "2");
+    const activeOlder = createGame(
+      "g-older",
+      "chat-order",
+      "2026-01-01T00:10:00.000Z",
+      "2",
+    );
     activeOlder.updatedAt = "2026-01-01T00:10:00.000Z";
 
-    const activeNewer = createGame("g-newer", "chat-other", "2026-01-01T00:20:00.000Z", "3");
+    const activeNewer = createGame(
+      "g-newer",
+      "chat-other",
+      "2026-01-01T00:20:00.000Z",
+      "3",
+    );
     activeNewer.updatedAt = "2026-01-01T00:20:00.000Z";
 
     repo.create(archived);
@@ -121,14 +160,29 @@ const defineRepositoryContract = (factory: RepoFactory): void => {
   });
 
   it("returns known chat ids and known users per chat from history", () => {
-    const canceledOld = createGame("g-known-1", "chat-known-a", "2026-01-01T00:00:00.000Z", "11");
+    const canceledOld = createGame(
+      "g-known-1",
+      "chat-known-a",
+      "2026-01-01T00:00:00.000Z",
+      "11",
+    );
     canceledOld.stage = "CANCELED";
     canceledOld.updatedAt = "2026-01-01T00:05:00.000Z";
 
-    const activeNew = createGame("g-known-2", "chat-known-a", "2026-01-01T00:10:00.000Z", "22");
+    const activeNew = createGame(
+      "g-known-2",
+      "chat-known-a",
+      "2026-01-01T00:10:00.000Z",
+      "22",
+    );
     activeNew.updatedAt = "2026-01-01T00:10:00.000Z";
 
-    const finished = createGame("g-known-3", "chat-known-b", "2026-01-01T00:20:00.000Z", "33");
+    const finished = createGame(
+      "g-known-3",
+      "chat-known-b",
+      "2026-01-01T00:20:00.000Z",
+      "33",
+    );
     finished.stage = "FINISHED";
     finished.updatedAt = "2026-01-01T00:20:00.000Z";
 
@@ -137,8 +191,13 @@ const defineRepositoryContract = (factory: RepoFactory): void => {
     repo.create(finished);
 
     expect(repo.listKnownChatIds()).toEqual(["chat-known-b", "chat-known-a"]);
-    expect(repo.listKnownTelegramUserIdsByChatId("chat-known-a")).toEqual(["11", "22"]);
-    expect(repo.listKnownTelegramUserIdsByChatId("chat-known-b")).toEqual(["33"]);
+    expect(repo.listKnownTelegramUserIdsByChatId("chat-known-a")).toEqual([
+      "11",
+      "22",
+    ]);
+    expect(repo.listKnownTelegramUserIdsByChatId("chat-known-b")).toEqual([
+      "33",
+    ]);
     expect(repo.listKnownTelegramUserIdsByChatId("chat-missing")).toEqual([]);
   });
 };

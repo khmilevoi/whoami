@@ -2,7 +2,10 @@ import { GameState } from "../domain/types";
 import { createBotCommands, ChatCommandResolution } from "./bot-commands";
 import { TextService } from "./text-service";
 
-const toPlayerTelegramUserId = (game: GameState, playerId: string | undefined): string | null => {
+const toPlayerTelegramUserId = (
+  game: GameState,
+  playerId: string | undefined,
+): string | null => {
   if (!playerId) {
     return null;
   }
@@ -29,13 +32,21 @@ export class ChatCommandResolver {
         memberOverrides: [
           {
             telegramUserId: game.creatorTelegramUserId,
-            commands: [this.commands.BOT_COMMANDS.CONFIG, this.commands.BOT_COMMANDS.CANCEL],
+            commands: [
+              this.commands.BOT_COMMANDS.CONFIG,
+              this.commands.BOT_COMMANDS.CANCEL,
+            ],
           },
         ],
       };
     }
 
-    if (game.stage === "LOBBY_CLOSED" || game.stage === "CONFIGURING" || game.stage === "PREPARE_WORDS" || game.stage === "READY_WAIT") {
+    if (
+      game.stage === "LOBBY_CLOSED" ||
+      game.stage === "CONFIGURING" ||
+      game.stage === "PREPARE_WORDS" ||
+      game.stage === "READY_WAIT"
+    ) {
       return {
         chatCommands: [],
         memberOverrides: [
@@ -57,7 +68,10 @@ export class ChatCommandResolver {
         if (askerTelegramUserId) {
           memberOverrides.push({
             telegramUserId: askerTelegramUserId,
-            commands: [this.commands.BOT_COMMANDS.GIVEUP, this.commands.BOT_COMMANDS.ASK],
+            commands: [
+              this.commands.BOT_COMMANDS.GIVEUP,
+              this.commands.BOT_COMMANDS.ASK,
+            ],
           });
         }
       }

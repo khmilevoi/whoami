@@ -12,7 +12,9 @@ export class GameQueryService {
     const uniqueChatIds = new Set<string>();
 
     for (const game of this.repository.listActiveGames()) {
-      const hasUser = game.players.some((player) => player.telegramUserId === telegramUserId);
+      const hasUser = game.players.some(
+        (player) => player.telegramUserId === telegramUserId,
+      );
       if (hasUser) {
         uniqueChatIds.add(game.chatId);
       }
@@ -22,7 +24,9 @@ export class GameQueryService {
   }
 
   listActiveChatIds(): string[] {
-    return [...new Set(this.repository.listActiveGames().map((game) => game.chatId))];
+    return [
+      ...new Set(this.repository.listActiveGames().map((game) => game.chatId)),
+    ];
   }
 
   listKnownChatIds(): string[] {

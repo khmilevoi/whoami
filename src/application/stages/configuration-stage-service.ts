@@ -1,5 +1,10 @@
 import * as appErrors from "../../domain/errors";
-import { ConfigureGameInput, GameMode, PairingMode, PlayMode } from "../../domain/types";
+import {
+  ConfigureGameInput,
+  GameMode,
+  PairingMode,
+  PlayMode,
+} from "../../domain/types";
 import type { ConfigurationStageError } from "../errors";
 import { GameServiceContext } from "../game-service-context";
 import { ConfigDraftStore } from "../stores/config-draft-store";
@@ -23,7 +28,10 @@ export class ConfigurationStageService {
     const game = this.context.getGameByIdOrError(gameId);
     if (game instanceof Error) return game;
 
-    const actor = this.context.getPlayerByTelegramOrError(game, actorTelegramUserId);
+    const actor = this.context.getPlayerByTelegramOrError(
+      game,
+      actorTelegramUserId,
+    );
     if (actor instanceof Error) return actor;
 
     if (actor.id !== game.creatorPlayerId) {
@@ -53,14 +61,26 @@ export class ConfigurationStageService {
         actorTelegramUserId,
         this.context.texts.choosePlayModePrompt(),
         [
-          [{ text: this.context.texts.playModeButton("ONLINE"), data: `cfg:play:ONLINE:${gameId}` }],
-          [{ text: this.context.texts.playModeButton("OFFLINE"), data: `cfg:play:OFFLINE:${gameId}` }],
+          [
+            {
+              text: this.context.texts.playModeButton("ONLINE"),
+              data: `cfg:play:ONLINE:${gameId}`,
+            },
+          ],
+          [
+            {
+              text: this.context.texts.playModeButton("OFFLINE"),
+              data: `cfg:play:OFFLINE:${gameId}`,
+            },
+          ],
         ],
       );
       if (!sentPrompt) {
         const sentFallback = await this.context.notifier.sendGroupMessage(
           game.chatId,
-          this.context.texts.creatorDmRequired(this.context.notifier.buildBotDeepLink()),
+          this.context.texts.creatorDmRequired(
+            this.context.notifier.buildBotDeepLink(),
+          ),
         );
         if (sentFallback instanceof Error) return sentFallback;
       }
@@ -72,14 +92,26 @@ export class ConfigurationStageService {
         actorTelegramUserId,
         this.context.texts.choosePairingModePrompt(),
         [
-          [{ text: this.context.texts.pairingModeButton("RANDOM"), data: `cfg:pair:RANDOM:${gameId}` }],
-          [{ text: this.context.texts.pairingModeButton("MANUAL"), data: `cfg:pair:MANUAL:${gameId}` }],
+          [
+            {
+              text: this.context.texts.pairingModeButton("RANDOM"),
+              data: `cfg:pair:RANDOM:${gameId}`,
+            },
+          ],
+          [
+            {
+              text: this.context.texts.pairingModeButton("MANUAL"),
+              data: `cfg:pair:MANUAL:${gameId}`,
+            },
+          ],
         ],
       );
       if (!sentPrompt) {
         const sentFallback = await this.context.notifier.sendGroupMessage(
           game.chatId,
-          this.context.texts.creatorDmRequired(this.context.notifier.buildBotDeepLink()),
+          this.context.texts.creatorDmRequired(
+            this.context.notifier.buildBotDeepLink(),
+          ),
         );
         if (sentFallback instanceof Error) return sentFallback;
       }
@@ -97,7 +129,11 @@ export class ConfigurationStageService {
         pairingMode: draft.mode === "NORMAL" ? draft.pairingMode : undefined,
       };
 
-      const updated = this.context.engine.configureGame(current, updateInput, this.context.clock.nowIso());
+      const updated = this.context.engine.configureGame(
+        current,
+        updateInput,
+        this.context.clock.nowIso(),
+      );
       if (updated instanceof Error) return updated;
 
       this.context.repository.update(updated);
@@ -117,7 +153,11 @@ export class ConfigurationStageService {
     );
     if (sentConfig instanceof Error) return sentConfig;
 
-    if (configured.config?.mode === "NORMAL" && configured.config.pairingMode === "MANUAL" && Object.keys(configured.words).length === 0) {
+    if (
+      configured.config?.mode === "NORMAL" &&
+      configured.config.pairingMode === "MANUAL" &&
+      Object.keys(configured.words).length === 0
+    ) {
       return this.normalPairingStage.promptCurrentChooser(configured);
     }
 

@@ -9,15 +9,27 @@ export class NormalPairingStageService {
     private readonly wordPreparationStage: WordPreparationStageService,
   ) {}
 
-  async applyManualPair(gameId: string, chooserTelegramUserId: string, targetPlayerId: string): Promise<void | NormalPairingStageError> {
+  async applyManualPair(
+    gameId: string,
+    chooserTelegramUserId: string,
+    targetPlayerId: string,
+  ): Promise<void | NormalPairingStageError> {
     const updated = this.context.transactionRunner.runInTransaction(() => {
       const current = this.context.getGameByIdOrError(gameId);
       if (current instanceof Error) return current;
 
-      const chooser = this.context.getPlayerByTelegramOrError(current, chooserTelegramUserId);
+      const chooser = this.context.getPlayerByTelegramOrError(
+        current,
+        chooserTelegramUserId,
+      );
       if (chooser instanceof Error) return chooser;
 
-      const next = this.context.engine.selectManualPair(current, chooser.id, targetPlayerId, this.context.clock.nowIso());
+      const next = this.context.engine.selectManualPair(
+        current,
+        chooser.id,
+        targetPlayerId,
+        this.context.clock.nowIso(),
+      );
       if (next instanceof Error) return next;
 
       this.context.repository.update(next);
@@ -29,7 +41,10 @@ export class NormalPairingStageService {
       return this.promptCurrentChooser(updated);
     }
 
-    const sentCompletion = await this.context.notifier.sendGroupMessage(updated.chatId, this.context.texts.manualPairingCompleted());
+    const sentCompletion = await this.context.notifier.sendGroupMessage(
+      updated.chatId,
+      this.context.texts.manualPairingCompleted(),
+    );
     if (sentCompletion instanceof Error) return sentCompletion;
     return this.wordPreparationStage.promptWordCollection(updated);
   }
@@ -42,11 +57,17 @@ export class NormalPairingStageService {
         continue;
       }
 
-      if (game.config?.mode !== "NORMAL" || game.config.pairingMode !== "MANUAL") {
+      if (
+        game.config?.mode !== "NORMAL" ||
+        game.config.pairingMode !== "MANUAL"
+      ) {
         continue;
       }
 
-      if (game.preparation.manualPairingCursor >= game.preparation.manualPairingQueue.length) {
+      if (
+        game.preparation.manualPairingCursor >=
+        game.preparation.manualPairingQueue.length
+      ) {
         continue;
       }
 
@@ -57,8 +78,11 @@ export class NormalPairingStageService {
     }
   }
 
-  async promptCurrentChooser(game: GameState): Promise<void | NormalPairingStageError> {
-    const chooserId = game.preparation.manualPairingQueue[game.preparation.manualPairingCursor];
+  async promptCurrentChooser(
+    game: GameState,
+  ): Promise<void | NormalPairingStageError> {
+    const chooserId =
+      game.preparation.manualPairingQueue[game.preparation.manualPairingCursor];
     const chooser = game.players.find((player) => player.id === chooserId);
     if (!chooser) {
       return;
@@ -68,13 +92,25 @@ export class NormalPairingStageService {
     const buttons = game.players
       .filter((player) => player.id !== chooser.id)
       .filter((player) => !usedTargets.has(player.id))
-      .map((player) => [{ text: this.context.playerLabel(game, player.id), data: `pair:${player.id}:${game.id}` }]);
+      .map((player) => [
+        {
+          text: this.context.playerLabel(game, player.id),
+          data: `pair:${player.id}:${game.id}`,
+        },
+      ]);
 
-    const ok = await this.context.notifier.sendPrivateKeyboard(chooser.telegramUserId, this.context.texts.manualPairPrompt(), buttons);
+    const ok = await this.context.notifier.sendPrivateKeyboard(
+      chooser.telegramUserId,
+      this.context.texts.manualPairPrompt(),
+      buttons,
+    );
     if (!ok) {
       const sentFallback = await this.context.notifier.sendGroupMessage(
         game.chatId,
-        this.context.texts.dmLinkRequired(this.context.playerLabel(game, chooser.id), this.context.notifier.buildBotDeepLink()),
+        this.context.texts.dmLinkRequired(
+          this.context.playerLabel(game, chooser.id),
+          this.context.notifier.buildBotDeepLink(),
+        ),
       );
       if (sentFallback instanceof Error) return sentFallback;
     }

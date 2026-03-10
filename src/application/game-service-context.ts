@@ -1,9 +1,16 @@
 import * as appErrors from "../domain/errors";
 import { GameState, TurnRecord } from "../domain/types";
 import { TextService } from "./text-service";
-import { ClockPort, GameRepository, IdPort, IdentityPort, LoggerPort, NotifierPort, TransactionRunner } from "./ports";
+import {
+  ClockPort,
+  GameRepository,
+  IdPort,
+  IdentityPort,
+  LoggerPort,
+  NotifierPort,
+  TransactionRunner,
+} from "./ports";
 import { GameEngine } from "../domain/game-engine";
-import type { GameServiceContextError } from "./errors";
 
 export interface GameServiceDeps {
   engine: GameEngine;
@@ -61,7 +68,9 @@ export class GameServiceContext {
     return this.deps.limits;
   }
 
-  getGameByChatOrError(chatId: string): GameState | appErrors.ActiveGameNotFoundByChatError {
+  getGameByChatOrError(
+    chatId: string,
+  ): GameState | appErrors.ActiveGameNotFoundByChatError {
     const game = this.repository.findActiveByChatId(chatId);
     if (!game) {
       return new appErrors.ActiveGameNotFoundByChatError();
@@ -79,11 +88,20 @@ export class GameServiceContext {
 
   findActiveGameByTelegramUser(telegramUserId: string): GameState | null {
     const active = this.repository.listActiveGames();
-    return active.find((game) => game.players.some((player) => player.telegramUserId === telegramUserId)) ?? null;
+    return (
+      active.find((game) =>
+        game.players.some((player) => player.telegramUserId === telegramUserId),
+      ) ?? null
+    );
   }
 
-  getPlayerByTelegramOrError(game: GameState, telegramUserId: string): GameState["players"][number] | appErrors.PlayerNotFoundInGameError {
-    const player = game.players.find((candidate) => candidate.telegramUserId === telegramUserId);
+  getPlayerByTelegramOrError(
+    game: GameState,
+    telegramUserId: string,
+  ): GameState["players"][number] | appErrors.PlayerNotFoundInGameError {
+    const player = game.players.find(
+      (candidate) => candidate.telegramUserId === telegramUserId,
+    );
     if (!player) {
       return new appErrors.PlayerNotFoundInGameError();
     }
@@ -103,4 +121,3 @@ export class GameServiceContext {
     return this.texts.voteOutcome(outcome);
   }
 }
-

@@ -37,8 +37,13 @@ const computeNormalScores = (game: GameState): FinalScore[] => {
 
 const computeReverseScores = (game: GameState): ReverseSummary => {
   const ownerScores: FinalScore[] = game.players.map((player) => {
-    const turnsForOwner = game.turns.filter((t) => t.targetWordOwnerId === player.id);
-    const rounds = turnsForOwner.length === 0 ? 0 : Math.max(...turnsForOwner.map((t) => t.round));
+    const turnsForOwner = game.turns.filter(
+      (t) => t.targetWordOwnerId === player.id,
+    );
+    const rounds =
+      turnsForOwner.length === 0
+        ? 0
+        : Math.max(...turnsForOwner.map((t) => t.round));
     return {
       playerId: player.id,
       rounds,
@@ -48,9 +53,16 @@ const computeReverseScores = (game: GameState): ReverseSummary => {
   });
 
   const guesserScores: FinalScore[] = game.players.map((player) => {
-    const turnsByPlayer = game.turns.filter((t) => t.askerPlayerId === player.id);
-    const wordsAttempted = new Set(turnsByPlayer.map((t) => t.targetWordOwnerId).filter(Boolean)).size || 1;
-    const rounds = turnsByPlayer.length === 0 ? 0 : Math.max(...turnsByPlayer.map((t) => t.round));
+    const turnsByPlayer = game.turns.filter(
+      (t) => t.askerPlayerId === player.id,
+    );
+    const wordsAttempted =
+      new Set(turnsByPlayer.map((t) => t.targetWordOwnerId).filter(Boolean))
+        .size || 1;
+    const rounds =
+      turnsByPlayer.length === 0
+        ? 0
+        : Math.max(...turnsByPlayer.map((t) => t.round));
 
     return {
       playerId: player.id,
@@ -68,7 +80,10 @@ const computeReverseScores = (game: GameState): ReverseSummary => {
   };
 };
 
-export const buildGameResult = (game: GameState, now: string): GameResult | StatsError => {
+export const buildGameResult = (
+  game: GameState,
+  now: string,
+): GameResult | StatsError => {
   if (!game.config) {
     return new GameConfigurationMissingError();
   }

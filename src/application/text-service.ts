@@ -1,6 +1,12 @@
 import * as errore from "errore";
 import { DomainAppError } from "../domain/errors";
-import { GameMode, PairingMode, PlayMode, TurnRecord, VoteDecision } from "../domain/types";
+import {
+  GameMode,
+  PairingMode,
+  PlayMode,
+  TurnRecord,
+  VoteDecision,
+} from "../domain/types";
 
 export type SupportedLocale = "ru";
 
@@ -18,46 +24,74 @@ export class TextService {
   renderError(error: DomainAppError): string {
     return errore.matchError(error, {
       InvalidManualPairPayloadError: () => "Некорректные данные выбора пары",
-      ActiveGameNotFoundByChatError: () => "Активная игра в этом чате не найдена",
+      ActiveGameNotFoundByChatError: () =>
+        "Активная игра в этом чате не найдена",
       GameNotFoundError: () => "Игра не найдена",
       PlayerNotFoundInGameError: () => "Игрок не найден в этой игре",
-      ActiveGameAlreadyExistsInChatError: () => "В этом чате уже идет активная игра. Завершите ее перед стартом новой.",
+      ActiveGameAlreadyExistsInChatError: () =>
+        "В этом чате уже идет активная игра. Завершите ее перед стартом новой.",
       GameConfigurationNotSetError: () => "Конфигурация игры не задана",
       GameConfigurationMissingError: () => "Конфигурация игры не задана",
-      OnlyGameCreatorCanCancelError: () => "Только создатель игры может отменить игру",
-      UnknownGameModeError: (typedError) => `Неизвестный режим игры: ${typedError.mode}`,
-      OnlyGameCreatorCanConfigureError: () => "Только создатель игры может настраивать режим",
-      JoinAllowedOnlyWhenLobbyOpenError: () => "Присоединиться можно только пока открыт набор игроков",
-      MaxPlayersReachedError: (typedError) => `Достигнут максимум игроков: ${typedError.maxPlayers}.`,
+      OnlyGameCreatorCanCancelError: () =>
+        "Только создатель игры может отменить игру",
+      UnknownGameModeError: (typedError) =>
+        `Неизвестный режим игры: ${typedError.mode}`,
+      OnlyGameCreatorCanConfigureError: () =>
+        "Только создатель игры может настраивать режим",
+      JoinAllowedOnlyWhenLobbyOpenError: () =>
+        "Присоединиться можно только пока открыт набор игроков",
+      MaxPlayersReachedError: (typedError) =>
+        `Достигнут максимум игроков: ${typedError.maxPlayers}.`,
       LobbyAlreadyClosedError: () => "Набор игроков уже закрыт",
-      OnlyGameCreatorCanCloseLobbyError: () => "Только создатель игры может закрыть набор игроков",
-      MinPlayersRequiredToStartError: (typedError) => `Для старта нужно минимум ${typedError.minPlayers} игрока(ов).`,
-      GameCanBeConfiguredOnlyAfterLobbyClosedError: () => "Настраивать игру можно только после закрытия набора игроков",
-      PairingModeRequiredForNormalModeError: () => "Для обычного режима нужно выбрать распределение пар",
-      ManualPairingAvailableOnlyForNormalManualModeError: () => "Ручное распределение доступно только для обычного режима с ручным выбором пар",
-      NotPlayersTurnToPickPairError: () => "Сейчас не ход этого игрока для выбора пары",
+      OnlyGameCreatorCanCloseLobbyError: () =>
+        "Только создатель игры может закрыть набор игроков",
+      MinPlayersRequiredToStartError: (typedError) =>
+        `Для старта нужно минимум ${typedError.minPlayers} игрока(ов).`,
+      GameCanBeConfiguredOnlyAfterLobbyClosedError: () =>
+        "Настраивать игру можно только после закрытия набора игроков",
+      PairingModeRequiredForNormalModeError: () =>
+        "Для обычного режима нужно выбрать распределение пар",
+      ManualPairingAvailableOnlyForNormalManualModeError: () =>
+        "Ручное распределение доступно только для обычного режима с ручным выбором пар",
+      NotPlayersTurnToPickPairError: () =>
+        "Сейчас не ход этого игрока для выбора пары",
       WordCannotBeEmptyError: () => "Слово не может быть пустым",
-      WordMustBeSubmittedBeforeConfirmationError: () => "Сначала нужно ввести слово",
-      WordMustBeConfirmedBeforeClueSubmissionError: () => "Сначала подтвердите слово, потом добавляйте пояснение",
-      WordMustBeConfirmedBeforeFinalizationError: () => "Сначала подтвердите слово",
+      WordMustBeSubmittedBeforeConfirmationError: () =>
+        "Сначала нужно ввести слово",
+      WordMustBeConfirmedBeforeClueSubmissionError: () =>
+        "Сначала подтвердите слово, потом добавляйте пояснение",
+      WordMustBeConfirmedBeforeFinalizationError: () =>
+        "Сначала подтвердите слово",
       NotAllPlayersConfirmedWordsError: () => "Не все игроки подтвердили слова",
-      PendingVoteMustBeResolvedFirstError: () => "Сначала нужно завершить текущее голосование",
-      QuestionTextRequiredInOnlineModeError: () => "В онлайн-режиме нужно отправить текст вопроса",
+      PendingVoteMustBeResolvedFirstError: () =>
+        "Сначала нужно завершить текущее голосование",
+      QuestionTextRequiredInOnlineModeError: () =>
+        "В онлайн-режиме нужно отправить текст вопроса",
       NotPlayersTurnError: () => "Сейчас не ход этого игрока",
-      ReverseModeTargetMissingError: () => "Не удалось определить игрока, чье слово сейчас угадывают",
+      ReverseModeTargetMissingError: () =>
+        "Не удалось определить игрока, чье слово сейчас угадывают",
       NoPendingVoteError: () => "Нет активного голосования",
-      PlayerNotAllowedToVoteError: () => "Этот игрок не может голосовать в текущем опросе",
-      ReverseVoteTargetMissingError: () => "Не удалось определить цель голосования в обратном режиме",
+      PlayerNotAllowedToVoteError: () =>
+        "Этот игрок не может голосовать в текущем опросе",
+      ReverseVoteTargetMissingError: () =>
+        "Не удалось определить цель голосования в обратном режиме",
       NoActivePlayersLeftError: () => "Не осталось активных игроков",
-      UnableToResolveCurrentAskerError: () => "Не удалось определить текущего задающего вопрос",
-      ReverseModeAskerMissingError: () => "Не удалось определить текущего задающего вопрос в обратном режиме",
-      WordActionsNotAvailableInCurrentStageError: () => "Сейчас нельзя выполнять действия со словом",
-      ExpectedStageMismatchError: (typedError) => `Ожидался этап ${typedError.expectedStage}, получен ${typedError.actualStage}`,
+      UnableToResolveCurrentAskerError: () =>
+        "Не удалось определить текущего задающего вопрос",
+      ReverseModeAskerMissingError: () =>
+        "Не удалось определить текущего задающего вопрос в обратном режиме",
+      WordActionsNotAvailableInCurrentStageError: () =>
+        "Сейчас нельзя выполнять действия со словом",
+      ExpectedStageMismatchError: (typedError) =>
+        `Ожидался этап ${typedError.expectedStage}, получен ${typedError.actualStage}`,
       PlayerNotFoundError: () => "Игрок не найден",
       WordEntryForPlayerMissingError: () => "Для игрока не найдено слово",
-      NeedAtLeastTwoPlayersForPairingsError: () => "Для распределения пар нужно минимум два игрока",
-      UnknownPlayerInManualPairingError: () => "В ручном распределении указан неизвестный игрок",
-      PlayerCannotPairWithSelfError: () => "Нельзя назначить игрока самому себе",
+      NeedAtLeastTwoPlayersForPairingsError: () =>
+        "Для распределения пар нужно минимум два игрока",
+      UnknownPlayerInManualPairingError: () =>
+        "В ручном распределении указан неизвестный игрок",
+      PlayerCannotPairWithSelfError: () =>
+        "Нельзя назначить игрока самому себе",
       PlayerHasAlreadySelectedAPairError: () => "Игрок уже выбрал пару",
       SelectedTargetIsAlreadyTakenError: () => "Выбранный игрок уже занят",
       Error: () => this.genericErrorRetry(),
@@ -345,7 +379,11 @@ export class TextService {
   }
 
   wordSummary(word: string | undefined, clue: string | undefined): string {
-    return [`Слово: ${word ?? "-"}`, `Пояснение: ${clue ?? "(нет)"}`, "Подтвердить?"].join("\n");
+    return [
+      `Слово: ${word ?? "-"}`,
+      `Пояснение: ${clue ?? "(нет)"}`,
+      "Подтвердить?",
+    ].join("\n");
   }
 
   confirmButton(): string {
@@ -356,5 +394,3 @@ export class TextService {
     return "Редактировать";
   }
 }
-
-

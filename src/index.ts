@@ -11,7 +11,7 @@ import { loadConfig } from "./config";
 import { buildContainer } from "./container";
 import { runStartupTasks } from "./startup";
 
-const start = async (): Promise<void | appErrors.StartAppError> => {
+const start = (): void | appErrors.StartAppError => {
   const config = loadConfig();
 
   if (!config.botToken) {
@@ -28,10 +28,7 @@ const start = async (): Promise<void | appErrors.StartAppError> => {
   registerTelegramHandlers(bot, gameService, logger, texts, commandSync);
 
   const app = buildHttpServer(bot, logger);
-
-  app.listen(config.appPort, async () => {
-    logger.info("http_started", { port: config.appPort });
-
+  const initializeRuntime = async (): Promise<void> => {
     await runStartupTasks({
       commandSync,
       gameService,
@@ -40,11 +37,17 @@ const start = async (): Promise<void | appErrors.StartAppError> => {
 
     if (config.webhookUrl) {
       const webhook = `${config.webhookUrl.replace(/\/$/, "")}/telegram/webhook`;
-      const webhookResult = await bot.api
-        .setWebhook(webhook)
-        .catch((error) => new appErrors.TelegramApiError({ operation: "setWebhook", cause: error }));
+      const webhookResult = await bot.api.setWebhook(webhook).catch(
+        (error) =>
+          new appErrors.TelegramApiError({
+            operation: "setWebhook",
+            cause: error,
+          }),
+      );
       if (webhookResult instanceof Error) {
-        logger.error("telegram_webhook_set_failed", { reason: webhookResult.message });
+        logger.error("telegram_webhook_set_failed", {
+          reason: webhookResult.message,
+        });
         return;
       }
 
@@ -52,17 +55,24 @@ const start = async (): Promise<void | appErrors.StartAppError> => {
       return;
     }
 
-    bot.start();
+    void bot.start();
     logger.info("telegram_polling_started");
+  };
+
+  app.listen(config.appPort, () => {
+    logger.info("http_started", { port: config.appPort });
+
+    void initializeRuntime().catch((error: unknown) => {
+      logger.error("startup_failed", {
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      process.exit(1);
+    });
   });
 };
 
-start().then((result) => {
-  if (result instanceof Error) {
-    console.error(result);
-    process.exit(1);
-  }
-}).catch((error) => {
-  console.error(error);
+const result = start();
+if (result instanceof Error) {
+  console.error(result);
   process.exit(1);
-});
+}

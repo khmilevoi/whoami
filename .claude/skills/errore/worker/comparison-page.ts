@@ -3,13 +3,13 @@
 // with @code-hike/lighter, renders prose with marked, and outputs
 // a full HTML page with side-by-side comparison layout.
 
-import { marked } from 'marked'
-import { highlightCode } from './highlight'
-import { darkModeColors, hideScrollbars } from './shared-styles'
+import { marked } from "marked";
+import { highlightCode } from "./highlight";
+import { darkModeColors, hideScrollbars } from "./shared-styles";
 
 interface Section {
-  prose: string
-  codeBlocks: { lang: string; code: string }[]
+  prose: string;
+  codeBlocks: { lang: string; code: string }[];
 }
 
 /**
@@ -17,29 +17,29 @@ interface Section {
  * Each section has prose (markdown) and exactly two fenced code blocks.
  */
 function parseSections(md: string): Section[] {
-  const rawSections = md.split(/\n---\n/)
+  const rawSections = md.split(/\n---\n/);
 
   return rawSections.map((raw) => {
-    const codeBlocks: { lang: string; code: string }[] = []
+    const codeBlocks: { lang: string; code: string }[] = [];
 
     // Extract fenced code blocks and replace with placeholders
     const prose = raw.replace(
       /```(\w+)?\n([\s\S]*?)```/g,
       (_match, lang, code) => {
-        codeBlocks.push({ lang: lang || 'typescript', code: code.trimEnd() })
-        return '' // remove from prose
+        codeBlocks.push({ lang: lang || "typescript", code: code.trimEnd() });
+        return ""; // remove from prose
       },
-    )
+    );
 
-    return { prose: prose.trim(), codeBlocks }
-  })
+    return { prose: prose.trim(), codeBlocks };
+  });
 }
 
 /**
  * Render a single comparison section to HTML.
  */
 async function renderSection(section: Section): Promise<string> {
-  const proseHtml = await marked.parse(section.prose)
+  const proseHtml = await marked.parse(section.prose);
 
   if (section.codeBlocks.length < 2) {
     // Not a comparison section, just render prose + any single code block
@@ -49,17 +49,17 @@ async function renderSection(section: Section): Promise<string> {
             section.codeBlocks[0].code,
             section.codeBlocks[0].lang,
           )
-        : ''
-    return `<section class="comparison-section">${proseHtml}${codeHtml}</section>`
+        : "";
+    return `<section class="comparison-section">${proseHtml}${codeHtml}</section>`;
   }
 
   const [left, right] = await Promise.all([
     highlightCode(section.codeBlocks[0].code, section.codeBlocks[0].lang),
     highlightCode(section.codeBlocks[1].code, section.codeBlocks[1].lang),
-  ])
+  ]);
 
-  const leftLabel = 'Effect'
-  const rightLabel = 'errore'
+  const leftLabel = "Effect";
+  const rightLabel = "errore";
 
   return `
     <section class="comparison-section">
@@ -74,23 +74,23 @@ async function renderSection(section: Section): Promise<string> {
           ${right}
         </div>
       </div>
-    </section>`
+    </section>`;
 }
 
 function escapeHtml(str: string): string {
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 /**
  * Render the full comparison page from markdown content.
  */
 export async function renderComparisonPage(mdContent: string): Promise<string> {
-  const sections = parseSections(mdContent)
-  const sectionsHtml = await Promise.all(sections.map(renderSection))
+  const sections = parseSections(mdContent);
+  const sectionsHtml = await Promise.all(sections.map(renderSection));
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -120,7 +120,7 @@ export async function renderComparisonPage(mdContent: string): Promise<string> {
     <p class="subtitle">Side-by-side comparison of typed error handling approaches in TypeScript.</p>
   </header>
   <main>
-    ${sectionsHtml.join('\n')}
+    ${sectionsHtml.join("\n")}
   </main>
   <footer class="page-footer">
     <p>
@@ -130,7 +130,7 @@ export async function renderComparisonPage(mdContent: string): Promise<string> {
     </p>
   </footer>
 </body>
-</html>`
+</html>`;
 }
 
 function getStyles(): string {
@@ -347,5 +347,5 @@ function getStyles(): string {
     .page-footer a:hover {
       color: var(--fg);
     }
-  `
+  `;
 }

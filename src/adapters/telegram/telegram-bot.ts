@@ -58,7 +58,9 @@ const createSyncFinalizer = (
 ): (() => Promise<void>) => {
   const beforeUserChats =
     commandSync && actorTelegramUserId
-      ? new Set(commandSync.listActiveChatIdsByTelegramUser(actorTelegramUserId))
+      ? new Set(
+          commandSync.listActiveChatIdsByTelegramUser(actorTelegramUserId),
+        )
       : null;
 
   return async () => {
@@ -77,7 +79,9 @@ const createSyncFinalizer = (
         affectedChats.add(chatId);
       }
 
-      for (const chatId of commandSync.listActiveChatIdsByTelegramUser(actorTelegramUserId)) {
+      for (const chatId of commandSync.listActiveChatIdsByTelegramUser(
+        actorTelegramUserId,
+      )) {
         affectedChats.add(chatId);
       }
     }
@@ -166,7 +170,8 @@ const createGroupMessageReadStatusResolver = (
       return inFlight;
     }
 
-    inFlight = bot.api.getMe()
+    inFlight = bot.api
+      .getMe()
       .then((me) => {
         if (me.can_read_all_group_messages === true) {
           cached = "enabled";
@@ -206,10 +211,18 @@ export const registerTelegramHandlers = (
   texts: TextService,
   commandSync?: TelegramCommandSync,
 ): void => {
-  const resolveGroupMessageReadStatus = createGroupMessageReadStatusResolver(bot, logger);
+  const resolveGroupMessageReadStatus = createGroupMessageReadStatusResolver(
+    bot,
+    logger,
+  );
 
   bot.command("start", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(
+      ctx,
+      logger,
+      commandSync,
+      ctx.from?.id ? String(ctx.from.id) : undefined,
+    );
     await execute(
       ctx,
       logger,
@@ -224,7 +237,12 @@ export const registerTelegramHandlers = (
   });
 
   bot.command("whoami_start", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(
+      ctx,
+      logger,
+      commandSync,
+      ctx.from?.id ? String(ctx.from.id) : undefined,
+    );
     await execute(
       ctx,
       logger,
@@ -235,7 +253,10 @@ export const registerTelegramHandlers = (
           return;
         }
 
-        const result = await gameService.startGame(String(ctx.chat!.id), asActor(ctx));
+        const result = await gameService.startGame(
+          String(ctx.chat.id),
+          asActor(ctx),
+        );
         if (result instanceof Error) return result;
 
         await safeReply(ctx, texts.gameCreatedAck());
@@ -245,7 +266,12 @@ export const registerTelegramHandlers = (
   });
 
   bot.command("join", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(
+      ctx,
+      logger,
+      commandSync,
+      ctx.from?.id ? String(ctx.from.id) : undefined,
+    );
     await execute(
       ctx,
       logger,
@@ -255,7 +281,10 @@ export const registerTelegramHandlers = (
           return;
         }
 
-        const result = await gameService.joinGame(String(ctx.chat!.id), asActor(ctx));
+        const result = await gameService.joinGame(
+          String(ctx.chat.id),
+          asActor(ctx),
+        );
         if (result instanceof Error) return result;
 
         await safeReply(ctx, texts.joinedGameAck());
@@ -265,7 +294,12 @@ export const registerTelegramHandlers = (
   });
 
   bot.command("whoami_config", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(
+      ctx,
+      logger,
+      commandSync,
+      ctx.from?.id ? String(ctx.from.id) : undefined,
+    );
     await execute(
       ctx,
       logger,
@@ -275,7 +309,10 @@ export const registerTelegramHandlers = (
           return;
         }
 
-        const result = await gameService.beginConfiguration(String(ctx.chat!.id), String(ctx.from!.id));
+        const result = await gameService.beginConfiguration(
+          String(ctx.chat.id),
+          String(ctx.from!.id),
+        );
         if (result instanceof Error) return result;
 
         await safeReply(ctx, texts.configSentToCreatorAck());
@@ -285,7 +322,12 @@ export const registerTelegramHandlers = (
   });
 
   bot.command("whoami_cancel", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(
+      ctx,
+      logger,
+      commandSync,
+      ctx.from?.id ? String(ctx.from.id) : undefined,
+    );
     await execute(
       ctx,
       logger,
@@ -295,7 +337,10 @@ export const registerTelegramHandlers = (
           return;
         }
 
-        const result = await gameService.cancel(String(ctx.chat!.id), String(ctx.from!.id));
+        const result = await gameService.cancel(
+          String(ctx.chat.id),
+          String(ctx.from!.id),
+        );
         if (result instanceof Error) return result;
 
         await safeReply(ctx, texts.gameCancelledAck());
@@ -305,7 +350,12 @@ export const registerTelegramHandlers = (
   });
 
   bot.command("giveup", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(
+      ctx,
+      logger,
+      commandSync,
+      ctx.from?.id ? String(ctx.from.id) : undefined,
+    );
     await execute(
       ctx,
       logger,
@@ -314,14 +364,19 @@ export const registerTelegramHandlers = (
         if (!isGroupChat(ctx)) {
           return;
         }
-        return gameService.giveUp(String(ctx.chat!.id), String(ctx.from!.id));
+        return gameService.giveUp(String(ctx.chat.id), String(ctx.from!.id));
       },
       finalizeSync,
     );
   });
 
   bot.command("ask", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(
+      ctx,
+      logger,
+      commandSync,
+      ctx.from?.id ? String(ctx.from.id) : undefined,
+    );
     await execute(
       ctx,
       logger,
@@ -330,14 +385,22 @@ export const registerTelegramHandlers = (
         if (!isGroupChat(ctx)) {
           return;
         }
-        return gameService.askOffline(String(ctx.chat!.id), String(ctx.from!.id));
+        return gameService.askOffline(
+          String(ctx.chat.id),
+          String(ctx.from!.id),
+        );
       },
       finalizeSync,
     );
   });
 
   bot.on("message:text", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(
+      ctx,
+      logger,
+      commandSync,
+      ctx.from?.id ? String(ctx.from.id) : undefined,
+    );
     await execute(
       ctx,
       logger,
@@ -349,10 +412,14 @@ export const registerTelegramHandlers = (
         }
 
         if (isPrivate(ctx)) {
-          return gameService.handlePrivateText(String(ctx.from!.id), text);
+          return gameService.handlePrivateText(String(ctx.from.id), text);
         }
         if (isGroupChat(ctx)) {
-          return gameService.handleGroupText(String(ctx.chat!.id), String(ctx.from!.id), text);
+          return gameService.handleGroupText(
+            String(ctx.chat.id),
+            String(ctx.from.id),
+            text,
+          );
         }
       },
       finalizeSync,
@@ -360,14 +427,19 @@ export const registerTelegramHandlers = (
   });
 
   bot.on("callback_query:data", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(ctx, logger, commandSync, ctx.from?.id ? String(ctx.from.id) : undefined);
+    const finalizeSync = createSyncFinalizer(
+      ctx,
+      logger,
+      commandSync,
+      ctx.from?.id ? String(ctx.from.id) : undefined,
+    );
     await execute(
       ctx,
       logger,
       texts,
       async () => {
         const payload = ctx.callbackQuery.data;
-        const fromUser = String(ctx.from!.id);
+        const fromUser = String(ctx.from.id);
 
         const parts = payload.split(":");
         if (parts[0] === "cfg") {
@@ -393,7 +465,12 @@ export const registerTelegramHandlers = (
             }
           }
 
-          const result = await gameService.applyConfigStep(gameId, fromUser, key as "mode" | "play" | "pair", value);
+          const result = await gameService.applyConfigStep(
+            gameId,
+            fromUser,
+            key as "mode" | "play" | "pair",
+            value,
+          );
           if (result instanceof Error) return result;
           await ctx.answerCallbackQuery();
           return;
@@ -403,7 +480,11 @@ export const registerTelegramHandlers = (
           const parsed = parseManualPairPayload(payload);
           if (parsed instanceof Error) return parsed;
 
-          const result = await gameService.applyManualPair(parsed.gameId, fromUser, parsed.targetPlayerId);
+          const result = await gameService.applyManualPair(
+            parsed.gameId,
+            fromUser,
+            parsed.targetPlayerId,
+          );
           if (result instanceof Error) return result;
           await ctx.answerCallbackQuery();
           return;
@@ -424,7 +505,11 @@ export const registerTelegramHandlers = (
 
         if (parts[0] === "vote") {
           const [, value, gameId] = parts;
-          const result = await gameService.handleVote(gameId, fromUser, value as "YES" | "NO" | "GUESSED");
+          const result = await gameService.handleVote(
+            gameId,
+            fromUser,
+            value as "YES" | "NO" | "GUESSED",
+          );
           if (result instanceof Error) return result;
           await ctx.answerCallbackQuery();
           return;
@@ -432,7 +517,10 @@ export const registerTelegramHandlers = (
 
         if (parts[0] === "ask") {
           if (ctx.chat) {
-            const result = await gameService.askOffline(String(ctx.chat.id), fromUser);
+            const result = await gameService.askOffline(
+              String(ctx.chat.id),
+              fromUser,
+            );
             if (result instanceof Error) return result;
           }
           await ctx.answerCallbackQuery();

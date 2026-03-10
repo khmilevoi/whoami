@@ -33,14 +33,21 @@ export interface IdentityPort {
 }
 
 export interface NotifierPort {
-  sendGroupMessage(chatId: string, text: string): Promise<void | NotificationError>;
+  sendGroupMessage(
+    chatId: string,
+    text: string,
+  ): Promise<void | NotificationError>;
   sendGroupKeyboard(
     chatId: string,
     text: string,
     buttons: Array<Array<{ text: string; data: string }>>,
   ): Promise<void | NotificationError>;
   sendPrivateMessage(userId: string, text: string): Promise<boolean>;
-  sendPrivateKeyboard(userId: string, text: string, buttons: Array<Array<{ text: string; data: string }>>): Promise<boolean>;
+  sendPrivateKeyboard(
+    userId: string,
+    text: string,
+    buttons: Array<Array<{ text: string; data: string }>>,
+  ): Promise<boolean>;
   buildBotDeepLink(): string;
 }
 

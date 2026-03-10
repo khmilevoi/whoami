@@ -6,8 +6,12 @@ describe("game service facade", () => {
     const harness = createGameServiceHarness();
     const service = harness.service as any;
 
-    const configurationStage = { applyConfigStep: vi.fn().mockResolvedValue(undefined) };
-    const normalPairingStage = { applyManualPair: vi.fn().mockResolvedValue(undefined) };
+    const configurationStage = {
+      applyConfigStep: vi.fn().mockResolvedValue(undefined),
+    };
+    const normalPairingStage = {
+      applyManualPair: vi.fn().mockResolvedValue(undefined),
+    };
     const wordPreparationStage = {
       handlePrivateText: vi.fn().mockResolvedValue(undefined),
       handleWordCallback: vi.fn().mockResolvedValue(undefined),
@@ -20,19 +24,48 @@ describe("game service facade", () => {
     await harness.service.applyConfigStep("game-1", "user-1", "mode", "NORMAL");
     await harness.service.applyManualPair("game-1", "user-1", "target-1");
     await harness.service.handlePrivateText("user-1", "hello");
-    await harness.service.handleWordCallback("game-1", "user-1", "confirm", "YES");
+    await harness.service.handleWordCallback(
+      "game-1",
+      "user-1",
+      "confirm",
+      "YES",
+    );
 
-    expect(configurationStage.applyConfigStep).toHaveBeenCalledWith("game-1", "user-1", "mode", "NORMAL");
-    expect(normalPairingStage.applyManualPair).toHaveBeenCalledWith("game-1", "user-1", "target-1");
-    expect(wordPreparationStage.handlePrivateText).toHaveBeenCalledWith("user-1", "hello");
-    expect(wordPreparationStage.handleWordCallback).toHaveBeenCalledWith("game-1", "user-1", "confirm", "YES");
+    expect(configurationStage.applyConfigStep).toHaveBeenCalledWith(
+      "game-1",
+      "user-1",
+      "mode",
+      "NORMAL",
+    );
+    expect(normalPairingStage.applyManualPair).toHaveBeenCalledWith(
+      "game-1",
+      "user-1",
+      "target-1",
+    );
+    expect(wordPreparationStage.handlePrivateText).toHaveBeenCalledWith(
+      "user-1",
+      "hello",
+    );
+    expect(wordPreparationStage.handleWordCallback).toHaveBeenCalledWith(
+      "game-1",
+      "user-1",
+      "confirm",
+      "YES",
+    );
   });
 
   it("routes gameplay methods by configured mode", async () => {
     const harness = createGameServiceHarness();
     const chatId = "chat-facade-routing";
-    const actors = [harness.createActor(1), harness.createActor(2), harness.createActor(3)];
-    const started = await harness.setupNormalOnlineRandomInProgress(chatId, actors);
+    const actors = [
+      harness.createActor(1),
+      harness.createActor(2),
+      harness.createActor(3),
+    ];
+    const started = await harness.setupNormalOnlineRandomInProgress(
+      chatId,
+      actors,
+    );
 
     const normalModeService = {
       mode: "NORMAL",
@@ -45,16 +78,40 @@ describe("game service facade", () => {
       sendFinalSummary: vi.fn().mockResolvedValue(undefined),
     };
 
-    (harness.service as any).modeServices = new Map([["NORMAL", normalModeService]]);
+    (harness.service as any).modeServices = new Map([
+      ["NORMAL", normalModeService],
+    ]);
 
-    await harness.service.handleGroupText(chatId, actors[0].telegramUserId, "question");
+    await harness.service.handleGroupText(
+      chatId,
+      actors[0].telegramUserId,
+      "question",
+    );
     await harness.service.askOffline(chatId, actors[0].telegramUserId);
-    await harness.service.handleVote(started.id, actors[0].telegramUserId, "NO");
+    await harness.service.handleVote(
+      started.id,
+      actors[0].telegramUserId,
+      "NO",
+    );
     await harness.service.giveUp(chatId, actors[0].telegramUserId);
 
-    expect(normalModeService.handleGroupText).toHaveBeenCalledWith(chatId, actors[0].telegramUserId, "question");
-    expect(normalModeService.askOffline).toHaveBeenCalledWith(chatId, actors[0].telegramUserId);
-    expect(normalModeService.handleVote).toHaveBeenCalledWith(started.id, actors[0].telegramUserId, "NO");
-    expect(normalModeService.giveUp).toHaveBeenCalledWith(chatId, actors[0].telegramUserId);
+    expect(normalModeService.handleGroupText).toHaveBeenCalledWith(
+      chatId,
+      actors[0].telegramUserId,
+      "question",
+    );
+    expect(normalModeService.askOffline).toHaveBeenCalledWith(
+      chatId,
+      actors[0].telegramUserId,
+    );
+    expect(normalModeService.handleVote).toHaveBeenCalledWith(
+      started.id,
+      actors[0].telegramUserId,
+      "NO",
+    );
+    expect(normalModeService.giveUp).toHaveBeenCalledWith(
+      chatId,
+      actors[0].telegramUserId,
+    );
   });
 });

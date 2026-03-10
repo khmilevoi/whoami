@@ -1,4 +1,4 @@
-import { UnhandledError } from './error.js'
+import { UnhandledError } from "./error.js";
 
 /**
  * Type guard: checks if value is an Error.
@@ -14,7 +14,7 @@ import { UnhandledError } from './error.js'
  * console.log(result.name)
  */
 export function isError<V>(value: V): value is Extract<V, Error> {
-  return value instanceof Error
+  return value instanceof Error;
 }
 
 /**
@@ -28,7 +28,7 @@ export function isError<V>(value: V): value is Extract<V, Error> {
  * }
  */
 export function isOk<V>(value: V): value is Exclude<V, Error> {
-  return !(value instanceof Error)
+  return !(value instanceof Error);
 }
 
 /**
@@ -47,32 +47,32 @@ export function isOk<V>(value: V): value is Exclude<V, Error> {
  * })
  * // result: ParseError | unknown
  */
-export function tryFn<T>(fn: () => T): UnhandledError | T
+export function tryFn<T>(fn: () => T): UnhandledError | T;
 export function tryFn<T, E extends Error>(opts: {
-  try: () => T
-  catch: (e: Error) => E
-}): E | T
+  try: () => T;
+  catch: (e: Error) => E;
+}): E | T;
 export function tryFn<T, E extends Error>(
   fnOrOpts: (() => T) | { try: () => T; catch: (e: Error) => E },
 ): UnhandledError | E | T {
-  if (typeof fnOrOpts === 'function') {
+  if (typeof fnOrOpts === "function") {
     try {
-      return fnOrOpts()
+      return fnOrOpts();
     } catch (cause) {
       if (!(cause instanceof Error)) {
-        throw cause
+        throw cause;
       }
-      return new UnhandledError({ cause })
+      return new UnhandledError({ cause });
     }
   }
 
   try {
-    return fnOrOpts.try()
+    return fnOrOpts.try();
   } catch (cause) {
     if (!(cause instanceof Error)) {
-      throw cause
+      throw cause;
     }
-    return fnOrOpts.catch(cause)
+    return fnOrOpts.catch(cause);
   }
 }
 
@@ -107,33 +107,33 @@ export function tryFn<T, E extends Error>(
  *   .catch((e) => new NetworkError({ url, cause: e }))
  * ```
  */
-export function tryAsync<T>(fn: () => Promise<T>): Promise<UnhandledError | T>
+export function tryAsync<T>(fn: () => Promise<T>): Promise<UnhandledError | T>;
 export function tryAsync<T, E extends Error>(opts: {
-  try: () => Promise<T>
-  catch: (e: Error) => E | Promise<E>
-}): Promise<E | T>
+  try: () => Promise<T>;
+  catch: (e: Error) => E | Promise<E>;
+}): Promise<E | T>;
 export async function tryAsync<T, E extends Error>(
   fnOrOpts:
     | (() => Promise<T>)
     | { try: () => Promise<T>; catch: (e: Error) => E | Promise<E> },
 ): Promise<UnhandledError | E | T> {
-  if (typeof fnOrOpts === 'function') {
+  if (typeof fnOrOpts === "function") {
     try {
-      return await fnOrOpts()
+      return await fnOrOpts();
     } catch (cause) {
       if (!(cause instanceof Error)) {
-        throw cause
+        throw cause;
       }
-      return new UnhandledError({ cause })
+      return new UnhandledError({ cause });
     }
   }
 
   try {
-    return await fnOrOpts.try()
+    return await fnOrOpts.try();
   } catch (cause) {
     if (!(cause instanceof Error)) {
-      throw cause
+      throw cause;
     }
-    return await fnOrOpts.catch(cause)
+    return await fnOrOpts.catch(cause);
   }
 }

@@ -16,8 +16,10 @@ Telegram bot for "Кто я?" game.
 2. Copy `.env.example` to `.env` and fill values.
 3. Install dependencies: `pnpm install`.
 4. If `better-sqlite3` bindings are missing, run:
-  - `pnpm approve-builds`
-  - `pnpm rebuild better-sqlite3`
+
+- `pnpm approve-builds`
+- `pnpm rebuild better-sqlite3`
+
 5. Start in dev mode: `pnpm dev`.
 
 ## Commands

@@ -7,7 +7,10 @@ import { ReadyStartStageService } from "../../src/application/stages/ready-start
 import { WordPreparationStageService } from "../../src/application/stages/word-preparation-stage-service";
 import { ConfigDraftStore } from "../../src/application/stores/config-draft-store";
 import { PrivateExpectationStore } from "../../src/application/stores/private-expectation-store";
-import { createGameServiceHarness, GameServiceHarness } from "./game-service.harness";
+import {
+  createGameServiceHarness,
+  GameServiceHarness,
+} from "./game-service.harness";
 
 export interface GameServiceComponentHarness {
   readonly game: GameServiceHarness;
@@ -22,40 +25,56 @@ export interface GameServiceComponentHarness {
   readonly expectationStore: PrivateExpectationStore;
 }
 
-export const createGameServiceComponentHarness = (): GameServiceComponentHarness => {
-  const game = createGameServiceHarness();
-  const context = new GameServiceContext({
-    engine: game.engine,
-    repository: game.repository,
-    transactionRunner: game.transactionRunner,
-    notifier: game.notifier,
-    identity: game.identity,
-    idPort: game.idPort,
-    clock: game.clock,
-    logger: game.logger,
-    texts: game.texts,
-    limits: game.limits,
-  });
+export const createGameServiceComponentHarness =
+  (): GameServiceComponentHarness => {
+    const game = createGameServiceHarness();
+    const context = new GameServiceContext({
+      engine: game.engine,
+      repository: game.repository,
+      transactionRunner: game.transactionRunner,
+      notifier: game.notifier,
+      identity: game.identity,
+      idPort: game.idPort,
+      clock: game.clock,
+      logger: game.logger,
+      texts: game.texts,
+      limits: game.limits,
+    });
 
-  const configDraftStore = new ConfigDraftStore();
-  const expectationStore = new PrivateExpectationStore();
-  const normalMode = new NormalModeService(context);
-  const reverseMode = new ReverseModeService(context);
-  const readyStartStage = new ReadyStartStageService(context, [normalMode, reverseMode]);
-  const wordPreparationStage = new WordPreparationStageService(context, expectationStore, readyStartStage);
-  const normalPairingStage = new NormalPairingStageService(context, wordPreparationStage);
-  const configurationStage = new ConfigurationStageService(context, configDraftStore, normalPairingStage, wordPreparationStage);
+    const configDraftStore = new ConfigDraftStore();
+    const expectationStore = new PrivateExpectationStore();
+    const normalMode = new NormalModeService(context);
+    const reverseMode = new ReverseModeService(context);
+    const readyStartStage = new ReadyStartStageService(context, [
+      normalMode,
+      reverseMode,
+    ]);
+    const wordPreparationStage = new WordPreparationStageService(
+      context,
+      expectationStore,
+      readyStartStage,
+    );
+    const normalPairingStage = new NormalPairingStageService(
+      context,
+      wordPreparationStage,
+    );
+    const configurationStage = new ConfigurationStageService(
+      context,
+      configDraftStore,
+      normalPairingStage,
+      wordPreparationStage,
+    );
 
-  return {
-    game,
-    context,
-    normalMode,
-    reverseMode,
-    readyStartStage,
-    wordPreparationStage,
-    normalPairingStage,
-    configurationStage,
-    configDraftStore,
-    expectationStore,
+    return {
+      game,
+      context,
+      normalMode,
+      reverseMode,
+      readyStartStage,
+      wordPreparationStage,
+      normalPairingStage,
+      configurationStage,
+      configDraftStore,
+      expectationStore,
+    };
   };
-};

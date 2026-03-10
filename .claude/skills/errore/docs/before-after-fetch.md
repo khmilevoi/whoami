@@ -13,19 +13,19 @@ async function getTodo(
   id: number,
 ): Promise<
   | { ok: true; todo: any }
-  | { ok: false; error: 'InvalidJson' | 'RequestFailed' }
+  | { ok: false; error: "InvalidJson" | "RequestFailed" }
 > {
   try {
-    const response = await fetch(`/todos/${id}`)
-    if (!response.ok) throw new Error('Not OK!')
+    const response = await fetch(`/todos/${id}`);
+    if (!response.ok) throw new Error("Not OK!");
     try {
-      const todo = await response.json()
-      return { ok: true, todo }
+      const todo = await response.json();
+      return { ok: true, todo };
     } catch (jsonError) {
-      return { ok: false, error: 'InvalidJson' }
+      return { ok: false, error: "InvalidJson" };
     }
   } catch (error) {
-    return { ok: false, error: 'RequestFailed' }
+    return { ok: false, error: "RequestFailed" };
   }
 }
 ```
@@ -40,16 +40,16 @@ async function getTodo(
 ### After
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 class InvalidJsonError extends errore.createTaggedError({
-  name: 'InvalidJsonError',
-  message: 'Failed to parse response for todo $id',
+  name: "InvalidJsonError",
+  message: "Failed to parse response for todo $id",
 }) {}
 
 class RequestFailedError extends errore.createTaggedError({
-  name: 'RequestFailedError',
-  message: 'Request failed for todo $id',
+  name: "RequestFailedError",
+  message: "Request failed for todo $id",
 }) {}
 
 async function getTodo(
@@ -57,19 +57,19 @@ async function getTodo(
 ): Promise<InvalidJsonError | RequestFailedError | { todo: any }> {
   const response = await fetch(`/todos/${id}`).catch(
     (e) => new RequestFailedError({ id: String(id), cause: e }),
-  )
-  if (response instanceof Error) return response
+  );
+  if (response instanceof Error) return response;
 
   if (!response.ok) {
-    return new RequestFailedError({ id: String(id) })
+    return new RequestFailedError({ id: String(id) });
   }
 
   const body = await response
     .json()
-    .catch((e) => new InvalidJsonError({ id: String(id), cause: e }))
-  if (body instanceof Error) return body
+    .catch((e) => new InvalidJsonError({ id: String(id), cause: e }));
+  if (body instanceof Error) return body;
 
-  return { todo: body }
+  return { todo: body };
 }
 ```
 
@@ -83,7 +83,7 @@ async function getTodo(
 ### Caller
 
 ```ts
-const result = await getTodo(1)
+const result = await getTodo(1);
 
 if (result instanceof Error) {
   // Exhaustive match on error type
@@ -91,12 +91,12 @@ if (result instanceof Error) {
     InvalidJsonError: (e) => `Bad JSON for todo ${e.id}`,
     RequestFailedError: (e) => `Fetch failed for todo ${e.id}`,
     Error: (e) => `Unexpected: ${e.message}`,
-  })
-  console.error(msg)
-  return
+  });
+  console.error(msg);
+  return;
 }
 
-console.log(result.todo) // TypeScript knows: { todo: any }
+console.log(result.todo); // TypeScript knows: { todo: any }
 ```
 
 ---
@@ -114,38 +114,38 @@ function getTodo(
   }: { retries?: number; retryBaseDelay?: number },
 ): Promise<
   | { ok: true; todo: any }
-  | { ok: false; error: 'InvalidJson' | 'RequestFailed' }
+  | { ok: false; error: "InvalidJson" | "RequestFailed" }
 > {
   async function execute(
     attempt: number,
   ): Promise<
     | { ok: true; todo: any }
-    | { ok: false; error: 'InvalidJson' | 'RequestFailed' }
+    | { ok: false; error: "InvalidJson" | "RequestFailed" }
   > {
     try {
-      const response = await fetch(`/todos/${id}`)
-      if (!response.ok) throw new Error('Not OK!')
+      const response = await fetch(`/todos/${id}`);
+      if (!response.ok) throw new Error("Not OK!");
       try {
-        const todo = await response.json()
-        return { ok: true, todo }
+        const todo = await response.json();
+        return { ok: true, todo };
       } catch (jsonError) {
         if (attempt < retries) {
-          throw jsonError // jump to retry
+          throw jsonError; // jump to retry
         }
-        return { ok: false, error: 'InvalidJson' }
+        return { ok: false, error: "InvalidJson" };
       }
     } catch (error) {
       if (attempt < retries) {
-        const delayMs = retryBaseDelay * 2 ** attempt
+        const delayMs = retryBaseDelay * 2 ** attempt;
         return new Promise((resolve) =>
           setTimeout(() => resolve(execute(attempt + 1)), delayMs),
-        )
+        );
       }
-      return { ok: false, error: 'RequestFailed' }
+      return { ok: false, error: "RequestFailed" };
     }
   }
 
-  return execute(0)
+  return execute(0);
 }
 ```
 
@@ -159,18 +159,18 @@ function getTodo(
 ### After
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 class InvalidJsonError extends errore.createTaggedError({
-  name: 'InvalidJsonError',
-  message: 'Failed to parse response for todo $id',
+  name: "InvalidJsonError",
+  message: "Failed to parse response for todo $id",
 }) {}
 
 class RequestFailedError extends errore.createTaggedError({
-  name: 'RequestFailedError',
-  message: 'Request failed for todo $id after $attempts attempts',
+  name: "RequestFailedError",
+  message: "Request failed for todo $id after $attempts attempts",
 }) {}
 
 async function getTodo(
@@ -188,46 +188,46 @@ async function getTodo(
           attempts: String(attempt + 1),
           cause: e,
         }),
-    )
+    );
 
     if (response instanceof Error) {
       if (attempt < retries) {
-        await sleep(retryBaseDelay * 2 ** attempt)
-        continue
+        await sleep(retryBaseDelay * 2 ** attempt);
+        continue;
       }
-      return response
+      return response;
     }
 
     if (!response.ok) {
       if (attempt < retries) {
-        await sleep(retryBaseDelay * 2 ** attempt)
-        continue
+        await sleep(retryBaseDelay * 2 ** attempt);
+        continue;
       }
       return new RequestFailedError({
         id: String(id),
         attempts: String(attempt + 1),
-      })
+      });
     }
 
     const body = await response
       .json()
-      .catch((e) => new InvalidJsonError({ id: String(id), cause: e }))
+      .catch((e) => new InvalidJsonError({ id: String(id), cause: e }));
 
     if (body instanceof Error) {
       if (attempt < retries) {
-        await sleep(retryBaseDelay * 2 ** attempt)
-        continue
+        await sleep(retryBaseDelay * 2 ** attempt);
+        continue;
       }
-      return body
+      return body;
     }
 
-    return { todo: body }
+    return { todo: body };
   }
 
   return new RequestFailedError({
     id: String(id),
     attempts: String(retries + 1),
-  })
+  });
 }
 ```
 
@@ -252,55 +252,55 @@ function getTodo(
     retryBaseDelay = 1000,
     signal,
   }: {
-    retries?: number
-    retryBaseDelay?: number
-    signal?: AbortSignal
+    retries?: number;
+    retryBaseDelay?: number;
+    signal?: AbortSignal;
   },
 ): Promise<
   | { ok: true; todo: any }
   | {
-      ok: false
-      error: 'InvalidJson' | 'RequestFailed' | 'Timeout'
+      ok: false;
+      error: "InvalidJson" | "RequestFailed" | "Timeout";
     }
 > {
   async function execute(attempt: number): Promise<
     | { ok: true; todo: any }
     | {
-        ok: false
-        error: 'InvalidJson' | 'RequestFailed' | 'Timeout'
+        ok: false;
+        error: "InvalidJson" | "RequestFailed" | "Timeout";
       }
   > {
     try {
-      const controller = new AbortController()
-      setTimeout(() => controller.abort(), 1000)
-      signal?.addEventListener('abort', () => controller.abort())
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 1000);
+      signal?.addEventListener("abort", () => controller.abort());
       const response = await fetch(`/todos/${id}`, {
         signal: controller.signal,
-      })
-      if (!response.ok) throw new Error('Not OK!')
+      });
+      if (!response.ok) throw new Error("Not OK!");
       try {
-        const todo = await response.json()
-        return { ok: true, todo }
+        const todo = await response.json();
+        return { ok: true, todo };
       } catch (jsonError) {
         if (attempt < retries) {
-          throw jsonError // jump to retry
+          throw jsonError; // jump to retry
         }
-        return { ok: false, error: 'InvalidJson' }
+        return { ok: false, error: "InvalidJson" };
       }
     } catch (error) {
-      if ((error as Error).name === 'AbortError') {
-        return { ok: false, error: 'Timeout' }
+      if ((error as Error).name === "AbortError") {
+        return { ok: false, error: "Timeout" };
       } else if (attempt < retries) {
-        const delayMs = retryBaseDelay * 2 ** attempt
+        const delayMs = retryBaseDelay * 2 ** attempt;
         return new Promise((resolve) =>
           setTimeout(() => resolve(execute(attempt + 1)), delayMs),
-        )
+        );
       }
-      return { ok: false, error: 'RequestFailed' }
+      return { ok: false, error: "RequestFailed" };
     }
   }
 
-  return execute(0)
+  return execute(0);
 }
 ```
 
@@ -314,23 +314,23 @@ function getTodo(
 ### After
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 class InvalidJsonError extends errore.createTaggedError({
-  name: 'InvalidJsonError',
-  message: 'Failed to parse response for todo $id',
+  name: "InvalidJsonError",
+  message: "Failed to parse response for todo $id",
 }) {}
 
 class RequestFailedError extends errore.createTaggedError({
-  name: 'RequestFailedError',
-  message: 'Request failed for todo $id after $attempts attempts',
+  name: "RequestFailedError",
+  message: "Request failed for todo $id after $attempts attempts",
 }) {}
 
 class TimeoutError extends errore.createTaggedError({
-  name: 'TimeoutError',
-  message: 'Request timed out for todo $id',
+  name: "TimeoutError",
+  message: "Request timed out for todo $id",
   extends: errore.AbortError,
 }) {}
 
@@ -341,20 +341,20 @@ async function getTodo(
     retryBaseDelay = 1000,
     signal,
   }: {
-    retries?: number
-    retryBaseDelay?: number
-    signal?: AbortSignal
+    retries?: number;
+    retryBaseDelay?: number;
+    signal?: AbortSignal;
   },
 ): Promise<InvalidJsonError | RequestFailedError | { todo: any }> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     // Abort handling: combine caller signal with per-request timeout
-    const controller = new AbortController()
+    const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(new TimeoutError({ id: String(id) })),
       1000,
-    )
-    const onAbort = () => controller.abort()
-    signal?.addEventListener('abort', onAbort, { once: true })
+    );
+    const onAbort = () => controller.abort();
+    signal?.addEventListener("abort", onAbort, { once: true });
 
     const response = await fetch(`/todos/${id}`, {
       signal: controller.signal,
@@ -365,52 +365,52 @@ async function getTodo(
           attempts: String(attempt + 1),
           cause: e,
         }),
-    )
+    );
 
-    clearTimeout(timeout)
-    signal?.removeEventListener('abort', onAbort)
+    clearTimeout(timeout);
+    signal?.removeEventListener("abort", onAbort);
 
     // Abort errors (timeout) are never retried
-    if (errore.isAbortError(response)) return response
+    if (errore.isAbortError(response)) return response;
 
     if (response instanceof Error) {
       if (attempt < retries) {
-        await sleep(retryBaseDelay * 2 ** attempt)
-        continue
+        await sleep(retryBaseDelay * 2 ** attempt);
+        continue;
       }
-      return response
+      return response;
     }
 
     if (!response.ok) {
       if (attempt < retries) {
-        await sleep(retryBaseDelay * 2 ** attempt)
-        continue
+        await sleep(retryBaseDelay * 2 ** attempt);
+        continue;
       }
       return new RequestFailedError({
         id: String(id),
         attempts: String(attempt + 1),
-      })
+      });
     }
 
     const body = await response
       .json()
-      .catch((e) => new InvalidJsonError({ id: String(id), cause: e }))
+      .catch((e) => new InvalidJsonError({ id: String(id), cause: e }));
 
     if (body instanceof Error) {
       if (attempt < retries) {
-        await sleep(retryBaseDelay * 2 ** attempt)
-        continue
+        await sleep(retryBaseDelay * 2 ** attempt);
+        continue;
       }
-      return body
+      return body;
     }
 
-    return { todo: body }
+    return { todo: body };
   }
 
   return new RequestFailedError({
     id: String(id),
     attempts: String(retries + 1),
-  })
+  });
 }
 ```
 
@@ -429,7 +429,7 @@ async function getTodo(
 ### Before
 
 ```ts
-const tracer = Otel.trace.getTracer('todos')
+const tracer = Otel.trace.getTracer("todos");
 
 function getTodo(
   id: number,
@@ -438,72 +438,72 @@ function getTodo(
     retryBaseDelay = 1000,
     signal,
   }: {
-    retries?: number
-    retryBaseDelay?: number
-    signal?: AbortSignal
+    retries?: number;
+    retryBaseDelay?: number;
+    signal?: AbortSignal;
   },
 ): Promise<
   | { ok: true; todo: any }
   | {
-      ok: false
-      error: 'InvalidJson' | 'RequestFailed' | 'Timeout'
+      ok: false;
+      error: "InvalidJson" | "RequestFailed" | "Timeout";
     }
 > {
   return tracer.startActiveSpan(
-    'getTodo',
+    "getTodo",
     { attributes: { id } },
     async (span) => {
       try {
-        const result = await execute(0)
+        const result = await execute(0);
         if (result.ok) {
-          span.setStatus({ code: Otel.SpanStatusCode.OK })
+          span.setStatus({ code: Otel.SpanStatusCode.OK });
         } else {
           span.setStatus({
             code: Otel.SpanStatusCode.ERROR,
             message: result.error,
-          })
+          });
         }
-        return result
+        return result;
       } finally {
-        span.end()
+        span.end();
       }
     },
-  )
+  );
 
   async function execute(attempt: number): Promise<
     | { ok: true; todo: any }
     | {
-        ok: false
-        error: 'InvalidJson' | 'RequestFailed' | 'Timeout'
+        ok: false;
+        error: "InvalidJson" | "RequestFailed" | "Timeout";
       }
   > {
     try {
-      const controller = new AbortController()
-      setTimeout(() => controller.abort(), 1000)
-      signal?.addEventListener('abort', () => controller.abort())
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 1000);
+      signal?.addEventListener("abort", () => controller.abort());
       const response = await fetch(`/todos/${id}`, {
         signal: controller.signal,
-      })
-      if (!response.ok) throw new Error('Not OK!')
+      });
+      if (!response.ok) throw new Error("Not OK!");
       try {
-        const todo = await response.json()
-        return { ok: true, todo }
+        const todo = await response.json();
+        return { ok: true, todo };
       } catch (jsonError) {
         if (attempt < retries) {
-          throw jsonError
+          throw jsonError;
         }
-        return { ok: false, error: 'InvalidJson' }
+        return { ok: false, error: "InvalidJson" };
       }
     } catch (error) {
-      if ((error as Error).name === 'AbortError') {
-        return { ok: false, error: 'Timeout' }
+      if ((error as Error).name === "AbortError") {
+        return { ok: false, error: "Timeout" };
       } else if (attempt < retries) {
-        const delayMs = retryBaseDelay * 2 ** attempt
+        const delayMs = retryBaseDelay * 2 ** attempt;
         return new Promise((resolve) =>
           setTimeout(() => resolve(execute(attempt + 1)), delayMs),
-        )
+        );
       }
-      return { ok: false, error: 'RequestFailed' }
+      return { ok: false, error: "RequestFailed" };
     }
   }
 }
@@ -520,24 +520,24 @@ function getTodo(
 ### After
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
-const tracer = Otel.trace.getTracer('todos')
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+const tracer = Otel.trace.getTracer("todos");
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 class InvalidJsonError extends errore.createTaggedError({
-  name: 'InvalidJsonError',
-  message: 'Failed to parse response for todo $id',
+  name: "InvalidJsonError",
+  message: "Failed to parse response for todo $id",
 }) {}
 
 class RequestFailedError extends errore.createTaggedError({
-  name: 'RequestFailedError',
-  message: 'Request failed for todo $id after $attempts attempts',
+  name: "RequestFailedError",
+  message: "Request failed for todo $id after $attempts attempts",
 }) {}
 
 class TimeoutError extends errore.createTaggedError({
-  name: 'TimeoutError',
-  message: 'Request timed out for todo $id',
+  name: "TimeoutError",
+  message: "Request timed out for todo $id",
   extends: errore.AbortError,
 }) {}
 
@@ -548,41 +548,41 @@ async function getTodo(
     retryBaseDelay = 1000,
     signal,
   }: {
-    retries?: number
-    retryBaseDelay?: number
-    signal?: AbortSignal
+    retries?: number;
+    retryBaseDelay?: number;
+    signal?: AbortSignal;
   },
 ): Promise<InvalidJsonError | RequestFailedError | { todo: any }> {
   return tracer.startActiveSpan(
-    'getTodo',
+    "getTodo",
     { attributes: { id } },
     async (span) => {
-      const result = await execute()
+      const result = await execute();
       if (result instanceof Error) {
         span.setStatus({
           code: Otel.SpanStatusCode.ERROR,
           message: result.message,
-        })
-        span.recordException(result)
+        });
+        span.recordException(result);
       } else {
-        span.setStatus({ code: Otel.SpanStatusCode.OK })
+        span.setStatus({ code: Otel.SpanStatusCode.OK });
       }
-      span.end()
-      return result
+      span.end();
+      return result;
     },
-  )
+  );
 
   async function execute(): Promise<
     InvalidJsonError | RequestFailedError | { todo: any }
   > {
     for (let attempt = 0; attempt <= retries; attempt++) {
-      const controller = new AbortController()
+      const controller = new AbortController();
       const timeout = setTimeout(
         () => controller.abort(new TimeoutError({ id: String(id) })),
         1000,
-      )
-      const onAbort = () => controller.abort()
-      signal?.addEventListener('abort', onAbort, { once: true })
+      );
+      const onAbort = () => controller.abort();
+      signal?.addEventListener("abort", onAbort, { once: true });
 
       const response = await fetch(`/todos/${id}`, {
         signal: controller.signal,
@@ -593,52 +593,52 @@ async function getTodo(
             attempts: String(attempt + 1),
             cause: e,
           }),
-      )
+      );
 
-      clearTimeout(timeout)
-      signal?.removeEventListener('abort', onAbort)
+      clearTimeout(timeout);
+      signal?.removeEventListener("abort", onAbort);
 
       // Abort errors (timeout) are never retried
-      if (errore.isAbortError(response)) return response
+      if (errore.isAbortError(response)) return response;
 
       if (response instanceof Error) {
         if (attempt < retries) {
-          await sleep(retryBaseDelay * 2 ** attempt)
-          continue
+          await sleep(retryBaseDelay * 2 ** attempt);
+          continue;
         }
-        return response
+        return response;
       }
 
       if (!response.ok) {
         if (attempt < retries) {
-          await sleep(retryBaseDelay * 2 ** attempt)
-          continue
+          await sleep(retryBaseDelay * 2 ** attempt);
+          continue;
         }
         return new RequestFailedError({
           id: String(id),
           attempts: String(attempt + 1),
-        })
+        });
       }
 
       const body = await response
         .json()
-        .catch((e) => new InvalidJsonError({ id: String(id), cause: e }))
+        .catch((e) => new InvalidJsonError({ id: String(id), cause: e }));
 
       if (body instanceof Error) {
         if (attempt < retries) {
-          await sleep(retryBaseDelay * 2 ** attempt)
-          continue
+          await sleep(retryBaseDelay * 2 ** attempt);
+          continue;
         }
-        return body
+        return body;
       }
 
-      return { todo: body }
+      return { todo: body };
     }
 
     return new RequestFailedError({
       id: String(id),
       attempts: String(retries + 1),
-    })
+    });
   }
 }
 ```
@@ -680,29 +680,29 @@ async function processOrder(
   orderId: string,
 ): Promise<
   | { ok: true; receipt: Receipt }
-  | { ok: false; error: 'DbError' | 'CacheError' | 'ProcessingError' }
+  | { ok: false; error: "DbError" | "CacheError" | "ProcessingError" }
 > {
-  const db = await connectDb()
+  const db = await connectDb();
   try {
-    const cache = await openCache()
+    const cache = await openCache();
     try {
       const order = await db.query(`SELECT * FROM orders WHERE id = $1`, [
         orderId,
-      ])
-      if (!order) return { ok: false, error: 'DbError' }
+      ]);
+      if (!order) return { ok: false, error: "DbError" };
 
-      const receipt = await processPayment(order)
-      await cache.set(`receipt:${orderId}`, receipt)
-      return { ok: true, receipt }
+      const receipt = await processPayment(order);
+      await cache.set(`receipt:${orderId}`, receipt);
+      return { ok: true, receipt };
     } catch (e) {
-      return { ok: false, error: 'ProcessingError' }
+      return { ok: false, error: "ProcessingError" };
     } finally {
-      await cache.flush()
+      await cache.flush();
     }
   } catch (e) {
-    return { ok: false, error: 'DbError' }
+    return { ok: false, error: "DbError" };
   } finally {
-    await db.close()
+    await db.close();
   }
 }
 ```
@@ -717,50 +717,50 @@ async function processOrder(
 ### After
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 class DbError extends errore.createTaggedError({
-  name: 'DbError',
-  message: 'Database operation failed for order $orderId',
+  name: "DbError",
+  message: "Database operation failed for order $orderId",
 }) {}
 
 class CacheError extends errore.createTaggedError({
-  name: 'CacheError',
-  message: 'Cache operation failed for order $orderId',
+  name: "CacheError",
+  message: "Cache operation failed for order $orderId",
 }) {}
 
 class ProcessingError extends errore.createTaggedError({
-  name: 'ProcessingError',
-  message: 'Payment processing failed for order $orderId',
+  name: "ProcessingError",
+  message: "Payment processing failed for order $orderId",
 }) {}
 
 async function processOrder(
   orderId: string,
 ): Promise<DbError | CacheError | ProcessingError | Receipt> {
-  await using cleanup = new errore.AsyncDisposableStack()
+  await using cleanup = new errore.AsyncDisposableStack();
 
-  const db = await connectDb().catch((e) => new DbError({ orderId, cause: e }))
-  if (db instanceof Error) return db
-  cleanup.defer(() => db.close())
+  const db = await connectDb().catch((e) => new DbError({ orderId, cause: e }));
+  if (db instanceof Error) return db;
+  cleanup.defer(() => db.close());
 
   const cache = await openCache().catch(
     (e) => new CacheError({ orderId, cause: e }),
-  )
-  if (cache instanceof Error) return cache
-  cleanup.defer(() => cache.flush())
+  );
+  if (cache instanceof Error) return cache;
+  cleanup.defer(() => cache.flush());
 
   const order = await db
     .query(`SELECT * FROM orders WHERE id = $1`, [orderId])
-    .catch((e) => new DbError({ orderId, cause: e }))
-  if (order instanceof Error) return order
+    .catch((e) => new DbError({ orderId, cause: e }));
+  if (order instanceof Error) return order;
 
   const receipt = await processPayment(order).catch(
     (e) => new ProcessingError({ orderId, cause: e }),
-  )
-  if (receipt instanceof Error) return receipt
+  );
+  if (receipt instanceof Error) return receipt;
 
-  await cache.set(`receipt:${orderId}`, receipt)
-  return receipt
+  await cache.set(`receipt:${orderId}`, receipt);
+  return receipt;
   // cleanup runs automatically: cache.flush() → db.close()
 }
 ```
@@ -776,7 +776,7 @@ async function processOrder(
 ### Effect.ts equivalent
 
 ```ts
-import { Effect } from 'effect'
+import { Effect } from "effect";
 
 const processOrder = (orderId: string) =>
   Effect.acquireRelease(connectDbEffect, (db) =>
@@ -792,21 +792,21 @@ const processOrder = (orderId: string) =>
               try: () =>
                 db.query(`SELECT * FROM orders WHERE id = $1`, [orderId]),
               catch: () => new DbError({ orderId }),
-            })
+            });
             const receipt = yield* Effect.tryPromise({
               try: () => processPayment(order),
               catch: () => new ProcessingError({ orderId }),
-            })
+            });
             yield* Effect.promise(() =>
               cache.set(`receipt:${orderId}`, receipt),
-            )
-            return receipt
+            );
+            return receipt;
           }),
         ),
       ),
     ),
     Effect.scoped,
-  )
+  );
 ```
 
 **Comparison:** Effect's `acquireRelease` + `Effect.scoped` provides the same guarantee — resources are always cleaned up. But it requires wrapping everything in the Effect system: `Effect.flatMap`, `Effect.gen`, `yield*`, and `Effect.scoped`. errore uses native `await using` + `DisposableStack` — the same cleanup guarantee with plain async/await.
@@ -821,21 +821,21 @@ A React server component that fetches a video with policy checks, handles passwo
 
 ```tsx
 return Effect.gen(function* () {
-  const videosPolicy = yield* VideosPolicy
+  const videosPolicy = yield* VideosPolicy;
 
   const [video] = yield* Effect.promise(() => fetchVideo(videoId)).pipe(
     Policy.withPublicPolicy(videosPolicy.canView(videoId)),
-  )
+  );
 
-  return Option.fromNullable(video)
+  return Option.fromNullable(video);
 }).pipe(
   Effect.flatten,
   Effect.map((video) => ({ needsPassword: false, video }) as const),
-  Effect.catchTag('VerifyVideoPasswordError', () =>
+  Effect.catchTag("VerifyVideoPasswordError", () =>
     Effect.succeed({ needsPassword: true } as const),
   ),
   Effect.map((data) => (
-    <div className='min-h-screen flex flex-col bg-[#F7F8FA]'>
+    <div className="min-h-screen flex flex-col bg-[#F7F8FA]">
       <PasswordOverlay isOpen={data.needsPassword} videoId={videoId} />
       {!data.needsPassword && (
         <AuthorizedContent video={data.video} searchParams={searchParams} />
@@ -845,21 +845,21 @@ return Effect.gen(function* () {
   Effect.catchTags({
     PolicyDenied: () =>
       Effect.succeed(
-        <div className='flex flex-col justify-center items-center p-4 min-h-screen text-center'>
-          <Logo className='size-32' />
-          <h1 className='mb-2 text-2xl font-semibold'>This video is private</h1>
-          <p className='text-gray-400'>
-            If you own this video, please <Link href='/login'>sign in</Link> to
+        <div className="flex flex-col justify-center items-center p-4 min-h-screen text-center">
+          <Logo className="size-32" />
+          <h1 className="mb-2 text-2xl font-semibold">This video is private</h1>
+          <p className="text-gray-400">
+            If you own this video, please <Link href="/login">sign in</Link> to
             manage sharing.
           </p>
         </div>,
       ),
     NoSuchElementException: () => {
-      console.log('[ShareVideoPage] No video found for videoId:', videoId)
-      return Effect.succeed(<p>No video found</p>)
+      console.log("[ShareVideoPage] No video found for videoId:", videoId);
+      return Effect.succeed(<p>No video found</p>);
     },
   }),
-)
+);
 ```
 
 **Problems:**
@@ -874,63 +874,63 @@ return Effect.gen(function* () {
 ### After (errore)
 
 ```tsx
-import * as errore from 'errore'
+import * as errore from "errore";
 
 class PolicyDeniedError extends errore.createTaggedError({
-  name: 'PolicyDeniedError',
-  message: 'Access denied for video $videoId',
+  name: "PolicyDeniedError",
+  message: "Access denied for video $videoId",
 }) {}
 
 class VerifyVideoPasswordError extends errore.createTaggedError({
-  name: 'VerifyVideoPasswordError',
-  message: 'Video $videoId requires password verification',
+  name: "VerifyVideoPasswordError",
+  message: "Video $videoId requires password verification",
 }) {}
 ```
 
 ```tsx
-const videoResult = await fetchVideoWithPolicy(videoId)
+const videoResult = await fetchVideoWithPolicy(videoId);
 
 // PolicyDenied → private video page
 if (videoResult instanceof PolicyDeniedError) {
   return (
-    <div className='flex flex-col justify-center items-center p-4 min-h-screen text-center'>
-      <Logo className='size-32' />
-      <h1 className='mb-2 text-2xl font-semibold'>This video is private</h1>
-      <p className='text-gray-400'>
-        If you own this video, please <Link href='/login'>sign in</Link> to
+    <div className="flex flex-col justify-center items-center p-4 min-h-screen text-center">
+      <Logo className="size-32" />
+      <h1 className="mb-2 text-2xl font-semibold">This video is private</h1>
+      <p className="text-gray-400">
+        If you own this video, please <Link href="/login">sign in</Link> to
         manage sharing.
       </p>
     </div>
-  )
+  );
 }
 
 // Password required → show overlay only
 if (videoResult instanceof VerifyVideoPasswordError) {
   return (
-    <div className='min-h-screen flex flex-col bg-[#F7F8FA]'>
+    <div className="min-h-screen flex flex-col bg-[#F7F8FA]">
       <PasswordOverlay isOpen={true} videoId={videoId} />
     </div>
-  )
+  );
 }
 
 // Unexpected errors bubble up
-if (videoResult instanceof Error) return videoResult
+if (videoResult instanceof Error) return videoResult;
 
-const [video] = videoResult
+const [video] = videoResult;
 
 // No video found
 if (!video) {
-  console.log('[ShareVideoPage] No video found for videoId:', videoId)
-  return <p>No video found</p>
+  console.log("[ShareVideoPage] No video found for videoId:", videoId);
+  return <p>No video found</p>;
 }
 
 // Success
 return (
-  <div className='min-h-screen flex flex-col bg-[#F7F8FA]'>
+  <div className="min-h-screen flex flex-col bg-[#F7F8FA]">
     <PasswordOverlay isOpen={false} videoId={videoId} />
     <AuthorizedContent video={video} searchParams={searchParams} />
   </div>
-)
+);
 ```
 
 **What changed:**

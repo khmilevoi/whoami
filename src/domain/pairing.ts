@@ -7,7 +7,9 @@ import {
   UnknownPlayerInManualPairingError,
 } from "./errors";
 
-export const buildRandomDerangement = (playerIds: string[]): Record<string, string> | PairingError => {
+export const buildRandomDerangement = (
+  playerIds: string[],
+): Record<string, string> | PairingError => {
   if (playerIds.length < 2) {
     return new NeedAtLeastTwoPlayersForPairingsError();
   }

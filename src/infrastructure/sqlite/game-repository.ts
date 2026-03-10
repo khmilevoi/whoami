@@ -2,7 +2,14 @@ import Database from "better-sqlite3";
 import { GameRepository } from "../../application/ports";
 import { FinalScore, GameState } from "../../domain/types";
 
-const activeStages = ["LOBBY_OPEN", "LOBBY_CLOSED", "CONFIGURING", "PREPARE_WORDS", "READY_WAIT", "IN_PROGRESS"];
+const activeStages = [
+  "LOBBY_OPEN",
+  "LOBBY_CLOSED",
+  "CONFIGURING",
+  "PREPARE_WORDS",
+  "READY_WAIT",
+  "IN_PROGRESS",
+];
 
 export class SqliteGameRepository implements GameRepository {
   constructor(private readonly db: Database.Database) {}
@@ -16,7 +23,9 @@ export class SqliteGameRepository implements GameRepository {
   }
 
   findById(gameId: string): GameState | null {
-    const row = this.db.prepare("SELECT state_json FROM games WHERE id = ?").get(gameId) as { state_json: string } | undefined;
+    const row = this.db
+      .prepare("SELECT state_json FROM games WHERE id = ?")
+      .get(gameId) as { state_json: string } | undefined;
     if (!row) {
       return null;
     }
@@ -33,7 +42,9 @@ export class SqliteGameRepository implements GameRepository {
       LIMIT 1
     `;
 
-    const row = this.db.prepare(sql).get(chatId, ...activeStages) as { state_json: string } | undefined;
+    const row = this.db.prepare(sql).get(chatId, ...activeStages) as
+      | { state_json: string }
+      | undefined;
     if (!row) {
       return null;
     }
@@ -49,7 +60,9 @@ export class SqliteGameRepository implements GameRepository {
       ORDER BY updated_at DESC
     `;
 
-    const rows = this.db.prepare(sql).all(...activeStages) as Array<{ state_json: string }>;
+    const rows = this.db.prepare(sql).all(...activeStages) as Array<{
+      state_json: string;
+    }>;
     return rows.map((row) => JSON.parse(row.state_json) as GameState);
   }
 
@@ -120,7 +133,10 @@ export class SqliteGameRepository implements GameRepository {
           stateJson: snapshot,
           canceledReason: game.canceledReason ?? null,
           updatedAt: game.updatedAt,
-          finishedAt: game.stage === "FINISHED" || game.stage === "CANCELED" ? game.updatedAt : null,
+          finishedAt:
+            game.stage === "FINISHED" || game.stage === "CANCELED"
+              ? game.updatedAt
+              : null,
         });
     } else {
       this.db
@@ -150,7 +166,10 @@ export class SqliteGameRepository implements GameRepository {
           canceledReason: game.canceledReason ?? null,
           createdAt: game.createdAt,
           updatedAt: game.updatedAt,
-          finishedAt: game.stage === "FINISHED" || game.stage === "CANCELED" ? game.updatedAt : null,
+          finishedAt:
+            game.stage === "FINISHED" || game.stage === "CANCELED"
+              ? game.updatedAt
+              : null,
         });
     }
 
@@ -218,7 +237,11 @@ export class SqliteGameRepository implements GameRepository {
     );
 
     for (const [owner, target] of Object.entries(game.pairings)) {
-      stmt.run({ gameId: game.id, ownerPlayerId: owner, targetPlayerId: target });
+      stmt.run({
+        gameId: game.id,
+        ownerPlayerId: owner,
+        targetPlayerId: target,
+      });
     }
   }
 
@@ -325,7 +348,9 @@ export class SqliteGameRepository implements GameRepository {
         rawJson: JSON.stringify(game.result),
       });
 
-    this.db.prepare("DELETE FROM player_results WHERE game_id = ?").run(game.id);
+    this.db
+      .prepare("DELETE FROM player_results WHERE game_id = ?")
+      .run(game.id);
 
     const stmt = this.db.prepare(
       `

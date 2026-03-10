@@ -26,9 +26,13 @@ export class TelegramNotifier implements NotifierPort {
   ) {}
 
   async sendGroupMessage(chatId: string, text: string) {
-    const result = await this.bot.api
-      .sendMessage(chatId, text)
-      .catch((error) => new appErrors.TelegramApiError({ operation: `sendGroupMessage:${chatId}`, cause: error }));
+    const result = await this.bot.api.sendMessage(chatId, text).catch(
+      (error) =>
+        new appErrors.TelegramApiError({
+          operation: `sendGroupMessage:${chatId}`,
+          cause: error,
+        }),
+    );
     if (result instanceof Error) {
       return result;
     }
@@ -39,7 +43,13 @@ export class TelegramNotifier implements NotifierPort {
       .sendMessage(chatId, text, {
         reply_markup: toKeyboard(buttons),
       })
-      .catch((error) => new appErrors.TelegramApiError({ operation: `sendGroupKeyboard:${chatId}`, cause: error }));
+      .catch(
+        (error) =>
+          new appErrors.TelegramApiError({
+            operation: `sendGroupKeyboard:${chatId}`,
+            cause: error,
+          }),
+      );
     if (result instanceof Error) {
       return result;
     }
@@ -47,7 +57,11 @@ export class TelegramNotifier implements NotifierPort {
 
   async sendPrivateMessage(userId: string, text: string): Promise<boolean> {
     const result = await this.bot.api.sendMessage(userId, text).catch(
-      (error) => new appErrors.TelegramApiError({ operation: `sendPrivateMessage:${userId}`, cause: error }),
+      (error) =>
+        new appErrors.TelegramApiError({
+          operation: `sendPrivateMessage:${userId}`,
+          cause: error,
+        }),
     );
     if (result instanceof Error) {
       this.logger.warn("telegram_private_message_failed", {
@@ -59,10 +73,22 @@ export class TelegramNotifier implements NotifierPort {
     return true;
   }
 
-  async sendPrivateKeyboard(userId: string, text: string, buttons: Button[][]): Promise<boolean> {
-    const result = await this.bot.api.sendMessage(userId, text, {
-      reply_markup: toKeyboard(buttons),
-    }).catch((error) => new appErrors.TelegramApiError({ operation: `sendPrivateKeyboard:${userId}`, cause: error }));
+  async sendPrivateKeyboard(
+    userId: string,
+    text: string,
+    buttons: Button[][],
+  ): Promise<boolean> {
+    const result = await this.bot.api
+      .sendMessage(userId, text, {
+        reply_markup: toKeyboard(buttons),
+      })
+      .catch(
+        (error) =>
+          new appErrors.TelegramApiError({
+            operation: `sendPrivateKeyboard:${userId}`,
+            cause: error,
+          }),
+      );
     if (result instanceof Error) {
       this.logger.warn("telegram_private_keyboard_failed", {
         userId,
@@ -74,6 +100,8 @@ export class TelegramNotifier implements NotifierPort {
   }
 
   buildBotDeepLink(): string {
-    return this.botUsername ? `https://t.me/${this.botUsername}` : "https://t.me";
+    return this.botUsername
+      ? `https://t.me/${this.botUsername}`
+      : "https://t.me";
   }
 }

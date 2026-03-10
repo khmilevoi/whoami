@@ -1,9 +1,9 @@
-import { serializeCause } from './serialize-cause.js'
+import { serializeCause } from "./serialize-cause.js";
 
 /**
  * Any class that extends Error (used by findCause)
  */
-type AnyErrorClass = new (...args: any[]) => Error
+type AnyErrorClass = new (...args: any[]) => Error;
 
 /**
  * Walk the .cause chain of an error to find an ancestor matching a specific error class.
@@ -24,35 +24,35 @@ export function findCause<T extends Error>(
   error: Error,
   ErrorClass: new (...args: any[]) => T,
 ): T | undefined {
-  const seen = new Set<Error>()
-  let current: unknown = error
+  const seen = new Set<Error>();
+  let current: unknown = error;
   while (current instanceof Error) {
-    if (seen.has(current)) break
-    seen.add(current)
-    if (current instanceof ErrorClass) return current as T
-    current = current.cause
+    if (seen.has(current)) break;
+    seen.add(current);
+    if (current instanceof ErrorClass) return current as T;
+    current = current.cause;
   }
-  return undefined
+  return undefined;
 }
 
 /**
  * Any tagged error (for generic constraints)
  */
-type AnyTaggedError = Error & { readonly _tag: string }
+type AnyTaggedError = Error & { readonly _tag: string };
 
 /**
  * Type guard for any tagged error
  */
 const isAnyTaggedError = (value: unknown): value is AnyTaggedError => {
   return (
-    value instanceof Error && '_tag' in value && typeof value._tag === 'string'
-  )
-}
+    value instanceof Error && "_tag" in value && typeof value._tag === "string"
+  );
+};
 
 /**
  * Any class that extends Error
  */
-type ErrorClass = new (...args: any[]) => Error
+type ErrorClass = new (...args: any[]) => Error;
 
 /**
  * Instance type produced by TaggedError factory
@@ -62,15 +62,15 @@ export type TaggedErrorInstance<
   Props,
   Base extends Error = Error,
 > = Base & {
-  readonly _tag: Tag
+  readonly _tag: Tag;
   /** Stable fingerprint for error grouping in Sentry/logging. Returns [_tag]. */
-  readonly fingerprint: readonly [Tag]
-  toJSON(): object
+  readonly fingerprint: readonly [Tag];
+  toJSON(): object;
   /** Walk the .cause chain to find an ancestor matching a specific error class. */
   findCause<T extends Error>(
     ErrorClass: new (...args: any[]) => T,
-  ): T | undefined
-} & Readonly<Props>
+  ): T | undefined;
+} & Readonly<Props>;
 
 /**
  * Class type produced by TaggedError factory
@@ -82,10 +82,10 @@ export type TaggedErrorClass<
 > = {
   new (
     ...args: keyof Props extends never ? [args?: {}] : [args: Props]
-  ): TaggedErrorInstance<Tag, Props, Base>
+  ): TaggedErrorInstance<Tag, Props, Base>;
   /** Type guard for this error class */
-  is(value: unknown): value is TaggedErrorInstance<Tag, Props, Base>
-}
+  is(value: unknown): value is TaggedErrorInstance<Tag, Props, Base>;
+};
 
 /**
  * Factory for tagged error classes with discriminated _tag property.
@@ -131,9 +131,9 @@ export const TaggedError: {
     Tag,
     Props,
     InstanceType<BaseClass>
-  >
+  >;
   /** Type guard for any TaggedError instance */
-  is(value: unknown): value is AnyTaggedError
+  is(value: unknown): value is AnyTaggedError;
 } = Object.assign(
   <Tag extends string, BaseClass extends ErrorClass = typeof Error>(
     tag: Tag,
@@ -144,62 +144,62 @@ export const TaggedError: {
       Props,
       InstanceType<BaseClass>
     > => {
-      const ActualBase = (BaseClass ?? Error) as typeof Error
+      const ActualBase = (BaseClass ?? Error) as typeof Error;
 
       // Keys that are managed internally and must not be overwritten by user props
       const RESERVED_KEYS = new Set([
-        '_tag',
-        'fingerprint',
-        'name',
-        'stack',
-        'message',
-        'cause',
-      ])
+        "_tag",
+        "fingerprint",
+        "name",
+        "stack",
+        "message",
+        "cause",
+      ]);
 
       class Tagged extends ActualBase {
-        readonly _tag: Tag = tag
+        readonly _tag: Tag = tag;
 
         get fingerprint(): readonly [Tag] {
-          return [this._tag]
+          return [this._tag];
         }
 
         /** Type guard for this error class */
         static is(value: unknown): value is Tagged {
-          return value instanceof Tagged
+          return value instanceof Tagged;
         }
 
         constructor(args?: Props) {
           const message =
-            args && 'message' in args && typeof args.message === 'string'
+            args && "message" in args && typeof args.message === "string"
               ? args.message
-              : undefined
-          const cause = args && 'cause' in args ? args.cause : undefined
+              : undefined;
+          const cause = args && "cause" in args ? args.cause : undefined;
 
-          super(message, cause !== undefined ? { cause } : undefined)
+          super(message, cause !== undefined ? { cause } : undefined);
 
           if (args) {
             for (const key of Object.keys(args)) {
               if (!RESERVED_KEYS.has(key)) {
-                ;(this as Record<string, unknown>)[key] = (
+                (this as Record<string, unknown>)[key] = (
                   args as Record<string, unknown>
-                )[key]
+                )[key];
               }
             }
           }
 
-          Object.setPrototypeOf(this, new.target.prototype)
-          this.name = tag
+          Object.setPrototypeOf(this, new.target.prototype);
+          this.name = tag;
 
           if (cause instanceof Error && cause.stack) {
-            const indented = cause.stack.replace(/\n/g, '\n  ')
-            this.stack = `${this.stack}\nCaused by: ${indented}`
+            const indented = cause.stack.replace(/\n/g, "\n  ");
+            this.stack = `${this.stack}\nCaused by: ${indented}`;
           }
         }
 
         findCause<T extends Error>(
           ErrorClass: new (...args: any[]) => T,
         ): T | undefined {
-          return findCause(this, ErrorClass)
+          return findCause(this, ErrorClass);
         }
 
         toJSON(): object {
@@ -211,7 +211,7 @@ export const TaggedError: {
             fingerprint: this.fingerprint,
             cause: serializeCause(this.cause),
             stack: this.stack,
-          }
+          };
         }
       }
 
@@ -219,10 +219,10 @@ export const TaggedError: {
         Tag,
         Props,
         InstanceType<BaseClass>
-      >
+      >;
     },
   { is: isAnyTaggedError },
-)
+);
 
 /**
  * Type guard for tagged error instances.
@@ -230,20 +230,22 @@ export const TaggedError: {
  * @example
  * if (isTaggedError(value)) { value._tag }
  */
-export const isTaggedError = isAnyTaggedError
+export const isTaggedError = isAnyTaggedError;
 
 /**
  * Handler map with required `Error` fallback for plain Error (untagged)
  */
 type MatchHandlersWithPlain<E extends Error, R> = {
-  [K in Extract<E, AnyTaggedError>['_tag']]: (err: Extract<E, { _tag: K }>) => R
+  [K in Extract<E, AnyTaggedError>["_tag"]]: (
+    err: Extract<E, { _tag: K }>,
+  ) => R;
 } & {
   Error: (
     err: Exclude<E, AnyTaggedError> extends never
       ? Error
       : Exclude<E, AnyTaggedError>,
-  ) => R
-}
+  ) => R;
+};
 
 /**
  * Exhaustive pattern match on error union by _tag.
@@ -260,15 +262,15 @@ export function matchError<E extends Error, R>(
   err: E,
   handlers: MatchHandlersWithPlain<E, R>,
 ): R {
-  const h = handlers as unknown as Record<string, (e: Error) => R>
-  if ('_tag' in err && typeof err._tag === 'string') {
-    const handler = h[err._tag]
+  const h = handlers as unknown as Record<string, (e: Error) => R>;
+  if ("_tag" in err && typeof err._tag === "string") {
+    const handler = h[err._tag];
     if (handler) {
-      return handler(err)
+      return handler(err);
     }
   }
   // Fall through to Error handler for plain Error or unknown tagged errors
-  return h['Error'](err)
+  return h["Error"](err);
 }
 
 /**
@@ -284,19 +286,19 @@ export function matchErrorPartial<E extends Error, R>(
   handlers: Partial<MatchHandlersWithPlain<E, R>>,
   fallback: (e: E) => R,
 ): R {
-  const h = handlers as unknown as Record<string, (e: Error) => R>
-  if ('_tag' in err && typeof err._tag === 'string') {
-    const handler = h[err._tag]
+  const h = handlers as unknown as Record<string, (e: Error) => R>;
+  if ("_tag" in err && typeof err._tag === "string") {
+    const handler = h[err._tag];
     if (handler) {
-      return handler(err)
+      return handler(err);
     }
   }
   // Check for Error handler before fallback
-  const errorHandler = h['Error']
+  const errorHandler = h["Error"];
   if (errorHandler) {
-    return errorHandler(err)
+    return errorHandler(err);
   }
-  return fallback(err)
+  return fallback(err);
 }
 
 /**
@@ -314,9 +316,9 @@ export function matchErrorPartial<E extends Error, R>(
  * controller.abort(new TimeoutError({ operation: 'fetch' }))
  */
 export class AbortError extends Error {
-  constructor(message = 'The operation was aborted', options?: ErrorOptions) {
-    super(message, options)
-    this.name = 'AbortError'
+  constructor(message = "The operation was aborted", options?: ErrorOptions) {
+    super(message, options);
+    this.name = "AbortError";
   }
 }
 
@@ -333,32 +335,32 @@ export class AbortError extends Error {
  * }
  */
 export function isAbortError(error: unknown): error is Error {
-  const seen = new Set<Error>()
-  let current: unknown = error
+  const seen = new Set<Error>();
+  let current: unknown = error;
   while (current instanceof Error) {
-    if (seen.has(current)) break
-    seen.add(current)
+    if (seen.has(current)) break;
+    seen.add(current);
     // Native DOMException AbortError or direct AbortError (name = 'AbortError')
-    if (current.name === 'AbortError') return true
+    if (current.name === "AbortError") return true;
     // Tagged errors extending AbortError (createTaggedError overrides name to _tag)
-    if (current instanceof AbortError) return true
-    current = current.cause
+    if (current instanceof AbortError) return true;
+    current = current.cause;
   }
-  return false
+  return false;
 }
 
 /**
  * Default error type when catching unknown exceptions.
  */
-export class UnhandledError extends TaggedError('UnhandledError')<{
-  message: string
-  cause: unknown
+export class UnhandledError extends TaggedError("UnhandledError")<{
+  message: string;
+  cause: unknown;
 }>() {
   constructor(args: { cause: unknown }) {
     const message =
       args.cause instanceof Error
         ? `Unhandled exception: ${args.cause.message}`
-        : `Unhandled exception: ${String(args.cause)}`
-    super({ message, cause: args.cause })
+        : `Unhandled exception: ${String(args.cause)}`;
+    super({ message, cause: args.cause });
   }
 }

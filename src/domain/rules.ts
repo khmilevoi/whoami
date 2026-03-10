@@ -1,4 +1,6 @@
-export const computeMajorityDecision = (votes: Array<"YES" | "NO" | "GUESSED">): "YES" | "NO" | "GUESSED" => {
+export const computeMajorityDecision = (
+  votes: Array<"YES" | "NO" | "GUESSED">,
+): "YES" | "NO" | "GUESSED" => {
   const counters = { YES: 0, NO: 0, GUESSED: 0 };
   for (const vote of votes) {
     counters[vote] += 1;

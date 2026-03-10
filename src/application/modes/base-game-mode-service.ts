@@ -1,6 +1,10 @@
 import type { NotificationError } from "../../domain/errors";
 import { GameState, VoteDecision } from "../../domain/types";
-import type { GiveUpHandlingError, StartQuestionError, VoteHandlingError } from "../errors";
+import type {
+  GiveUpHandlingError,
+  StartQuestionError,
+  VoteHandlingError,
+} from "../errors";
 import { GameServiceContext } from "../game-service-context";
 import { GameModeService } from "./game-mode-service";
 
@@ -9,13 +13,24 @@ export abstract class BaseGameModeService implements GameModeService {
 
   constructor(protected readonly context: GameServiceContext) {}
 
-  async handleGroupText(chatId: string, telegramUserId: string, text: string): Promise<void | StartQuestionError> {
+  async handleGroupText(
+    chatId: string,
+    telegramUserId: string,
+    text: string,
+  ): Promise<void | StartQuestionError> {
     const game = this.context.repository.findActiveByChatId(chatId);
-    if (!game || game.stage !== "IN_PROGRESS" || game.config?.mode !== this.mode || game.config.playMode !== "ONLINE") {
+    if (
+      !game ||
+      game.stage !== "IN_PROGRESS" ||
+      game.config?.mode !== this.mode ||
+      game.config.playMode !== "ONLINE"
+    ) {
       return;
     }
 
-    const actor = game.players.find((player) => player.telegramUserId === telegramUserId);
+    const actor = game.players.find(
+      (player) => player.telegramUserId === telegramUserId,
+    );
     if (!actor) {
       return;
     }
@@ -23,13 +38,23 @@ export abstract class BaseGameModeService implements GameModeService {
     return this.startQuestion(game.id, actor.id, text);
   }
 
-  async askOffline(chatId: string, telegramUserId: string): Promise<void | StartQuestionError> {
+  async askOffline(
+    chatId: string,
+    telegramUserId: string,
+  ): Promise<void | StartQuestionError> {
     const game = this.context.repository.findActiveByChatId(chatId);
-    if (!game || game.stage !== "IN_PROGRESS" || game.config?.mode !== this.mode || game.config.playMode !== "OFFLINE") {
+    if (
+      !game ||
+      game.stage !== "IN_PROGRESS" ||
+      game.config?.mode !== this.mode ||
+      game.config.playMode !== "OFFLINE"
+    ) {
       return;
     }
 
-    const actor = game.players.find((player) => player.telegramUserId === telegramUserId);
+    const actor = game.players.find(
+      (player) => player.telegramUserId === telegramUserId,
+    );
     if (!actor) {
       return;
     }
@@ -37,11 +62,18 @@ export abstract class BaseGameModeService implements GameModeService {
     return this.startQuestion(game.id, actor.id, undefined);
   }
 
-  async handleVote(gameId: string, voterTelegramUserId: string, decision: VoteDecision): Promise<void | VoteHandlingError> {
+  async handleVote(
+    gameId: string,
+    voterTelegramUserId: string,
+    decision: VoteDecision,
+  ): Promise<void | VoteHandlingError> {
     const game = this.context.getGameByIdOrError(gameId);
     if (game instanceof Error) return game;
 
-    const voter = this.context.getPlayerByTelegramOrError(game, voterTelegramUserId);
+    const voter = this.context.getPlayerByTelegramOrError(
+      game,
+      voterTelegramUserId,
+    );
     if (voter instanceof Error) return voter;
 
     const updated = this.context.transactionRunner.runInTransaction(() => {
@@ -68,7 +100,10 @@ export abstract class BaseGameModeService implements GameModeService {
 
     const lastTurn = updated.turns[updated.turns.length - 1];
     if (lastTurn) {
-      const sentSummary = await this.context.notifier.sendGroupMessage(updated.chatId, this.context.texts.voteSummary(lastTurn.outcome));
+      const sentSummary = await this.context.notifier.sendGroupMessage(
+        updated.chatId,
+        this.context.texts.voteSummary(lastTurn.outcome),
+      );
       if (sentSummary instanceof Error) return sentSummary;
     }
 
@@ -79,19 +114,28 @@ export abstract class BaseGameModeService implements GameModeService {
     return this.announceCurrentTurn(updated);
   }
 
-  async giveUp(chatId: string, telegramUserId: string): Promise<void | GiveUpHandlingError> {
+  async giveUp(
+    chatId: string,
+    telegramUserId: string,
+  ): Promise<void | GiveUpHandlingError> {
     const game = this.context.repository.findActiveByChatId(chatId);
     if (!game || game.config?.mode !== this.mode) {
       return;
     }
 
     if (game.stage !== "IN_PROGRESS") {
-      const sentMessage = await this.context.notifier.sendGroupMessage(chatId, this.context.texts.giveUpOnlyDuringGame());
+      const sentMessage = await this.context.notifier.sendGroupMessage(
+        chatId,
+        this.context.texts.giveUpOnlyDuringGame(),
+      );
       if (sentMessage instanceof Error) return sentMessage;
       return;
     }
 
-    const player = this.context.getPlayerByTelegramOrError(game, telegramUserId);
+    const player = this.context.getPlayerByTelegramOrError(
+      game,
+      telegramUserId,
+    );
     if (player instanceof Error) return player;
 
     const updated = this.context.transactionRunner.runInTransaction(() => {
@@ -110,7 +154,10 @@ export abstract class BaseGameModeService implements GameModeService {
     });
     if (updated instanceof Error) return updated;
 
-    const sentGiveUp = await this.context.notifier.sendGroupMessage(chatId, this.context.texts.playerGaveUp(player.displayName));
+    const sentGiveUp = await this.context.notifier.sendGroupMessage(
+      chatId,
+      this.context.texts.playerGaveUp(player.displayName),
+    );
     if (sentGiveUp instanceof Error) return sentGiveUp;
 
     if (updated.stage === "FINISHED") {
@@ -120,9 +167,15 @@ export abstract class BaseGameModeService implements GameModeService {
     return this.announceCurrentTurn(updated);
   }
 
-  abstract announceCurrentTurn(game: GameState): Promise<void | NotificationError>;
+  abstract announceCurrentTurn(
+    game: GameState,
+  ): Promise<void | NotificationError>;
   abstract beforeFirstTurn(game: GameState): Promise<void>;
   abstract sendFinalSummary(game: GameState): Promise<void | NotificationError>;
 
-  protected abstract startQuestion(gameId: string, actorPlayerId: string, questionText?: string): Promise<void | StartQuestionError>;
+  protected abstract startQuestion(
+    gameId: string,
+    actorPlayerId: string,
+    questionText?: string,
+  ): Promise<void | StartQuestionError>;
 }

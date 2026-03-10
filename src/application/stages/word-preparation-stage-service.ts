@@ -1,5 +1,8 @@
 import { GameState } from "../../domain/types";
-import type { PromptWordCollectionError, WordPreparationStageError } from "../errors";
+import type {
+  PromptWordCollectionError,
+  WordPreparationStageError,
+} from "../errors";
 import { GameServiceContext } from "../game-service-context";
 import { PrivateExpectationStore } from "../stores/private-expectation-store";
 import { ReadyStartStageService } from "./ready-start-stage-service";
@@ -11,13 +14,19 @@ export class WordPreparationStageService {
     private readonly readyStartStage: ReadyStartStageService,
   ) {}
 
-  async handlePrivateText(telegramUserId: string, text: string): Promise<void | WordPreparationStageError> {
+  async handlePrivateText(
+    telegramUserId: string,
+    text: string,
+  ): Promise<void | WordPreparationStageError> {
     const game = this.context.findActiveGameByTelegramUser(telegramUserId);
     if (!game) {
       return;
     }
 
-    const player = this.context.getPlayerByTelegramOrError(game, telegramUserId);
+    const player = this.context.getPlayerByTelegramOrError(
+      game,
+      telegramUserId,
+    );
     if (player instanceof Error) return player;
 
     const expected = this.expectationStore.get(game.id, player.id) ?? "WORD";
@@ -27,7 +36,10 @@ export class WordPreparationStageService {
     }
 
     if (!game.words[player.id]) {
-      await this.context.notifier.sendPrivateMessage(telegramUserId, this.context.texts.waitForPairingCompletion());
+      await this.context.notifier.sendPrivateMessage(
+        telegramUserId,
+        this.context.texts.waitForPairingCompletion(),
+      );
       return;
     }
 
@@ -36,7 +48,12 @@ export class WordPreparationStageService {
         const current = this.context.getGameByIdOrError(game.id);
         if (current instanceof Error) return current;
 
-        const next = this.context.engine.submitClue(current, player.id, text, this.context.clock.nowIso());
+        const next = this.context.engine.submitClue(
+          current,
+          player.id,
+          text,
+          this.context.clock.nowIso(),
+        );
         if (next instanceof Error) return next;
 
         this.context.repository.update(next);
@@ -52,7 +69,12 @@ export class WordPreparationStageService {
       const current = this.context.getGameByIdOrError(game.id);
       if (current instanceof Error) return current;
 
-      const next = this.context.engine.submitWord(current, player.id, text, this.context.clock.nowIso());
+      const next = this.context.engine.submitWord(
+        current,
+        player.id,
+        text,
+        this.context.clock.nowIso(),
+      );
       if (next instanceof Error) return next;
 
       this.context.repository.update(next);
@@ -63,15 +85,26 @@ export class WordPreparationStageService {
     const sentPrompt = await this.context.notifier.sendPrivateKeyboard(
       telegramUserId,
       this.context.texts.confirmWordPrompt(updated.words[player.id].word ?? ""),
-      [[
-        { text: this.context.texts.yesButton(), data: `word:confirm:YES:${game.id}` },
-        { text: this.context.texts.noButton(), data: `word:confirm:NO:${game.id}` },
-      ]],
+      [
+        [
+          {
+            text: this.context.texts.yesButton(),
+            data: `word:confirm:YES:${game.id}`,
+          },
+          {
+            text: this.context.texts.noButton(),
+            data: `word:confirm:NO:${game.id}`,
+          },
+        ],
+      ],
     );
     if (!sentPrompt) {
       const sentFallback = await this.context.notifier.sendGroupMessage(
         updated.chatId,
-        this.context.texts.dmLinkWithLabel(this.context.playerLabel(updated, player.id), this.context.notifier.buildBotDeepLink()),
+        this.context.texts.dmLinkWithLabel(
+          this.context.playerLabel(updated, player.id),
+          this.context.notifier.buildBotDeepLink(),
+        ),
       );
       if (sentFallback instanceof Error) return sentFallback;
     }
@@ -86,7 +119,10 @@ export class WordPreparationStageService {
     const playerGame = this.context.getGameByIdOrError(gameId);
     if (playerGame instanceof Error) return playerGame;
 
-    const player = this.context.getPlayerByTelegramOrError(playerGame, telegramUserId);
+    const player = this.context.getPlayerByTelegramOrError(
+      playerGame,
+      telegramUserId,
+    );
     if (player instanceof Error) return player;
 
     if (action === "confirm") {
@@ -94,7 +130,12 @@ export class WordPreparationStageService {
         const current = this.context.getGameByIdOrError(gameId);
         if (current instanceof Error) return current;
 
-        const next = this.context.engine.confirmWord(current, player.id, value === "YES", this.context.clock.nowIso());
+        const next = this.context.engine.confirmWord(
+          current,
+          player.id,
+          value === "YES",
+          this.context.clock.nowIso(),
+        );
         if (next instanceof Error) return next;
 
         this.context.repository.update(next);
@@ -104,17 +145,28 @@ export class WordPreparationStageService {
 
       if (value === "NO") {
         this.expectationStore.set(gameId, player.id, "WORD");
-        await this.context.notifier.sendPrivateMessage(telegramUserId, this.context.texts.reenterWordPrompt());
+        await this.context.notifier.sendPrivateMessage(
+          telegramUserId,
+          this.context.texts.reenterWordPrompt(),
+        );
         return;
       }
 
       await this.context.notifier.sendPrivateKeyboard(
         telegramUserId,
         this.context.texts.addCluePrompt(),
-        [[
-          { text: this.context.texts.yesButton(), data: `word:clue:YES:${gameId}` },
-          { text: this.context.texts.noButton(), data: `word:clue:NO:${gameId}` },
-        ]],
+        [
+          [
+            {
+              text: this.context.texts.yesButton(),
+              data: `word:clue:YES:${gameId}`,
+            },
+            {
+              text: this.context.texts.noButton(),
+              data: `word:clue:NO:${gameId}`,
+            },
+          ],
+        ],
       );
 
       return this.sendWordSummary(updated, player.id, false);
@@ -123,7 +175,10 @@ export class WordPreparationStageService {
     if (action === "clue") {
       if (value === "YES") {
         this.expectationStore.set(gameId, player.id, "CLUE");
-        await this.context.notifier.sendPrivateMessage(telegramUserId, this.context.texts.enterCluePrompt());
+        await this.context.notifier.sendPrivateMessage(
+          telegramUserId,
+          this.context.texts.enterCluePrompt(),
+        );
         return;
       }
 
@@ -131,7 +186,12 @@ export class WordPreparationStageService {
         const current = this.context.getGameByIdOrError(gameId);
         if (current instanceof Error) return current;
 
-        const next = this.context.engine.submitClue(current, player.id, undefined, this.context.clock.nowIso());
+        const next = this.context.engine.submitClue(
+          current,
+          player.id,
+          undefined,
+          this.context.clock.nowIso(),
+        );
         if (next instanceof Error) return next;
 
         this.context.repository.update(next);
@@ -147,7 +207,12 @@ export class WordPreparationStageService {
       const current = this.context.getGameByIdOrError(gameId);
       if (current instanceof Error) return current;
 
-      const next = this.context.engine.finalizeWord(current, player.id, value === "YES", this.context.clock.nowIso());
+      const next = this.context.engine.finalizeWord(
+        current,
+        player.id,
+        value === "YES",
+        this.context.clock.nowIso(),
+      );
       if (next instanceof Error) return next;
 
       this.context.repository.update(next);
@@ -157,24 +222,39 @@ export class WordPreparationStageService {
 
     if (value === "NO") {
       this.expectationStore.set(gameId, player.id, "WORD");
-      await this.context.notifier.sendPrivateMessage(telegramUserId, this.context.texts.restartWordPrompt());
+      await this.context.notifier.sendPrivateMessage(
+        telegramUserId,
+        this.context.texts.restartWordPrompt(),
+      );
       return;
     }
 
     this.expectationStore.delete(gameId, player.id);
-    await this.context.notifier.sendPrivateMessage(telegramUserId, this.context.texts.readyWaitingOthers());
+    await this.context.notifier.sendPrivateMessage(
+      telegramUserId,
+      this.context.texts.readyWaitingOthers(),
+    );
     return this.readyStartStage.tryStartGame(updated.id);
   }
 
-  async promptWordCollection(game: GameState): Promise<void | PromptWordCollectionError> {
+  async promptWordCollection(
+    game: GameState,
+  ): Promise<void | PromptWordCollectionError> {
     for (const player of game.players) {
-      const ok = await this.context.notifier.sendPrivateMessage(player.telegramUserId, this.context.texts.enterWordPrompt());
+      const ok = await this.context.notifier.sendPrivateMessage(
+        player.telegramUserId,
+        this.context.texts.enterWordPrompt(),
+      );
       if (!ok) {
         const updated = this.context.transactionRunner.runInTransaction(() => {
           const current = this.context.getGameByIdOrError(game.id);
           if (current instanceof Error) return current;
 
-          const next = this.context.engine.markDmBlocked(current, player.id, this.context.clock.nowIso());
+          const next = this.context.engine.markDmBlocked(
+            current,
+            player.id,
+            this.context.clock.nowIso(),
+          );
           if (next instanceof Error) return next;
 
           this.context.repository.update(next);
@@ -184,7 +264,10 @@ export class WordPreparationStageService {
 
         const sentFallback = await this.context.notifier.sendGroupMessage(
           game.chatId,
-          this.context.texts.dmLinkWithLabel(this.context.playerLabel(game, player.id), this.context.notifier.buildBotDeepLink()),
+          this.context.texts.dmLinkWithLabel(
+            this.context.playerLabel(game, player.id),
+            this.context.notifier.buildBotDeepLink(),
+          ),
         );
         if (sentFallback instanceof Error) return sentFallback;
       }
@@ -193,7 +276,11 @@ export class WordPreparationStageService {
     }
   }
 
-  async sendWordSummary(game: GameState, playerId: string, includeButtons = true): Promise<void | PromptWordCollectionError> {
+  async sendWordSummary(
+    game: GameState,
+    playerId: string,
+    includeButtons = true,
+  ): Promise<void | PromptWordCollectionError> {
     const player = game.players.find((candidate) => candidate.id === playerId);
     if (!player) {
       return;
@@ -207,22 +294,36 @@ export class WordPreparationStageService {
     const text = this.context.texts.wordSummary(entry.word, entry.clue);
 
     if (!includeButtons) {
-      await this.context.notifier.sendPrivateMessage(player.telegramUserId, text);
+      await this.context.notifier.sendPrivateMessage(
+        player.telegramUserId,
+        text,
+      );
       return;
     }
 
     const sentSummary = await this.context.notifier.sendPrivateKeyboard(
       player.telegramUserId,
       text,
-      [[
-        { text: this.context.texts.confirmButton(), data: `word:final:YES:${game.id}` },
-        { text: this.context.texts.editButton(), data: `word:final:NO:${game.id}` },
-      ]],
+      [
+        [
+          {
+            text: this.context.texts.confirmButton(),
+            data: `word:final:YES:${game.id}`,
+          },
+          {
+            text: this.context.texts.editButton(),
+            data: `word:final:NO:${game.id}`,
+          },
+        ],
+      ],
     );
     if (!sentSummary) {
       const sentFallback = await this.context.notifier.sendGroupMessage(
         game.chatId,
-        this.context.texts.dmLinkWithLabel(this.context.playerLabel(game, player.id), this.context.notifier.buildBotDeepLink()),
+        this.context.texts.dmLinkWithLabel(
+          this.context.playerLabel(game, player.id),
+          this.context.notifier.buildBotDeepLink(),
+        ),
       );
       if (sentFallback instanceof Error) return sentFallback;
     }

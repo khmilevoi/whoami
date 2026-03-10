@@ -8,16 +8,16 @@ In Go, functions return errors as values instead of throwing exceptions. errore 
 
 ```ts
 // Go-style: errors as values
-const user = await getUser(id)
+const user = await getUser(id);
 if (user instanceof NotFoundError) {
-  console.error('Missing:', user.id)
-  return
+  console.error("Missing:", user.id);
+  return;
 }
 if (user instanceof DbError) {
-  console.error('DB failed:', user.reason)
-  return
+  console.error("DB failed:", user.reason);
+  return;
 }
-console.log(user.username) // user is User, fully narrowed
+console.log(user.username); // user is User, fully narrowed
 ```
 
 ## Install
@@ -45,46 +45,46 @@ This codebase uses the errore.org convention. ALWAYS read the errore skill befor
 Define typed errors with **variable interpolation** and return **Error or Value** directly:
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 // Define typed errors with $variable interpolation
 class NotFoundError extends errore.createTaggedError({
-  name: 'NotFoundError',
-  message: 'User $id not found',
+  name: "NotFoundError",
+  message: "User $id not found",
 }) {}
 
 class DbError extends errore.createTaggedError({
-  name: 'DbError',
-  message: 'Database query failed: $reason',
+  name: "DbError",
+  message: "Database query failed: $reason",
 }) {}
 
 // Function returns Error | Value (no wrapper!)
 async function getUser(id: string): Promise<NotFoundError | DbError | User> {
   const result = await db
     .query(id)
-    .catch((e) => new DbError({ reason: e.message, cause: e }))
+    .catch((e) => new DbError({ reason: e.message, cause: e }));
 
-  if (result instanceof Error) return result
-  if (!result) return new NotFoundError({ id })
+  if (result instanceof Error) return result;
+  if (!result) return new NotFoundError({ id });
 
-  return result
+  return result;
 }
 
 // Caller handles errors explicitly
-const user = await getUser('123')
+const user = await getUser("123");
 
 if (user instanceof Error) {
   const message = errore.matchError(user, {
     NotFoundError: (e) => `User ${e.id} not found`,
     DbError: (e) => `Database error: ${e.reason}`,
     Error: (e) => `Unexpected error: ${e.message}`,
-  })
-  console.log(message)
-  return
+  });
+  console.log(message);
+  return;
 }
 
 // TypeScript knows: user is User
-console.log(user.name)
+console.log(user.name);
 ```
 
 ## Example: API Error Handling
@@ -92,32 +92,32 @@ console.log(user.name)
 A complete example with **custom base class** and HTTP status codes:
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 // Base class with shared functionality
 class AppError extends Error {
-  statusCode: number = 500
+  statusCode: number = 500;
 
   toResponse() {
-    return { error: this.message, code: this.statusCode }
+    return { error: this.message, code: this.statusCode };
   }
 }
 
 // Specific errors with status codes and $variable interpolation
 class NotFoundError extends errore.createTaggedError({
-  name: 'NotFoundError',
-  message: '$resource not found',
+  name: "NotFoundError",
+  message: "$resource not found",
   extends: AppError,
 }) {}
 
 class ValidationError extends errore.createTaggedError({
-  name: 'ValidationError',
-  message: 'Invalid $field: $reason',
+  name: "ValidationError",
+  message: "Invalid $field: $reason",
   extends: AppError,
 }) {}
 
 class UnauthorizedError extends errore.createTaggedError({
-  name: 'UnauthorizedError',
+  name: "UnauthorizedError",
 
   extends: AppError,
 }) {}
@@ -127,37 +127,37 @@ async function updateUser(
   userId: string,
   data: { email?: string },
 ): Promise<NotFoundError | ValidationError | UnauthorizedError | User> {
-  const session = await getSession()
+  const session = await getSession();
   if (!session) {
-    return new UnauthorizedError({ message: 'Not logged in' })
+    return new UnauthorizedError({ message: "Not logged in" });
   }
 
-  const user = await db.users.find(userId)
+  const user = await db.users.find(userId);
   if (!user) {
-    return new NotFoundError({ resource: `User ${userId}` })
+    return new NotFoundError({ resource: `User ${userId}` });
   }
 
   if (data.email && !isValidEmail(data.email)) {
     return new ValidationError({
-      field: 'email',
-      reason: 'Invalid email format',
-    })
+      field: "email",
+      reason: "Invalid email format",
+    });
   }
 
-  return db.users.update(userId, data)
+  return db.users.update(userId, data);
 }
 
 // API handler
-app.post('/users/:id', async (req, res) => {
-  const result = await updateUser(req.params.id, req.body)
+app.post("/users/:id", async (req, res) => {
+  const result = await updateUser(req.params.id, req.body);
 
   if (result instanceof Error) {
     // All errors have toResponse() from AppError base
-    return res.status(result.statusCode).json(result.toResponse())
+    return res.status(result.statusCode).json(result.toResponse());
   }
 
-  return res.json(result)
-})
+  return res.json(result);
+});
 ```
 
 ## API
@@ -167,55 +167,55 @@ app.post('/users/:id', async (req, res) => {
 Create typed errors with **variable interpolation** in the message:
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 // Variables are extracted from the message and required in constructor
 class NotFoundError extends errore.createTaggedError({
-  name: 'NotFoundError',
-  message: 'User $id not found in $database',
+  name: "NotFoundError",
+  message: "User $id not found in $database",
 }) {}
 
-const err = new NotFoundError({ id: '123', database: 'users' })
-err.message // 'User 123 not found in users'
-err.id // '123'
-err.database // 'users'
-err._tag // 'NotFoundError'
+const err = new NotFoundError({ id: "123", database: "users" });
+err.message; // 'User 123 not found in users'
+err.id; // '123'
+err.database; // 'users'
+err._tag; // 'NotFoundError'
 
 // Error without variables
 class EmptyError extends errore.createTaggedError({
-  name: 'EmptyError',
-  message: 'Something went wrong',
+  name: "EmptyError",
+  message: "Something went wrong",
 }) {}
-new EmptyError() // no args required
+new EmptyError(); // no args required
 
 // Message omitted — caller provides it at construction time
 class GenericError extends errore.createTaggedError({
-  name: 'GenericError',
+  name: "GenericError",
 }) {}
-new GenericError({ message: 'caller decides the message' })
+new GenericError({ message: "caller decides the message" });
 // fingerprint is stable regardless of what message is passed
 
 // With cause for error chaining
 class WrapperError extends errore.createTaggedError({
-  name: 'WrapperError',
-  message: 'Failed to process $item',
+  name: "WrapperError",
+  message: "Failed to process $item",
 }) {}
-new WrapperError({ item: 'data', cause: originalError })
+new WrapperError({ item: "data", cause: originalError });
 
 // With custom base class
 class AppError extends Error {
-  statusCode = 500
+  statusCode = 500;
 }
 
 class HttpError extends errore.createTaggedError({
-  name: 'HttpError',
-  message: 'HTTP $status error',
+  name: "HttpError",
+  message: "HTTP $status error",
   extends: AppError,
 }) {}
 
-const err = new HttpError({ status: 404 })
-err.statusCode // 500 (inherited from AppError)
-err instanceof AppError // true
+const err = new HttpError({ status: 404 });
+err.statusCode; // 500 (inherited from AppError)
+err instanceof AppError; // true
 ```
 
 **Reserved variable names:** `$_tag`, `$name`, `$stack`, `$cause` cannot be used in message templates — they conflict with Error internals.
@@ -227,22 +227,22 @@ Wrap errors with additional context while **preserving the original error** via 
 ```ts
 // Wrap with context, preserve original in cause
 async function processUser(id: string): Promise<ServiceError | ProcessedUser> {
-  const user = await getUser(id) // returns NotFoundError | User
+  const user = await getUser(id); // returns NotFoundError | User
 
   if (user instanceof Error) {
-    return new ServiceError({ id, cause: user })
+    return new ServiceError({ id, cause: user });
   }
 
-  return process(user)
+  return process(user);
 }
 
 // Access original error via cause
-const result = await processUser('123')
+const result = await processUser("123");
 if (result instanceof Error) {
-  console.log(result.message) // "Failed to process user 123"
+  console.log(result.message); // "Failed to process user 123"
 
   if (result.cause instanceof NotFoundError) {
-    console.log(result.cause.id) // access original error's properties
+    console.log(result.cause.id); // access original error's properties
   }
 }
 ```
@@ -250,16 +250,16 @@ if (result instanceof Error) {
 The error definitions:
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 class NotFoundError extends errore.createTaggedError({
-  name: 'NotFoundError',
-  message: 'User $id not found',
+  name: "NotFoundError",
+  message: "User $id not found",
 }) {}
 
 class ServiceError extends errore.createTaggedError({
-  name: 'ServiceError',
-  message: 'Failed to process user $id',
+  name: "ServiceError",
+  message: "Failed to process user $id",
 }) {}
 ```
 
@@ -279,44 +279,44 @@ Caused by: NotFoundError: User 123 not found
 Walk the `.cause` chain to find an ancestor matching a specific error class. Similar to Go's `errors.As` — checks the error itself first, then traverses `.cause` recursively:
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 class NotFoundError extends errore.createTaggedError({
-  name: 'NotFoundError',
-  message: 'User $id not found',
+  name: "NotFoundError",
+  message: "User $id not found",
 }) {}
 
 class ServiceError extends errore.createTaggedError({
-  name: 'ServiceError',
-  message: 'Failed to process user $id',
+  name: "ServiceError",
+  message: "Failed to process user $id",
 }) {}
 
 // Deep chain: ServiceError -> NotFoundError
-const notFound = new NotFoundError({ id: '123' })
-const service = new ServiceError({ id: '123', cause: notFound })
+const notFound = new NotFoundError({ id: "123" });
+const service = new ServiceError({ id: "123", cause: notFound });
 
 // Instance method on tagged errors
-const found = service.findCause(NotFoundError)
-found?.id // '123' — type-safe access
+const found = service.findCause(NotFoundError);
+found?.id; // '123' — type-safe access
 
 // Standalone function for any Error
-const found2 = errore.findCause(service, NotFoundError)
-found2?.id // '123'
+const found2 = errore.findCause(service, NotFoundError);
+found2?.id; // '123'
 ```
 
 This solves the problem where `result.cause instanceof MyError` only checks one level deep. `findCause` walks the entire chain:
 
 ```ts
 // A -> B -> C chain
-const c = new DbError({ reason: 'connection reset' })
-const b = new ServiceError({ id: '123', cause: c })
-const a = new NotFoundError({ id: '456', cause: b })
+const c = new DbError({ reason: "connection reset" });
+const b = new ServiceError({ id: "123", cause: c });
+const a = new NotFoundError({ id: "456", cause: b });
 
 // Manual check only finds B
-a.cause instanceof DbError // false — only checks one level
+a.cause instanceof DbError; // false — only checks one level
 
 // findCause walks the full chain
-a.findCause(DbError) // finds C ✓
+a.findCause(DbError); // finds C ✓
 ```
 
 Returns `undefined` if no matching ancestor is found. Safe against circular `.cause` references.
@@ -326,30 +326,30 @@ Returns `undefined` if no matching ancestor is found. Safe against circular `.ca
 Use `extends` to inherit from a custom base class. The error will pass `instanceof` for both the base class and the specific error class:
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 class AppError extends Error {
-  statusCode = 500
+  statusCode = 500;
   toResponse() {
-    return { error: this.message, code: this.statusCode }
+    return { error: this.message, code: this.statusCode };
   }
 }
 
 class NotFoundError extends errore.createTaggedError({
-  name: 'NotFoundError',
-  message: 'Resource $id not found',
+  name: "NotFoundError",
+  message: "Resource $id not found",
   extends: AppError,
 }) {
-  statusCode = 404
+  statusCode = 404;
 }
 
-const err = new NotFoundError({ id: '123' })
-err instanceof NotFoundError // true
-err instanceof AppError // true
-err instanceof Error // true
+const err = new NotFoundError({ id: "123" });
+err instanceof NotFoundError; // true
+err instanceof AppError; // true
+err instanceof Error; // true
 
-err.statusCode // 404
-err.toResponse() // { error: 'Resource 123 not found', code: 404 }
+err.statusCode; // 404
+err.toResponse(); // { error: 'Resource 123 not found', code: 404 }
 ```
 
 ### Type Guards
@@ -357,11 +357,11 @@ err.toResponse() // { error: 'Resource 123 not found', code: 404 }
 Use **instanceof checks** to narrow union types:
 
 ```ts
-const result: NetworkError | User = await fetchUser(id)
+const result: NetworkError | User = await fetchUser(id);
 
 if (result instanceof Error) {
   // result is NetworkError
-  return result
+  return result;
 }
 // result is User
 ```
@@ -371,27 +371,27 @@ if (result instanceof Error) {
 **Wrap exceptions** as error values:
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 // Sync - wraps exceptions in UnhandledError
-const parsed = errore.try(() => JSON.parse(input))
+const parsed = errore.try(() => JSON.parse(input));
 
 // Sync - with custom error type
 const parsed = errore.try({
   try: () => JSON.parse(input),
   catch: (e) => new ParseError({ reason: e.message, cause: e }),
-})
+});
 
 // Async — prefer .catch() for promises (no wrapper needed)
 const response = await fetch(url).catch(
   (e) => new NetworkError({ url, cause: e }),
-)
+);
 
 // Async — errore.tryAsync also works, but .catch() is preferred
 const response = await errore.tryAsync({
   try: () => fetch(url),
   catch: (e) => new NetworkError({ url, cause: e }),
-})
+});
 ```
 
 > **Best practices for `try` / `tryAsync`:**
@@ -407,19 +407,19 @@ const response = await errore.tryAsync({
 **Transform and chain** operations:
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 // Transform value (if not error)
-const name = errore.map(user, (u) => u.name)
+const name = errore.map(user, (u) => u.name);
 
 // Transform error
-const appError = errore.mapError(dbError, (e) => new AppError({ cause: e }))
+const appError = errore.mapError(dbError, (e) => new AppError({ cause: e }));
 
 // Chain operations
-const posts = errore.andThen(user, (u) => fetchPosts(u.id))
+const posts = errore.andThen(user, (u) => fetchPosts(u.id));
 
 // Side effects
-const logged = errore.tap(user, (u) => console.log('Got user:', u.name))
+const logged = errore.tap(user, (u) => console.log("Got user:", u.name));
 ```
 
 ### Resource Cleanup (defer)
@@ -427,20 +427,20 @@ const logged = errore.tap(user, (u) => console.log('Got user:', u.name))
 errore ships `DisposableStack` and `AsyncDisposableStack` polyfills for Go-like `defer` cleanup. Works in every runtime — no native `DisposableStack` support needed:
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 async function processRequest(id: string): Promise<DbError | Result> {
   // await using = cleanup runs automatically when scope exits
-  await using cleanup = new errore.AsyncDisposableStack()
+  await using cleanup = new errore.AsyncDisposableStack();
 
-  const db = await connectDb()
-  cleanup.defer(() => db.close())
+  const db = await connectDb();
+  cleanup.defer(() => db.close());
 
-  const cache = await openCache()
-  cleanup.defer(() => cache.flush())
+  const cache = await openCache();
+  cleanup.defer(() => cache.flush());
 
   // ... use db and cache ...
-  return result
+  return result;
   // cleanup runs in LIFO order: cache.flush() → db.close()
 }
 ```
@@ -450,24 +450,24 @@ Resources are released in **reverse order** (last deferred = first cleaned up), 
 ```ts
 // Sync version with using
 function readConfig(path: string): ParseError | Config {
-  using cleanup = new errore.DisposableStack()
+  using cleanup = new errore.DisposableStack();
 
-  const file = openFileSync(path)
-  cleanup.defer(() => file.closeSync())
+  const file = openFileSync(path);
+  cleanup.defer(() => file.closeSync());
 
-  const lock = acquireLock(path)
-  cleanup.defer(() => lock.release())
+  const lock = acquireLock(path);
+  cleanup.defer(() => lock.release());
 
-  return parseConfig(file.readSync())
+  return parseConfig(file.readSync());
 }
 ```
 
 You can also register existing `Disposable` objects directly:
 
 ```ts
-await using cleanup = new errore.AsyncDisposableStack()
-cleanup.use(dbConnection) // calls dbConnection[Symbol.dispose]() on exit
-cleanup.adopt(handle, (h) => h.close()) // custom cleanup for non-disposable values
+await using cleanup = new errore.AsyncDisposableStack();
+cleanup.use(dbConnection); // calls dbConnection[Symbol.dispose]() on exit
+cleanup.adopt(handle, (h) => h.close()); // custom cleanup for non-disposable values
 ```
 
 ### Extraction
@@ -475,23 +475,23 @@ cleanup.adopt(handle, (h) => h.close()) // custom cleanup for non-disposable val
 **Extract values** or throw, **split arrays** by success/error:
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 // Extract or throw
-const user = errore.unwrap(result)
-const user = errore.unwrap(result, 'Custom error message')
+const user = errore.unwrap(result);
+const user = errore.unwrap(result, "Custom error message");
 
 // Extract or fallback
-const name = errore.unwrapOr(result, 'Anonymous')
+const name = errore.unwrapOr(result, "Anonymous");
 
 // Pattern match
 const message = errore.match(result, {
   ok: (user) => `Hello, ${user.name}`,
   err: (error) => `Failed: ${error.message}`,
-})
+});
 
 // Split array into [successes, errors]
-const [users, errors] = errore.partition(results)
+const [users, errors] = errore.partition(results);
 ```
 
 ### Error Matching
@@ -499,16 +499,16 @@ const [users, errors] = errore.partition(results)
 **Exhaustive pattern matching** with `matchError`. Always assign results to a variable and keep callbacks pure:
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 class ValidationError extends errore.createTaggedError({
-  name: 'ValidationError',
-  message: 'Invalid $field',
+  name: "ValidationError",
+  message: "Invalid $field",
 }) {}
 
 class NetworkError extends errore.createTaggedError({
-  name: 'NetworkError',
-  message: 'Failed to fetch $url',
+  name: "NetworkError",
+  message: "Failed to fetch $url",
 }) {}
 
 // Exhaustive matching - Error handler is always required
@@ -516,8 +516,8 @@ const message = errore.matchError(error, {
   ValidationError: (e) => `Invalid ${e.field}`,
   NetworkError: (e) => `Failed to fetch ${e.url}`,
   Error: (e) => `Unexpected: ${e.message}`, // required fallback for plain Error
-})
-console.log(message) // side effects outside callbacks
+});
+console.log(message); // side effects outside callbacks
 
 // Partial matching with fallback
 const fallbackMsg = errore.matchErrorPartial(
@@ -526,10 +526,10 @@ const fallbackMsg = errore.matchErrorPartial(
     ValidationError: (e) => `Invalid ${e.field}`,
   },
   (e) => `Unknown error: ${e.message}`,
-)
+);
 
 // Type guards
-ValidationError.is(value) // specific class
+ValidationError.is(value); // specific class
 ```
 
 ## How Type Safety Works
@@ -540,10 +540,10 @@ TypeScript **narrows types** after `instanceof Error` checks:
 function example(result: NetworkError | User): string {
   if (result instanceof Error) {
     // TypeScript knows: result is NetworkError
-    return result.message
+    return result.message;
   }
   // TypeScript knows: result is User (Error excluded)
-  return result.name
+  return result.name;
 }
 ```
 
@@ -558,37 +558,37 @@ This works because:
 Naturally combine **error handling with optional values**. No wrapper nesting needed!
 
 ```ts
-import * as errore from 'errore'
+import * as errore from "errore";
 
 class NotFoundError extends errore.createTaggedError({
-  name: 'NotFoundError',
-  message: 'Resource $id not found',
+  name: "NotFoundError",
+  message: "Resource $id not found",
 }) {}
 
 // Result + Option in one natural type
 function findUser(id: string): NotFoundError | User | null {
-  if (id === 'bad') return new NotFoundError({ id })
-  if (id === 'missing') return null
-  return { id, name: 'Alice' }
+  if (id === "bad") return new NotFoundError({ id });
+  if (id === "missing") return null;
+  return { id, name: "Alice" };
 }
 
-const user = findUser('123')
+const user = findUser("123");
 
 // Handle error first
 if (user instanceof Error) {
-  return user.message // TypeScript: user is NotFoundError
+  return user.message; // TypeScript: user is NotFoundError
 }
 
 // Handle null/missing case - use ?. and ?? naturally!
-const name = user?.name ?? 'Anonymous'
+const name = user?.name ?? "Anonymous";
 
 // Or check explicitly
 if (user === null) {
-  return 'User not found'
+  return "User not found";
 }
 
 // TypeScript knows: user is User
-console.log(user.name)
+console.log(user.name);
 ```
 
 ### Why this is better than Rust/Zig
@@ -621,9 +621,9 @@ The compiler can't save you here. You can ignore `err` entirely and use `user` d
 With errore, **forgetting to check is impossible**:
 
 ```ts
-const user = await fetchUser(id) // type: NotFoundError | User
+const user = await fetchUser(id); // type: NotFoundError | User
 
-console.log(user.id) // TS Error: Property 'id' does not exist on type 'NotFoundError'
+console.log(user.id); // TS Error: Property 'id' does not exist on type 'NotFoundError'
 ```
 
 Since errore uses a **single union variable** instead of two separate values, TypeScript forces you to narrow the type before accessing value-specific properties. You literally cannot use the value without first doing an `instanceof Error` check.
@@ -636,7 +636,7 @@ There's still one case errore can't catch: **ignored return values**:
 
 ```ts
 // Oops! Completely ignoring the return value
-updateUser(id, data) // No error, but we should check!
+updateUser(id, data); // No error, but we should check!
 ```
 
 For this, use **TypeScript's built-in checks** or a linter:
@@ -692,36 +692,36 @@ These libraries wrap values in a **Result container**. You construct results wit
 
 ```ts
 // neverthrow
-import { ok, err, Result } from 'neverthrow'
+import { ok, err, Result } from "neverthrow";
 
 function getUser(id: string): Result<User, NotFoundError> {
-  const user = db.find(id)
-  if (!user) return err(new NotFoundError({ id }))
-  return ok(user) // must wrap
+  const user = db.find(id);
+  if (!user) return err(new NotFoundError({ id }));
+  return ok(user); // must wrap
 }
 
-const result = getUser('123')
+const result = getUser("123");
 if (result.isErr()) {
-  console.log(result.error) // must unwrap
-  return
+  console.log(result.error); // must unwrap
+  return;
 }
-console.log(result.value.name) // must unwrap
+console.log(result.value.name); // must unwrap
 ```
 
 ```ts
 // errore
 function getUser(id: string): User | NotFoundError {
-  const user = db.find(id)
-  if (!user) return new NotFoundError({ id })
-  return user // just return
+  const user = db.find(id);
+  if (!user) return new NotFoundError({ id });
+  return user; // just return
 }
 
-const user = getUser('123')
+const user = getUser("123");
 if (user instanceof Error) {
-  console.log(user) // it's already the error
-  return
+  console.log(user); // it's already the error
+  return;
 }
-console.log(user.name) // it's already the user
+console.log(user.name); // it's already the user
 ```
 
 **The key insight**: `T | Error` already encodes success/failure. TypeScript's type narrowing does the rest. No wrapper needed.
@@ -743,27 +743,27 @@ Effect is not just error handling—it's a **complete functional programming fra
 
 ```ts
 // Effect.ts - a paradigm shift
-import { Effect, pipe } from 'effect'
+import { Effect, pipe } from "effect";
 
 const program = pipe(
   fetchUser(id),
   Effect.flatMap((user) => fetchPosts(user.id)),
   Effect.map((posts) => posts.filter((p) => p.published)),
-  Effect.catchTag('NotFoundError', () => Effect.succeed([])),
-)
+  Effect.catchTag("NotFoundError", () => Effect.succeed([])),
+);
 
-const result = await Effect.runPromise(program)
+const result = await Effect.runPromise(program);
 ```
 
 ```ts
 // errore - regular TypeScript
-const user = await fetchUser(id)
-if (user instanceof Error) return []
+const user = await fetchUser(id);
+if (user instanceof Error) return [];
 
-const posts = await fetchPosts(user.id)
-if (posts instanceof Error) return []
+const posts = await fetchPosts(user.id);
+if (posts instanceof Error) return [];
 
-return posts.filter((p) => p.published)
+return posts.filter((p) => p.published);
 ```
 
 Effect is powerful if you need its full feature set. But if you just want type-safe errors:
@@ -788,21 +788,21 @@ errore is more a **way of writing code** than a library. The core pattern requir
 ```ts
 // You can write this without installing errore at all
 class NotFoundError extends Error {
-  readonly _tag = 'NotFoundError'
+  readonly _tag = "NotFoundError";
   constructor(public id: string) {
-    super(`User ${id} not found`)
+    super(`User ${id} not found`);
   }
 }
 
 async function getUser(id: string): Promise<User | NotFoundError> {
-  const user = await db.find(id)
-  if (!user) return new NotFoundError(id)
-  return user
+  const user = await db.find(id);
+  if (!user) return new NotFoundError(id);
+  return user;
 }
 
-const user = await getUser('123')
-if (user instanceof Error) return user
-console.log(user.name)
+const user = await getUser("123");
+if (user instanceof Error) return user;
+console.log(user.name);
 ```
 
 The `errore` package just provides conveniences: `createTaggedError` for less boilerplate, `matchError` for exhaustive pattern matching, `try` for catching sync exceptions (and `.catch()` for async promises). But the core pattern—**errors as union types**—works with zero dependencies.
@@ -813,15 +813,15 @@ Ideal for library authors. Return **plain TypeScript unions** instead of forcing
 
 ```ts
 // ❌ Library that forces a dependency on users
-import { Result } from 'some-result-lib'
-export function parse(input: string): Result<AST, ParseError>
+import { Result } from "some-result-lib";
+export function parse(input: string): Result<AST, ParseError>;
 
 // Users must now install and learn 'some-result-lib'
 ```
 
 ```ts
 // ✓ Library using plain TypeScript unions
-export function parse(input: string): AST | ParseError
+export function parse(input: string): AST | ParseError;
 
 // Users handle errors with standard instanceof checks
 // No new dependencies, no new concepts to learn

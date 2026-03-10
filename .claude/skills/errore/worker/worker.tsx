@@ -1,10 +1,10 @@
-import { Hono } from 'hono'
-import { html, raw } from 'hono/html'
-import { renderComparisonPage } from './comparison-page'
-import comparisonMd from './errore-vs-effect.md'
-import { css, baseReset, hideScrollbars } from './shared-styles'
+import { Hono } from "hono";
+import { html, raw } from "hono/html";
+import { renderComparisonPage } from "./comparison-page";
+import comparisonMd from "./errore-vs-effect.md";
+import { css, baseReset, hideScrollbars } from "./shared-styles";
 
-const app = new Hono()
+const app = new Hono();
 
 const styles = css`
   ${baseReset}
@@ -19,9 +19,9 @@ const styles = css`
     --color-code-bg: #fdfcf9;
     --color-code-border: #e8e6e1;
     --color-inline-code-bg: rgba(0, 0, 0, 0.04);
-    --font-serif: 'Source Serif 4', Georgia, serif;
-    --font-sans: 'Lato', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-mono: 'IBM Plex Mono', 'SF Mono', Monaco, monospace;
+    --font-serif: "Source Serif 4", Georgia, serif;
+    --font-sans: "Lato", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: "IBM Plex Mono", "SF Mono", Monaco, monospace;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -131,8 +131,8 @@ const styles = css`
     border-bottom-color: var(--color-link);
   }
 
-  code[class*='language-'],
-  pre[class*='language-'] {
+  code[class*="language-"],
+  pre[class*="language-"] {
     font-family: var(--font-mono);
     font-size: 0.85rem;
     font-weight: 450;
@@ -149,7 +149,7 @@ const styles = css`
     hyphens: none;
   }
 
-  pre[class*='language-'] {
+  pre[class*="language-"] {
     grid-column: 2 / -1;
     padding: 0.4rem 0;
     margin: 0.25rem 0 1.25rem;
@@ -335,7 +335,7 @@ const styles = css`
     color: var(--color-text-muted);
   }
 
-  footer pre[class*='language-'] {
+  footer pre[class*="language-"] {
     display: flex;
     justify-content: center;
     padding: 0.5rem 0;
@@ -365,7 +365,7 @@ const styles = css`
       line-height: 1.45;
     }
 
-    pre[class*='language-'] {
+    pre[class*="language-"] {
       grid-column: 2;
       padding: 0.3rem 0;
       font-size: 0.8rem;
@@ -376,7 +376,7 @@ const styles = css`
       line-height: 2rem;
     }
   }
-`
+`;
 
 // The hook - instant understanding
 const codeHook = `const user = await getUser(id)
@@ -388,7 +388,7 @@ if (user instanceof DbError) {
   console.error('DB failed:', user.reason)
   return
 }
-console.log(user.username)  // user is User, fully narrowed`
+console.log(user.username)  // user is User, fully narrowed`;
 
 // Why this works
 const codeWhyItWorks = `// The return type tells the truth
@@ -396,13 +396,13 @@ async function getUser(id: string): Promise<NotFoundError | User> {
   const user = await db.find(id)
   if (!user) return new NotFoundError({ id })
   return user
-}`
+}`;
 
 // Compile error example
 const codeCompileError = `const user = await getUser(id)
 console.log(user.username)
 //                ~~~~~~~~
-// Error: Property 'username' does not exist on type 'NotFoundError'`
+// Error: Property 'username' does not exist on type 'NotFoundError'`;
 
 // Expression vs block
 const codeExpressionVsBlock = `// With errore: error handling is an expression
@@ -419,7 +419,7 @@ try {
   db = connectDB(config.dbUrl)
 } catch (e) {
   ...
-}`
+}`;
 
 // Go comparison
 // Null handling
@@ -432,7 +432,7 @@ function findUser(id: string): NotFoundError | User | null {
 
 const user = findUser(id)
 if (user instanceof Error) return user
-const username = user?.username ?? 'Guest'`
+const username = user?.username ?? 'Guest'`;
 
 // Tagged errors
 const codeTaggedErrors = `class NotFoundError extends errore.createTaggedError({
@@ -447,7 +447,7 @@ class NetworkError extends errore.createTaggedError({
 
 const err = new NotFoundError({ id: '123' })
 err.message  // "User 123 not found"
-err.id       // "123"`
+err.id       // "123"`;
 
 // Pattern matching
 const codePatternMatch = `// Exhaustive matching - compiler errors if you miss a case
@@ -462,7 +462,7 @@ errore.matchError(error, {
   NetworkError: e => \`...\`,
   Error: e => \`...\`
 })
-// TS Error: Property 'NotFoundError' is missing in type '{ NetworkError: ...; Error: ...; }'`
+// TS Error: Property 'NotFoundError' is missing in type '{ NetworkError: ...; Error: ...; }'`;
 
 // instanceof checking
 const codeInstanceofExhaustive = `async function getUser(id: string): Promise<NotFoundError | NetworkError | ValidationError | User>
@@ -473,7 +473,7 @@ if (user instanceof NetworkError) return 'network issue'
 // Forgot ValidationError? TypeScript knows:
 return user.username
 //          ~~~~~~~~
-// TS Error: Property 'username' does not exist on type 'ValidationError'`
+// TS Error: Property 'username' does not exist on type 'ValidationError'`;
 
 // Migration: try-catch
 const codeMigrationBefore = `try {
@@ -486,7 +486,7 @@ const codeMigrationBefore = `try {
   if (e instanceof NetworkError) { console.error('Network failed', e.url); return null }
   if (e instanceof RateLimitError) { console.warn('Rate limited'); return null }
   throw e  // unknown error, hope someone catches it
-}`
+}`;
 
 const codeMigrationAfter = `const user = await getUser(id)
 if (user instanceof NotFoundError) { console.warn('User not found', id); return null }
@@ -499,7 +499,7 @@ if (posts instanceof RateLimitError) { console.warn('Rate limited'); return null
 const enriched = await enrichPosts(posts)
 if (enriched instanceof Error) { console.error('Processing failed', enriched); return null }
 
-return enriched`
+return enriched`;
 
 // Migration: parallel operations
 const codeMigrationParallelBefore = `try {
@@ -513,7 +513,7 @@ const codeMigrationParallelBefore = `try {
   // Which one failed? No idea.
   console.error('Something failed', e)
   return null
-}`
+}`;
 
 const codeMigrationParallelAfter = `const [user, posts, stats] = await Promise.all([
   getUser(id),
@@ -525,31 +525,31 @@ if (user instanceof Error) { console.error('User fetch failed', user); return nu
 if (posts instanceof Error) { console.error('Posts fetch failed', posts); return null }
 if (stats instanceof Error) { console.error('Stats fetch failed', stats); return null }
 
-return { user, posts, stats }`
+return { user, posts, stats }`;
 
 // Migration: wrapping external libs
 const codeMigrationWrapBefore = `function parseConfig(input: string): Config {
   return JSON.parse(input)  // throws on invalid JSON
-}`
+}`;
 
 const codeMigrationWrapAfter = `function parseConfig(input: string): ParseError | Config {
   const result = errore.try(() => JSON.parse(input))
   if (result instanceof Error) return new ParseError({ reason: result.message })
   return result
-}`
+}`;
 
 // Migration: validation
 const codeMigrationValidateBefore = `function createUser(input: unknown): User {
   if (!input.email) throw new Error('Email required')
   if (!input.name) throw new Error('Name required')
   return { email: input.email, name: input.name }
-}`
+}`;
 
 const codeMigrationValidateAfter = `function createUser(input: unknown): ValidationError | User {
   if (!input.email) return new ValidationError({ field: 'email', reason: 'required' })
   if (!input.name) return new ValidationError({ field: 'name', reason: 'required' })
   return { email: input.email, name: input.name }
-}`
+}`;
 
 // Why not neverthrow / better-result
 const codeNeverthrow = `// neverthrow / better-result
@@ -566,7 +566,7 @@ if (result.isErr()) {
   console.log(result.error)  // must unwrap
   return
 }
-console.log(result.value.name)  // must unwrap`
+console.log(result.value.name)  // must unwrap`;
 
 const codeNeverthrowErrore = `// errore
 function getUser(id: string): User | NotFoundError {
@@ -580,7 +580,7 @@ if (user instanceof Error) {
   console.log(user)  // it's already the error
   return
 }
-console.log(user.name)  // it's already the user`
+console.log(user.name)  // it's already the user`;
 
 // Zero dependency example
 const codeZeroDep = `// You can write this without installing errore at all
@@ -599,7 +599,7 @@ async function getUser(id: string): Promise<User | NotFoundError> {
 
 const user = await getUser('123')
 if (user instanceof Error) return user
-console.log(user.name)`
+console.log(user.name)`;
 
 // Resource cleanup (defer)
 const codeDeferBefore = `// Nested try/finally for each resource
@@ -618,7 +618,7 @@ async function processOrder(orderId: string) {
   } finally {
     await db.close()
   }
-}`
+}`;
 
 const codeDeferAfter = `// Go-like defer with await using
 async function processOrder(orderId: string): Promise<DbError | Receipt> {
@@ -639,7 +639,7 @@ async function processOrder(orderId: string): Promise<DbError | Receipt> {
   await cache.set(orderId, receipt)
   return receipt
   // cleanup runs automatically: cache.flush() → db.close()
-}`
+}`;
 
 // Effect comparison
 const codeEffect = `// Effect.ts - a paradigm shift
@@ -652,7 +652,7 @@ const program = pipe(
   Effect.catchTag('NotFoundError', () => Effect.succeed([]))
 )
 
-const result = await Effect.runPromise(program)`
+const result = await Effect.runPromise(program)`;
 
 const codeEffectErrore = `// errore - regular TypeScript
 const user = await fetchUser(id)
@@ -661,26 +661,26 @@ if (user instanceof Error) return []
 const posts = await fetchPosts(user.id)
 if (posts instanceof Error) return []
 
-return posts.filter(p => p.published)`
+return posts.filter(p => p.published)`;
 
 // Perfect for libraries
 const codeLibraryBad = `// ❌ Library that forces a dependency
 import { Result } from 'some-result-lib'
 export function parse(input: string): Result<AST, ParseError>
 
-// Users must install and learn 'some-result-lib'`
+// Users must install and learn 'some-result-lib'`;
 
 const codeLibraryGood = `// ✓ Library using plain TypeScript unions
 export function parse(input: string): AST | ParseError
 
 // Users handle errors with standard instanceof
-// No new dependencies, no new concepts`
+// No new dependencies, no new concepts`;
 
 // AI Agents skill install
-const codeSkillInstall = `npx skills add remorses/errore`
+const codeSkillInstall = `npx skills add remorses/errore`;
 
 const codeAgentsMd = `This codebase uses the errore.org convention.
-ALWAYS read the errore skill before editing any code.`
+ALWAYS read the errore skill before editing any code.`;
 
 function Page() {
   return html`
@@ -1066,24 +1066,24 @@ function Page() {
         <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
       </body>
     </html>
-  `
+  `;
 }
 
-app.get('/errore-vs-effect', async (c) => {
-  const pageHtml = await renderComparisonPage(comparisonMd)
-  return c.html(pageHtml)
-})
+app.get("/errore-vs-effect", async (c) => {
+  const pageHtml = await renderComparisonPage(comparisonMd);
+  return c.html(pageHtml);
+});
 
-app.get('*', (c) => {
-  const url = new URL(c.req.url)
+app.get("*", (c) => {
+  const url = new URL(c.req.url);
 
   // Redirect www to non-www
-  if (url.hostname === 'www.errore.org') {
-    url.hostname = 'errore.org'
-    return c.redirect(url.toString(), 301)
+  if (url.hostname === "www.errore.org") {
+    url.hostname = "errore.org";
+    return c.redirect(url.toString(), 301);
   }
 
-  return c.html(Page())
-})
+  return c.html(Page());
+});
 
-export default app
+export default app;

@@ -12,9 +12,9 @@ export function unwrap<V>(value: V, message?: string): Exclude<V, Error> {
   if (value instanceof Error) {
     throw new Error(message ?? `Unwrap called on error: ${value.message}`, {
       cause: value,
-    })
+    });
   }
-  return value as Exclude<V, Error>
+  return value as Exclude<V, Error>;
 }
 
 /**
@@ -27,9 +27,9 @@ export function unwrap<V>(value: V, message?: string): Exclude<V, Error> {
  */
 export function unwrapOr<V, U>(value: V, fallback: U): Exclude<V, Error> | U {
   if (value instanceof Error) {
-    return fallback
+    return fallback;
   }
-  return value as Exclude<V, Error>
+  return value as Exclude<V, Error>;
 }
 
 /**
@@ -45,14 +45,14 @@ export function unwrapOr<V, U>(value: V, fallback: U): Exclude<V, Error> | U {
 export function match<V, R>(
   value: V,
   handlers: {
-    ok: (v: Exclude<V, Error>) => R
-    err: (e: Extract<V, Error>) => R
+    ok: (v: Exclude<V, Error>) => R;
+    err: (e: Extract<V, Error>) => R;
   },
 ): R {
   if (value instanceof Error) {
-    return handlers.err(value as Extract<V, Error>)
+    return handlers.err(value as Extract<V, Error>);
   }
-  return handlers.ok(value as Exclude<V, Error>)
+  return handlers.ok(value as Exclude<V, Error>);
 }
 
 /**
@@ -65,16 +65,16 @@ export function match<V, R>(
 export function partition<V>(
   values: V[],
 ): [Exclude<V, Error>[], Extract<V, Error>[]] {
-  const oks: Exclude<V, Error>[] = []
-  const errs: Extract<V, Error>[] = []
+  const oks: Exclude<V, Error>[] = [];
+  const errs: Extract<V, Error>[] = [];
   for (const v of values) {
     if (v instanceof Error) {
-      errs.push(v as Extract<V, Error>)
+      errs.push(v as Extract<V, Error>);
     } else {
-      oks.push(v as Exclude<V, Error>)
+      oks.push(v as Exclude<V, Error>);
     }
   }
-  return [oks, errs]
+  return [oks, errs];
 }
 
 /**
@@ -86,5 +86,5 @@ export function partition<V>(
  * const flat: NetworkError | ParseError | User = flatten(nested)
  */
 export function flatten<V>(value: V): V {
-  return value
+  return value;
 }

@@ -8,7 +8,10 @@ export class FakeIdentityPort implements IdentityPort {
     firstName?: string;
     lastName?: string;
   }): PlayerIdentity {
-    const displayName = [input.firstName, input.lastName].filter(Boolean).join(" ").trim() || input.username || input.telegramUserId;
+    const displayName =
+      [input.firstName, input.lastName].filter(Boolean).join(" ").trim() ||
+      input.username ||
+      input.telegramUserId;
 
     return {
       id: `tg:${input.telegramUserId}`,

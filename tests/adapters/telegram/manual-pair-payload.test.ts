@@ -11,7 +11,11 @@ describe("parseManualPairPayload", () => {
   });
 
   it("returns error for malformed payload", () => {
-    expect(parseManualPairPayload("pair:test-1")).toBeInstanceOf(InvalidManualPairPayloadError);
-    expect(parseManualPairPayload("vote:YES:test-1")).toBeInstanceOf(InvalidManualPairPayloadError);
+    expect(parseManualPairPayload("pair:test-1")).toBeInstanceOf(
+      InvalidManualPairPayloadError,
+    );
+    expect(parseManualPairPayload("vote:YES:test-1")).toBeInstanceOf(
+      InvalidManualPairPayloadError,
+    );
   });
 });

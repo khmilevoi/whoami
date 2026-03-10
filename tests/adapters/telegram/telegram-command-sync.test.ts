@@ -80,11 +80,13 @@ const createQueryServiceStub = (state: {
   knownUserIdsByChatId?: Record<string, string[]>;
 }) =>
   ({
-    findActiveGameByChatId: (chatId: string) => (state.game && state.game.chatId === chatId ? state.game : null),
+    findActiveGameByChatId: (chatId: string) =>
+      state.game && state.game.chatId === chatId ? state.game : null,
     listActiveChatIdsByTelegramUser: () => [],
     listActiveChatIds: () => [],
     listKnownChatIds: () => state.knownChatIds ?? [],
-    listKnownTelegramUserIdsByChatId: (chatId: string) => state.knownUserIdsByChatId?.[chatId] ?? [],
+    listKnownTelegramUserIdsByChatId: (chatId: string) =>
+      state.knownUserIdsByChatId?.[chatId] ?? [],
   }) as unknown as GameQueryService;
 
 const texts = new TextService("ru");
@@ -99,13 +101,23 @@ describe("telegram command sync", () => {
 
     const query = createQueryServiceStub({ game: null });
 
-    const sync = new TelegramCommandSync(api, query, new ChatCommandResolver(texts), createLogger(), texts);
+    const sync = new TelegramCommandSync(
+      api,
+      query,
+      new ChatCommandResolver(texts),
+      createLogger(),
+      texts,
+    );
 
     await sync.syncGroupCommands();
 
     expect(api.setMyCommands).toHaveBeenCalledTimes(1);
     expect(api.setMyCommands).toHaveBeenCalledWith(
-      [expect.objectContaining({ command: commands.BOT_COMMANDS.START_GAME.command })],
+      [
+        expect.objectContaining({
+          command: commands.BOT_COMMANDS.START_GAME.command,
+        }),
+      ],
       {
         scope: {
           type: "all_group_chats",
@@ -123,7 +135,13 @@ describe("telegram command sync", () => {
 
     const query = createQueryServiceStub({ game: null });
 
-    const sync = new TelegramCommandSync(api, query, new ChatCommandResolver(texts), createLogger(), texts);
+    const sync = new TelegramCommandSync(
+      api,
+      query,
+      new ChatCommandResolver(texts),
+      createLogger(),
+      texts,
+    );
 
     await sync.syncGroupCommands();
     await sync.syncGroupCommands();
@@ -140,7 +158,13 @@ describe("telegram command sync", () => {
 
     const query = createQueryServiceStub({ game: null });
 
-    const sync = new TelegramCommandSync(api, query, new ChatCommandResolver(texts), createLogger(), texts);
+    const sync = new TelegramCommandSync(
+      api,
+      query,
+      new ChatCommandResolver(texts),
+      createLogger(),
+      texts,
+    );
 
     await sync.syncPrivateCommands();
     await sync.syncGroupCommands();
@@ -149,7 +173,11 @@ describe("telegram command sync", () => {
     expect(api.setMyCommands).toHaveBeenCalledTimes(2);
     expect(api.setMyCommands).toHaveBeenNthCalledWith(
       1,
-      [expect.objectContaining({ command: commands.BOT_COMMANDS.START_PRIVATE.command })],
+      [
+        expect.objectContaining({
+          command: commands.BOT_COMMANDS.START_PRIVATE.command,
+        }),
+      ],
       {
         scope: {
           type: "all_private_chats",
@@ -158,7 +186,11 @@ describe("telegram command sync", () => {
     );
     expect(api.setMyCommands).toHaveBeenNthCalledWith(
       2,
-      [expect.objectContaining({ command: commands.BOT_COMMANDS.START_GAME.command })],
+      [
+        expect.objectContaining({
+          command: commands.BOT_COMMANDS.START_GAME.command,
+        }),
+      ],
       {
         scope: {
           type: "all_group_chats",
@@ -179,7 +211,13 @@ describe("telegram command sync", () => {
       knownChatIds: ["-1001", "-1002"],
     });
 
-    const sync = new TelegramCommandSync(api, query, new ChatCommandResolver(texts), createLogger(), texts);
+    const sync = new TelegramCommandSync(
+      api,
+      query,
+      new ChatCommandResolver(texts),
+      createLogger(),
+      texts,
+    );
 
     await sync.syncKnownChats();
 
@@ -218,7 +256,13 @@ describe("telegram command sync", () => {
 
     const query = createQueryServiceStub(state);
 
-    const sync = new TelegramCommandSync(api, query, new ChatCommandResolver(texts), createLogger(), texts);
+    const sync = new TelegramCommandSync(
+      api,
+      query,
+      new ChatCommandResolver(texts),
+      createLogger(),
+      texts,
+    );
 
     await sync.syncChat("-1001");
     await sync.syncChat("-1001");
@@ -239,7 +283,13 @@ describe("telegram command sync", () => {
 
     const query = createQueryServiceStub(state);
 
-    const sync = new TelegramCommandSync(api, query, new ChatCommandResolver(texts), createLogger(), texts);
+    const sync = new TelegramCommandSync(
+      api,
+      query,
+      new ChatCommandResolver(texts),
+      createLogger(),
+      texts,
+    );
 
     await sync.syncChat("-1001");
     state.game = createOfflineInProgressGame(1);
@@ -271,14 +321,23 @@ describe("telegram command sync", () => {
 
     const query = createQueryServiceStub(state);
 
-    const sync = new TelegramCommandSync(api, query, new ChatCommandResolver(texts), createLogger(), texts);
+    const sync = new TelegramCommandSync(
+      api,
+      query,
+      new ChatCommandResolver(texts),
+      createLogger(),
+      texts,
+    );
 
     await sync.syncChat("-1001");
     state.game = null;
     await sync.syncChat("-1001");
 
-    const lastSetCall = api.setMyCommands.mock.calls[api.setMyCommands.mock.calls.length - 1];
-    expect(lastSetCall[0]).toEqual([expect.objectContaining({ command: "whoami_start" })]);
+    const lastSetCall =
+      api.setMyCommands.mock.calls[api.setMyCommands.mock.calls.length - 1];
+    expect(lastSetCall[0]).toEqual([
+      expect.objectContaining({ command: "whoami_start" }),
+    ]);
     expect(lastSetCall[1]).toEqual({
       scope: {
         type: "chat",
@@ -308,7 +367,13 @@ describe("telegram command sync", () => {
       },
     });
 
-    const sync = new TelegramCommandSync(api, query, new ChatCommandResolver(texts), createLogger(), texts);
+    const sync = new TelegramCommandSync(
+      api,
+      query,
+      new ChatCommandResolver(texts),
+      createLogger(),
+      texts,
+    );
 
     await sync.syncChat("-1001");
 

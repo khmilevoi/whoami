@@ -34,13 +34,17 @@ describe("startup tasks", () => {
     expect(commandSync.syncPrivateCommands).toHaveBeenCalledTimes(1);
     expect(commandSync.syncGroupCommands).toHaveBeenCalledTimes(1);
     expect(commandSync.syncKnownChats).toHaveBeenCalledTimes(1);
-    expect(gameService.recoverManualPairingPromptsOnStartup).toHaveBeenCalledTimes(1);
+    expect(
+      gameService.recoverManualPairingPromptsOnStartup,
+    ).toHaveBeenCalledTimes(1);
     expect(logger.error).not.toHaveBeenCalled();
   });
 
   it("still runs manual pairing recovery when command sync returns an expected error", async () => {
     const commandSync = {
-      syncPrivateCommands: vi.fn(async () => new CommandSyncError({ scope: "all_private_chats" })),
+      syncPrivateCommands: vi.fn(
+        async () => new CommandSyncError({ scope: "all_private_chats" }),
+      ),
       syncGroupCommands: vi.fn(async () => undefined),
       syncKnownChats: vi.fn(async () => undefined),
     } as unknown as TelegramCommandSync;
@@ -57,7 +61,9 @@ describe("startup tasks", () => {
       logger,
     });
 
-    expect(gameService.recoverManualPairingPromptsOnStartup).toHaveBeenCalledTimes(1);
+    expect(
+      gameService.recoverManualPairingPromptsOnStartup,
+    ).toHaveBeenCalledTimes(1);
     expect(logger.error).toHaveBeenCalledWith(
       "commands_sync_failed",
       expect.objectContaining({
@@ -88,7 +94,9 @@ describe("startup tasks", () => {
       logger,
     });
 
-    expect(gameService.recoverManualPairingPromptsOnStartup).toHaveBeenCalledTimes(1);
+    expect(
+      gameService.recoverManualPairingPromptsOnStartup,
+    ).toHaveBeenCalledTimes(1);
     expect(logger.error).toHaveBeenCalledWith(
       "startup_task_failed",
       expect.objectContaining({

@@ -9,12 +9,12 @@
 
 // Polyfill Symbol.dispose and Symbol.asyncDispose if missing
 // @ts-ignore — Symbol.dispose may not exist yet
-Symbol.dispose ??= Symbol('Symbol.dispose')
+Symbol.dispose ??= Symbol("Symbol.dispose");
 // @ts-ignore — Symbol.asyncDispose may not exist yet
-Symbol.asyncDispose ??= Symbol('Symbol.asyncDispose')
+Symbol.asyncDispose ??= Symbol("Symbol.asyncDispose");
 
-type DisposeMethod = () => void
-type AsyncDisposeMethod = () => void | Promise<void>
+type DisposeMethod = () => void;
+type AsyncDisposeMethod = () => void | Promise<void>;
 
 /**
  * A stack of cleanup functions that run in LIFO order when disposed.
@@ -39,14 +39,14 @@ type AsyncDisposeMethod = () => void | Promise<void>
  * }
  */
 export class DisposableStack implements Disposable {
-  #stack: DisposeMethod[] = []
-  #disposed = false
+  #stack: DisposeMethod[] = [];
+  #disposed = false;
 
   /**
    * Whether this stack has already been disposed.
    */
   get disposed(): boolean {
-    return this.#disposed
+    return this.#disposed;
   }
 
   /**
@@ -55,9 +55,9 @@ export class DisposableStack implements Disposable {
    */
   defer(onDispose: DisposeMethod): void {
     if (this.#disposed) {
-      throw new ReferenceError('DisposableStack already disposed')
+      throw new ReferenceError("DisposableStack already disposed");
     }
-    this.#stack.push(onDispose)
+    this.#stack.push(onDispose);
   }
 
   /**
@@ -66,9 +66,9 @@ export class DisposableStack implements Disposable {
    */
   use<T extends Disposable | null | undefined>(value: T): T {
     if (value != null) {
-      this.defer(() => value[Symbol.dispose]())
+      this.defer(() => value[Symbol.dispose]());
     }
-    return value
+    return value;
   }
 
   /**
@@ -76,8 +76,8 @@ export class DisposableStack implements Disposable {
    * Returns the value for convenience.
    */
   adopt<T>(value: T, onDispose: (value: T) => void): T {
-    this.defer(() => onDispose(value))
-    return value
+    this.defer(() => onDispose(value));
+    return value;
   }
 
   /**
@@ -86,13 +86,13 @@ export class DisposableStack implements Disposable {
    */
   move(): DisposableStack {
     if (this.#disposed) {
-      throw new ReferenceError('DisposableStack already disposed')
+      throw new ReferenceError("DisposableStack already disposed");
     }
-    const newStack = new DisposableStack()
-    newStack.#stack = this.#stack
-    this.#stack = []
-    this.#disposed = true
-    return newStack
+    const newStack = new DisposableStack();
+    newStack.#stack = this.#stack;
+    this.#stack = [];
+    this.#disposed = true;
+    return newStack;
   }
 
   /**
@@ -100,27 +100,27 @@ export class DisposableStack implements Disposable {
    * later errors are attached via SuppressedError (or cause chain fallback).
    */
   [Symbol.dispose](): void {
-    if (this.#disposed) return
-    this.#disposed = true
+    if (this.#disposed) return;
+    this.#disposed = true;
 
-    let firstError: unknown = undefined
+    let firstError: unknown = undefined;
     for (let i = this.#stack.length - 1; i >= 0; i--) {
       try {
-        this.#stack[i]!()
+        this.#stack[i]!();
       } catch (err) {
         if (firstError === undefined) {
-          firstError = err
+          firstError = err;
         } else {
-          firstError = buildSuppressedError(err, firstError)
+          firstError = buildSuppressedError(err, firstError);
         }
       }
     }
-    this.#stack = []
-    if (firstError !== undefined) throw firstError
+    this.#stack = [];
+    if (firstError !== undefined) throw firstError;
   }
 
   dispose(): void {
-    this[Symbol.dispose]()
+    this[Symbol.dispose]();
   }
 }
 
@@ -145,14 +145,14 @@ export class DisposableStack implements Disposable {
  * }
  */
 export class AsyncDisposableStack implements AsyncDisposable {
-  #stack: AsyncDisposeMethod[] = []
-  #disposed = false
+  #stack: AsyncDisposeMethod[] = [];
+  #disposed = false;
 
   /**
    * Whether this stack has already been disposed.
    */
   get disposed(): boolean {
-    return this.#disposed
+    return this.#disposed;
   }
 
   /**
@@ -161,9 +161,9 @@ export class AsyncDisposableStack implements AsyncDisposable {
    */
   defer(onDispose: AsyncDisposeMethod): void {
     if (this.#disposed) {
-      throw new ReferenceError('AsyncDisposableStack already disposed')
+      throw new ReferenceError("AsyncDisposableStack already disposed");
     }
-    this.#stack.push(onDispose)
+    this.#stack.push(onDispose);
   }
 
   /**
@@ -175,12 +175,12 @@ export class AsyncDisposableStack implements AsyncDisposable {
       if (Symbol.asyncDispose in (value as object)) {
         this.defer(
           async () => await (value as AsyncDisposable)[Symbol.asyncDispose](),
-        )
+        );
       } else {
-        this.defer(() => (value as Disposable)[Symbol.dispose]())
+        this.defer(() => (value as Disposable)[Symbol.dispose]());
       }
     }
-    return value
+    return value;
   }
 
   /**
@@ -188,8 +188,8 @@ export class AsyncDisposableStack implements AsyncDisposable {
    * Returns the value for convenience.
    */
   adopt<T>(value: T, onDispose: (value: T) => void | Promise<void>): T {
-    this.defer(() => onDispose(value))
-    return value
+    this.defer(() => onDispose(value));
+    return value;
   }
 
   /**
@@ -198,13 +198,13 @@ export class AsyncDisposableStack implements AsyncDisposable {
    */
   move(): AsyncDisposableStack {
     if (this.#disposed) {
-      throw new ReferenceError('AsyncDisposableStack already disposed')
+      throw new ReferenceError("AsyncDisposableStack already disposed");
     }
-    const newStack = new AsyncDisposableStack()
-    newStack.#stack = this.#stack
-    this.#stack = []
-    this.#disposed = true
-    return newStack
+    const newStack = new AsyncDisposableStack();
+    newStack.#stack = this.#stack;
+    this.#stack = [];
+    this.#disposed = true;
+    return newStack;
   }
 
   /**
@@ -212,27 +212,27 @@ export class AsyncDisposableStack implements AsyncDisposable {
    * later errors are attached via SuppressedError (or cause chain fallback).
    */
   async [Symbol.asyncDispose](): Promise<void> {
-    if (this.#disposed) return
-    this.#disposed = true
+    if (this.#disposed) return;
+    this.#disposed = true;
 
-    let firstError: unknown = undefined
+    let firstError: unknown = undefined;
     for (let i = this.#stack.length - 1; i >= 0; i--) {
       try {
-        await this.#stack[i]!()
+        await this.#stack[i]!();
       } catch (err) {
         if (firstError === undefined) {
-          firstError = err
+          firstError = err;
         } else {
-          firstError = buildSuppressedError(err, firstError)
+          firstError = buildSuppressedError(err, firstError);
         }
       }
     }
-    this.#stack = []
-    if (firstError !== undefined) throw firstError
+    this.#stack = [];
+    if (firstError !== undefined) throw firstError;
   }
 
   async disposeAsync(): Promise<void> {
-    await this[Symbol.asyncDispose]()
+    await this[Symbol.asyncDispose]();
   }
 }
 
@@ -244,18 +244,18 @@ function buildSuppressedError(
   latestError: unknown,
   previousError: unknown,
 ): Error {
-  if (typeof globalThis.SuppressedError === 'function') {
+  if (typeof globalThis.SuppressedError === "function") {
     return new globalThis.SuppressedError(
       latestError,
       previousError,
-      'An error was suppressed during disposal',
-    )
+      "An error was suppressed during disposal",
+    );
   }
   // Fallback: attach previous error as cause
   const err =
-    latestError instanceof Error ? latestError : new Error(String(latestError))
+    latestError instanceof Error ? latestError : new Error(String(latestError));
   if (!err.cause) {
-    err.cause = previousError
+    err.cause = previousError;
   }
-  return err
+  return err;
 }
