@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createGameServiceComponentHarness } from "./game-service-components.harness";
+import { createGameServiceComponentHarness } from "./game-service-components.harness.js";
 
 describe("reverse mode service", () => {
   it("does nothing before first turn hook", async () => {
@@ -121,8 +121,8 @@ describe("reverse mode service", () => {
         intruder.telegramUserId,
         "YES",
       ),
-    ).rejects.toMatchObject({
-      code: "PLAYER_NOT_ALLOWED_TO_VOTE",
+    ).resolves.toMatchObject({
+      _tag: "PlayerNotAllowedToVoteError",
     });
 
     await expect(
@@ -138,3 +138,4 @@ describe("reverse mode service", () => {
     expect(updated.turns.at(-1)?.outcome).toBe("YES");
   });
 });
+

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeMajorityDecision } from "../../src/domain/rules";
+import { computeMajorityDecision } from "../../src/domain/rules.js";
 
 describe("voting", () => {
   it("uses YES on tie between YES and NO", () => {

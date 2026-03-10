@@ -1,13 +1,13 @@
-import { GameService } from "../../src/application/game-service";
-import { TextService } from "../../src/application/text-service";
-import { GameEngine } from "../../src/domain/game-engine";
+import { GameService } from "../../src/application/game-service.js";
+import { TextService } from "../../src/application/text-service.js";
+import { GameEngine } from "../../src/domain/game-engine.js";
 import {
   GameMode,
   GameState,
   PairingMode,
   PlayMode,
   VoteDecision,
-} from "../../src/domain/types";
+} from "../../src/domain/types.js";
 import {
   FakeClock,
   FakeGameRepository,
@@ -16,7 +16,7 @@ import {
   FakeLogger,
   FakeNotifier,
   FakeTransactionRunner,
-} from "../mocks";
+} from "../mocks/index.js";
 
 export interface TestActor {
   telegramUserId: string;

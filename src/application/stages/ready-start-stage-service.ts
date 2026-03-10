@@ -1,7 +1,7 @@
-import { GameMode } from "../../domain/types";
-import type { ReadyStartError } from "../errors";
-import { GameServiceContext } from "../game-service-context";
-import { GameModeService } from "../modes/game-mode-service";
+import { GameMode } from "../../domain/types.js";
+import type { ReadyStartError } from "../errors.js";
+import { GameServiceContext } from "../game-service-context.js";
+import { GameModeService } from "../modes/game-mode-service.js";
 
 export class ReadyStartStageService {
   private readonly modeServices = new Map<GameMode, GameModeService>();

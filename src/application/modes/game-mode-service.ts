@@ -1,10 +1,10 @@
-import type { NotificationError } from "../../domain/errors";
-import { GameMode, GameState, VoteDecision } from "../../domain/types";
+import type { NotificationError } from "../../domain/errors.js";
+import { GameMode, GameState, VoteDecision } from "../../domain/types.js";
 import type {
   GiveUpHandlingError,
   StartQuestionError,
   VoteHandlingError,
-} from "../errors";
+} from "../errors.js";
 
 export interface GameModeService {
   readonly mode: GameMode;

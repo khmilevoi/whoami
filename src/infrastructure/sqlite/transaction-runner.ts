@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { TransactionRunner } from "../../application/ports";
+import { TransactionRunner } from "../../application/ports.js";
 
 export class SqliteTransactionRunner implements TransactionRunner {
   constructor(private readonly db: Database.Database) {}

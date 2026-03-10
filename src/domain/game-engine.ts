@@ -1,7 +1,7 @@
-import * as appErrors from "./errors";
-import { buildRandomDerangement, validateManualPairChoice } from "./pairing";
-import { computeMajorityDecision } from "./rules";
-import { buildGameResult } from "./stats";
+import * as appErrors from "./errors.js";
+import { buildRandomDerangement, validateManualPairChoice } from "./pairing.js";
+import { computeMajorityDecision } from "./rules.js";
+import { buildGameResult } from "./stats.js";
 import {
   ConfigureGameInput,
   GameState,
@@ -12,7 +12,7 @@ import {
   StartGameInput,
   VoteDecision,
   WordEntry,
-} from "./types";
+} from "./types.js";
 
 interface AskQuestionInput {
   actorPlayerId: string;

@@ -1,7 +1,7 @@
-import { GameState } from "../../domain/types";
-import type { NormalPairingStageError } from "../errors";
-import { GameServiceContext } from "../game-service-context";
-import { WordPreparationStageService } from "./word-preparation-stage-service";
+import { GameState } from "../../domain/types.js";
+import type { NormalPairingStageError } from "../errors.js";
+import { GameServiceContext } from "../game-service-context.js";
+import { WordPreparationStageService } from "./word-preparation-stage-service.js";
 
 export class NormalPairingStageService {
   constructor(

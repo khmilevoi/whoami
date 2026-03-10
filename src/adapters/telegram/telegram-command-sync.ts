@@ -1,12 +1,12 @@
-import * as appErrors from "../../domain/errors";
+import * as appErrors from "../../domain/errors.js";
 import {
   BotCommandDef,
   createBotCommands,
-} from "../../application/bot-commands";
-import { ChatCommandResolver } from "../../application/chat-command-resolver";
-import { GameQueryService } from "../../application/game-query-service";
-import { LoggerPort } from "../../application/ports";
-import { TextService } from "../../application/text-service";
+} from "../../application/bot-commands.js";
+import { ChatCommandResolver } from "../../application/chat-command-resolver.js";
+import { GameQueryService } from "../../application/game-query-service.js";
+import { LoggerPort } from "../../application/ports.js";
+import { TextService } from "../../application/text-service.js";
 
 type TelegramScope =
   | { type: "all_private_chats" }

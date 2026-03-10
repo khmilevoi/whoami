@@ -1,6 +1,6 @@
-import * as appErrors from "../../domain/errors";
+import * as appErrors from "../../domain/errors.js";
 import { Bot, InlineKeyboard } from "grammy";
-import { LoggerPort, NotifierPort } from "../../application/ports";
+import { LoggerPort, NotifierPort } from "../../application/ports.js";
 
 type Button = { text: string; data: string };
 

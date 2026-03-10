@@ -1,4 +1,4 @@
-import { TransactionRunner } from "../../src/application/ports";
+import { TransactionRunner } from "../../src/application/ports.js";
 
 export class FakeTransactionRunner implements TransactionRunner {
   runs = 0;

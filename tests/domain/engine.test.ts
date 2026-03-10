@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { GameEngine } from "../../src/domain/game-engine";
+import { GameEngine } from "../../src/domain/game-engine.js";
 import {
   ExpectedStageMismatchError,
   GameEngineError,
-} from "../../src/domain/errors";
-import { GameState } from "../../src/domain/types";
+} from "../../src/domain/errors.js";
+import { GameState } from "../../src/domain/types.js";
 
 const engine = new GameEngine();
 

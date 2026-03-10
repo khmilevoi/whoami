@@ -1,4 +1,4 @@
-import { GameMode, PairingMode, PlayMode } from "../../domain/types";
+import { GameMode, PairingMode, PlayMode } from "../../domain/types.js";
 
 export interface ConfigDraft {
   mode?: GameMode;

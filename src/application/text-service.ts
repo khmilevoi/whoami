@@ -1,12 +1,12 @@
 import * as errore from "errore";
-import { DomainAppError } from "../domain/errors";
+import { DomainAppError } from "../domain/errors.js";
 import {
   GameMode,
   PairingMode,
   PlayMode,
   TurnRecord,
   VoteDecision,
-} from "../domain/types";
+} from "../domain/types.js";
 
 export type SupportedLocale = "ru";
 

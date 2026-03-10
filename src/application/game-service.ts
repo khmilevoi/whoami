@@ -1,7 +1,7 @@
-import * as appErrors from "../domain/errors";
-import { GameEngine } from "../domain/game-engine";
-import { GameMode, VoteDecision } from "../domain/types";
-import type { GameServiceError, RecoveryStartupError } from "./errors";
+import * as appErrors from "../domain/errors.js";
+import { GameEngine } from "../domain/game-engine.js";
+import { GameMode, VoteDecision } from "../domain/types.js";
+import type { GameServiceError, RecoveryStartupError } from "./errors.js";
 import {
   ClockPort,
   GameRepository,
@@ -10,18 +10,18 @@ import {
   LoggerPort,
   NotifierPort,
   TransactionRunner,
-} from "./ports";
-import { GameServiceContext } from "./game-service-context";
-import { GameModeService } from "./modes/game-mode-service";
-import { NormalModeService } from "./modes/normal-mode-service";
-import { ReverseModeService } from "./modes/reverse-mode-service";
-import { ConfigurationStageService } from "./stages/configuration-stage-service";
-import { NormalPairingStageService } from "./stages/normal-pairing-stage-service";
-import { ReadyStartStageService } from "./stages/ready-start-stage-service";
-import { WordPreparationStageService } from "./stages/word-preparation-stage-service";
-import { ConfigDraftStore } from "./stores/config-draft-store";
-import { PrivateExpectationStore } from "./stores/private-expectation-store";
-import { TextService } from "./text-service";
+} from "./ports.js";
+import { GameServiceContext } from "./game-service-context.js";
+import { GameModeService } from "./modes/game-mode-service.js";
+import { NormalModeService } from "./modes/normal-mode-service.js";
+import { ReverseModeService } from "./modes/reverse-mode-service.js";
+import { ConfigurationStageService } from "./stages/configuration-stage-service.js";
+import { NormalPairingStageService } from "./stages/normal-pairing-stage-service.js";
+import { ReadyStartStageService } from "./stages/ready-start-stage-service.js";
+import { WordPreparationStageService } from "./stages/word-preparation-stage-service.js";
+import { ConfigDraftStore } from "./stores/config-draft-store.js";
+import { PrivateExpectationStore } from "./stores/private-expectation-store.js";
+import { TextService } from "./text-service.js";
 
 interface ActorInput {
   telegramUserId: string;

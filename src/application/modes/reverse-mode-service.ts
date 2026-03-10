@@ -1,8 +1,8 @@
-import type { NotificationError } from "../../domain/errors";
-import { GameState } from "../../domain/types";
-import type { StartQuestionError } from "../errors";
-import { GameServiceContext } from "../game-service-context";
-import { BaseGameModeService } from "./base-game-mode-service";
+import type { NotificationError } from "../../domain/errors.js";
+import { GameState } from "../../domain/types.js";
+import type { StartQuestionError } from "../errors.js";
+import { GameServiceContext } from "../game-service-context.js";
+import { BaseGameModeService } from "./base-game-mode-service.js";
 
 export class ReverseModeService extends BaseGameModeService {
   readonly mode = "REVERSE" as const;

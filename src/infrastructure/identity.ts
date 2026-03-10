@@ -1,5 +1,5 @@
-import { IdentityPort } from "../application/ports";
-import { PlayerIdentity } from "../domain/types";
+import { IdentityPort } from "../application/ports.js";
+import { PlayerIdentity } from "../domain/types.js";
 
 export class TelegramIdentityPort implements IdentityPort {
   toPlayerIdentity(input: {

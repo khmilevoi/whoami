@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { createDatabase } from "../../src/infrastructure/sqlite/db";
-import { SqliteGameRepository } from "../../src/infrastructure/sqlite/game-repository";
-import { GameEngine } from "../../src/domain/game-engine";
+import { createDatabase } from "../../src/infrastructure/sqlite/db.js";
+import { SqliteGameRepository } from "../../src/infrastructure/sqlite/game-repository.js";
+import { GameEngine } from "../../src/domain/game-engine.js";
 
 const canUseBetterSqlite = (): boolean => {
   try {

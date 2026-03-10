@@ -1,5 +1,5 @@
 import { customAlphabet } from "nanoid";
-import { IdPort } from "../application/ports";
+import { IdPort } from "../application/ports.js";
 
 const nano = customAlphabet("1234567890abcdefghijklmnopqrstuvwxyz", 16);
 

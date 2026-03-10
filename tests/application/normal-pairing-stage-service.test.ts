@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createGameServiceComponentHarness } from "./game-service-components.harness";
+import { createGameServiceComponentHarness } from "./game-service-components.harness.js";
 import {
   SentPrivateKeyboard,
   SentPrivateMessage,
-} from "../mocks/fake-notifier";
-import { TextService } from "../../src/application/text-service";
+} from "../mocks/fake-notifier.js";
+import { TextService } from "../../src/application/text-service.js";
 
 const MANUAL_PAIR_PROMPT_TEXT = new TextService("ru").manualPairPrompt();
 

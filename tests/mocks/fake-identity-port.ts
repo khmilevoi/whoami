@@ -1,5 +1,5 @@
-import { IdentityPort } from "../../src/application/ports";
-import { PlayerIdentity } from "../../src/domain/types";
+import { IdentityPort } from "../../src/application/ports.js";
+import { PlayerIdentity } from "../../src/domain/types.js";
 
 export class FakeIdentityPort implements IdentityPort {
   toPlayerIdentity(input: {

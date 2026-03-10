@@ -1,5 +1,5 @@
-import type { NotificationError } from "../domain/errors";
-import { GameState, PlayerIdentity } from "../domain/types";
+import type { NotificationError } from "../domain/errors.js";
+import { GameState, PlayerIdentity } from "../domain/types.js";
 
 export interface GameRepository {
   create(game: GameState): void;

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createGameServiceHarness } from "./game-service.harness";
+import { createGameServiceHarness } from "./game-service.harness.js";
 
 describe("game service facade", () => {
   it("delegates stage-specific methods to extracted stage services", async () => {

@@ -1,5 +1,5 @@
-import { GameState } from "../domain/types";
-import { GameRepository } from "./ports";
+import { GameState } from "../domain/types.js";
+import { GameRepository } from "./ports.js";
 
 export class GameQueryService {
   constructor(private readonly repository: GameRepository) {}

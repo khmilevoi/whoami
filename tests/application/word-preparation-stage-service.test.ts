@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createGameServiceComponentHarness } from "./game-service-components.harness";
+import { createGameServiceComponentHarness } from "./game-service-components.harness.js";
 import {
   SentPrivateKeyboard,
   SentPrivateMessage,
-} from "../mocks/fake-notifier";
+} from "../mocks/fake-notifier.js";
 
 describe("word preparation stage service", () => {
   it("reuses the same word/clue/finalization flow for reverse mode", async () => {

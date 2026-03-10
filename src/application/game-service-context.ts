@@ -1,6 +1,6 @@
-import * as appErrors from "../domain/errors";
-import { GameState, TurnRecord } from "../domain/types";
-import { TextService } from "./text-service";
+import * as appErrors from "../domain/errors.js";
+import { GameState, TurnRecord } from "../domain/types.js";
+import { TextService } from "./text-service.js";
 import {
   ClockPort,
   GameRepository,
@@ -9,8 +9,8 @@ import {
   LoggerPort,
   NotifierPort,
   TransactionRunner,
-} from "./ports";
-import { GameEngine } from "../domain/game-engine";
+} from "./ports.js";
+import { GameEngine } from "../domain/game-engine.js";
 
 export interface GameServiceDeps {
   engine: GameEngine;

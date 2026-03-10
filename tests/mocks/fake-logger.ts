@@ -1,4 +1,4 @@
-import { LoggerPort } from "../../src/application/ports";
+import { LoggerPort } from "../../src/application/ports.js";
 
 export interface LoggedEvent {
   level: "info" | "warn" | "error";

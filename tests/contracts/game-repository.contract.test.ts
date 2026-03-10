@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { GameRepository } from "../../src/application/ports";
-import { GameEngine } from "../../src/domain/game-engine";
-import { GameState } from "../../src/domain/types";
-import { createDatabase } from "../../src/infrastructure/sqlite/db";
-import { SqliteGameRepository } from "../../src/infrastructure/sqlite/game-repository";
-import { FakeGameRepository } from "../mocks";
+import { GameRepository } from "../../src/application/ports.js";
+import { GameEngine } from "../../src/domain/game-engine.js";
+import { GameState } from "../../src/domain/types.js";
+import { createDatabase } from "../../src/infrastructure/sqlite/db.js";
+import { SqliteGameRepository } from "../../src/infrastructure/sqlite/game-repository.js";
+import { FakeGameRepository } from "../mocks/index.js";
 
 type RepoFactory = () => { repo: GameRepository; close: () => void };
 

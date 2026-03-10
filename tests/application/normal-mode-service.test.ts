@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createGameServiceComponentHarness } from "./game-service-components.harness";
+import { createGameServiceComponentHarness } from "./game-service-components.harness.js";
 
 describe("normal mode service", () => {
   it("sends pre-start disclosure to every player", async () => {

@@ -1,15 +1,15 @@
-import * as appErrors from "./domain/errors";
+import * as appErrors from "./domain/errors.js";
 import { AwilixContainer } from "awilix";
 import { Bot } from "grammy";
-import { buildHttpServer } from "./adapters/http/server";
-import { registerTelegramHandlers } from "./adapters/telegram/telegram-bot";
-import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync";
-import { GameService } from "./application/game-service";
-import { LoggerPort } from "./application/ports";
-import { TextService } from "./application/text-service";
-import { loadConfig } from "./config";
-import { buildContainer } from "./container";
-import { runStartupTasks } from "./startup";
+import { buildHttpServer } from "./adapters/http/server.js";
+import { registerTelegramHandlers } from "./adapters/telegram/telegram-bot.js";
+import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync.js";
+import { GameService } from "./application/game-service.js";
+import { LoggerPort } from "./application/ports.js";
+import { TextService } from "./application/text-service.js";
+import { loadConfig } from "./config.js";
+import { buildContainer } from "./container.js";
+import { runStartupTasks } from "./startup.js";
 
 const start = (): void | appErrors.StartAppError => {
   const config = loadConfig();

@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { TelegramCommandSync } from "../../../src/adapters/telegram/telegram-command-sync";
-import { createBotCommands } from "../../../src/application/bot-commands";
-import { ChatCommandResolver } from "../../../src/application/chat-command-resolver";
-import { GameQueryService } from "../../../src/application/game-query-service";
-import { LoggerPort } from "../../../src/application/ports";
-import { TextService } from "../../../src/application/text-service";
-import { GameState } from "../../../src/domain/types";
+import { TelegramCommandSync } from "../../../src/adapters/telegram/telegram-command-sync.js";
+import { createBotCommands } from "../../../src/application/bot-commands.js";
+import { ChatCommandResolver } from "../../../src/application/chat-command-resolver.js";
+import { GameQueryService } from "../../../src/application/game-query-service.js";
+import { LoggerPort } from "../../../src/application/ports.js";
+import { TextService } from "../../../src/application/text-service.js";
+import { GameState } from "../../../src/domain/types.js";
 
 const createOfflineInProgressGame = (turnCursor: number): GameState => ({
   id: "g1",

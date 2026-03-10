@@ -1,6 +1,6 @@
-import { GameState } from "../domain/types";
-import { createBotCommands, ChatCommandResolution } from "./bot-commands";
-import { TextService } from "./text-service";
+import { GameState } from "../domain/types.js";
+import { createBotCommands, ChatCommandResolution } from "./bot-commands.js";
+import { TextService } from "./text-service.js";
 
 const toPlayerTelegramUserId = (
   game: GameState,

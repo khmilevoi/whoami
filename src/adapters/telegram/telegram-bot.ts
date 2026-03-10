@@ -1,12 +1,12 @@
 import * as errore from "errore";
-import * as appErrors from "../../domain/errors";
+import * as appErrors from "../../domain/errors.js";
 import { Bot, Context } from "grammy";
-import { GameService } from "../../application/game-service";
-import type { TelegramHandlerError } from "../../application/errors";
-import { LoggerPort } from "../../application/ports";
-import { TextService } from "../../application/text-service";
-import { TelegramCommandSync } from "./telegram-command-sync";
-import { parseManualPairPayload } from "./manual-pair-payload";
+import { GameService } from "../../application/game-service.js";
+import type { TelegramHandlerError } from "../../application/errors.js";
+import { LoggerPort } from "../../application/ports.js";
+import { TextService } from "../../application/text-service.js";
+import { TelegramCommandSync } from "./telegram-command-sync.js";
+import { parseManualPairPayload } from "./manual-pair-payload.js";
 
 type GroupMessageReadStatus = "enabled" | "disabled" | "unknown";
 

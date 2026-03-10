@@ -1,4 +1,4 @@
-import { LoggerPort } from "../application/ports";
+import { LoggerPort } from "../application/ports.js";
 
 const print = (
   level: string,

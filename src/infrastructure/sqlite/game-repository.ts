@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
-import { GameRepository } from "../../application/ports";
-import { FinalScore, GameState } from "../../domain/types";
+import { GameRepository } from "../../application/ports.js";
+import { FinalScore, GameState } from "../../domain/types.js";
 
 const activeStages = [
   "LOBBY_OPEN",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ChatCommandResolver } from "../../src/application/chat-command-resolver";
-import { TextService } from "../../src/application/text-service";
-import { GameState, GameStage } from "../../src/domain/types";
+import { ChatCommandResolver } from "../../src/application/chat-command-resolver.js";
+import { TextService } from "../../src/application/text-service.js";
+import { GameState, GameStage } from "../../src/domain/types.js";
 
 const resolver = new ChatCommandResolver(new TextService("ru"));
 

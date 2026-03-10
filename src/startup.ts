@@ -1,9 +1,9 @@
 import * as errore from "errore";
-import * as appErrors from "./domain/errors";
-import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync";
-import { GameService } from "./application/game-service";
-import type { RecoveryStartupError } from "./application/errors";
-import { LoggerPort } from "./application/ports";
+import * as appErrors from "./domain/errors.js";
+import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync.js";
+import { GameService } from "./application/game-service.js";
+import type { RecoveryStartupError } from "./application/errors.js";
+import { LoggerPort } from "./application/ports.js";
 
 interface StartupDependencies {
   commandSync: TelegramCommandSync;

@@ -1,11 +1,11 @@
-import type { PairingError, PairingValidationError } from "./errors";
+import type { PairingError, PairingValidationError } from "./errors.js";
 import {
   NeedAtLeastTwoPlayersForPairingsError,
   PlayerCannotPairWithSelfError,
   PlayerHasAlreadySelectedAPairError,
   SelectedTargetIsAlreadyTakenError,
   UnknownPlayerInManualPairingError,
-} from "./errors";
+} from "./errors.js";
 
 export const buildRandomDerangement = (
   playerIds: string[],

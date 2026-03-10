@@ -2,8 +2,8 @@ import * as errore from "errore";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
-import { DatabaseOpenError } from "../../domain/errors";
-import { runMigrations } from "./migrations";
+import { DatabaseOpenError } from "../../domain/errors.js";
+import { runMigrations } from "./migrations.js";
 
 const missingBindingHint = [
   "better-sqlite3 native bindings are missing.",

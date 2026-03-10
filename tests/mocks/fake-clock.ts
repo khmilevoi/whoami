@@ -1,4 +1,4 @@
-import { ClockPort } from "../../src/application/ports";
+import { ClockPort } from "../../src/application/ports.js";
 
 export class FakeClock implements ClockPort {
   private currentMs: number;

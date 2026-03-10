@@ -25,7 +25,7 @@ import type {
   ConfirmWordError,
   UnknownGameModeError,
   WebhookAppError,
-} from "../domain/errors";
+} from "../domain/errors.js";
 
 export type GameServiceContextError =
   | ActiveGameNotFoundByChatError

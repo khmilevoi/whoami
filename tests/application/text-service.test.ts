@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { createBotCommands } from "../../src/application/bot-commands";
-import { TextService } from "../../src/application/text-service";
-import { DOMAIN_ERROR_FACTORIES } from "../../src/domain/errors";
+import { createBotCommands } from "../../src/application/bot-commands.js";
+import { TextService } from "../../src/application/text-service.js";
+import { DOMAIN_ERROR_FACTORIES } from "../../src/domain/errors.js";
 
 const texts = new TextService("ru");
 

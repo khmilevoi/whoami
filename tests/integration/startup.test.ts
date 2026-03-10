@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { CommandSyncError } from "../../src/domain/errors";
-import { TelegramCommandSync } from "../../src/adapters/telegram/telegram-command-sync";
-import { GameService } from "../../src/application/game-service";
-import { LoggerPort } from "../../src/application/ports";
-import { runStartupTasks } from "../../src/startup";
+import { CommandSyncError } from "../../src/domain/errors.js";
+import { TelegramCommandSync } from "../../src/adapters/telegram/telegram-command-sync.js";
+import { GameService } from "../../src/application/game-service.js";
+import { LoggerPort } from "../../src/application/ports.js";
+import { runStartupTasks } from "../../src/startup.js";
 
 const createLogger = (): LoggerPort => ({
   info: vi.fn(),

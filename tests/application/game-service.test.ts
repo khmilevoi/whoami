@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { OnlyGameCreatorCanCancelError } from "../../src/domain/errors";
-import { TextService } from "../../src/application/text-service";
-import { VoteDecision } from "../../src/domain/types";
-import { createGameServiceHarness } from "./game-service.harness";
+import { OnlyGameCreatorCanCancelError } from "../../src/domain/errors.js";
+import { TextService } from "../../src/application/text-service.js";
+import { VoteDecision } from "../../src/domain/types.js";
+import { createGameServiceHarness } from "./game-service.harness.js";
 import {
   SentPrivateKeyboard,
   SentPrivateMessage,
-} from "../mocks/fake-notifier";
+} from "../mocks/fake-notifier.js";
 const MANUAL_PAIR_PROMPT_TEXT = new TextService("ru").manualPairPrompt();
 
 const extractPairTargetIds = (

@@ -1,12 +1,12 @@
-import type { NotificationError } from "../../domain/errors";
-import { GameState, VoteDecision } from "../../domain/types";
+import type { NotificationError } from "../../domain/errors.js";
+import { GameState, VoteDecision } from "../../domain/types.js";
 import type {
   GiveUpHandlingError,
   StartQuestionError,
   VoteHandlingError,
-} from "../errors";
-import { GameServiceContext } from "../game-service-context";
-import { GameModeService } from "./game-mode-service";
+} from "../errors.js";
+import { GameServiceContext } from "../game-service-context.js";
+import { GameModeService } from "./game-mode-service.js";
 
 export abstract class BaseGameModeService implements GameModeService {
   abstract readonly mode: GameModeService["mode"];

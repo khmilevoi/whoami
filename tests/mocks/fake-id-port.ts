@@ -1,4 +1,4 @@
-import { IdPort } from "../../src/application/ports";
+import { IdPort } from "../../src/application/ports.js";
 
 export class FakeIdPort implements IdPort {
   private counter = 1;

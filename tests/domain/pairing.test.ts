@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { PlayerCannotPairWithSelfError } from "../../src/domain/errors";
+import { PlayerCannotPairWithSelfError } from "../../src/domain/errors.js";
 import {
   buildRandomDerangement,
   validateManualPairChoice,
-} from "../../src/domain/pairing";
+} from "../../src/domain/pairing.js";
 
 describe("pairing", () => {
   it("builds derangement without self pair", () => {

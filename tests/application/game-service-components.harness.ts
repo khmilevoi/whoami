@@ -1,16 +1,16 @@
-import { GameServiceContext } from "../../src/application/game-service-context";
-import { NormalModeService } from "../../src/application/modes/normal-mode-service";
-import { ReverseModeService } from "../../src/application/modes/reverse-mode-service";
-import { ConfigurationStageService } from "../../src/application/stages/configuration-stage-service";
-import { NormalPairingStageService } from "../../src/application/stages/normal-pairing-stage-service";
-import { ReadyStartStageService } from "../../src/application/stages/ready-start-stage-service";
-import { WordPreparationStageService } from "../../src/application/stages/word-preparation-stage-service";
-import { ConfigDraftStore } from "../../src/application/stores/config-draft-store";
-import { PrivateExpectationStore } from "../../src/application/stores/private-expectation-store";
+import { GameServiceContext } from "../../src/application/game-service-context.js";
+import { NormalModeService } from "../../src/application/modes/normal-mode-service.js";
+import { ReverseModeService } from "../../src/application/modes/reverse-mode-service.js";
+import { ConfigurationStageService } from "../../src/application/stages/configuration-stage-service.js";
+import { NormalPairingStageService } from "../../src/application/stages/normal-pairing-stage-service.js";
+import { ReadyStartStageService } from "../../src/application/stages/ready-start-stage-service.js";
+import { WordPreparationStageService } from "../../src/application/stages/word-preparation-stage-service.js";
+import { ConfigDraftStore } from "../../src/application/stores/config-draft-store.js";
+import { PrivateExpectationStore } from "../../src/application/stores/private-expectation-store.js";
 import {
   createGameServiceHarness,
   GameServiceHarness,
-} from "./game-service.harness";
+} from "./game-service.harness.js";
 
 export interface GameServiceComponentHarness {
   readonly game: GameServiceHarness;

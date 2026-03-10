@@ -1,11 +1,11 @@
-import { GameState } from "../../domain/types";
+import { GameState } from "../../domain/types.js";
 import type {
   PromptWordCollectionError,
   WordPreparationStageError,
-} from "../errors";
-import { GameServiceContext } from "../game-service-context";
-import { PrivateExpectationStore } from "../stores/private-expectation-store";
-import { ReadyStartStageService } from "./ready-start-stage-service";
+} from "../errors.js";
+import { GameServiceContext } from "../game-service-context.js";
+import { PrivateExpectationStore } from "../stores/private-expectation-store.js";
+import { ReadyStartStageService } from "./ready-start-stage-service.js";
 
 export class WordPreparationStageService {
   constructor(

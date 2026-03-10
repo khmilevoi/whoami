@@ -1,4 +1,4 @@
-import { TextService } from "./text-service";
+import { TextService } from "./text-service.js";
 
 export interface BotCommandDef {
   command: string;

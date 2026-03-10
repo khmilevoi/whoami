@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { InvalidManualPairPayloadError } from "../../../src/domain/errors";
-import { parseManualPairPayload } from "../../../src/adapters/telegram/manual-pair-payload";
+import { InvalidManualPairPayloadError } from "../../../src/domain/errors.js";
+import { parseManualPairPayload } from "../../../src/adapters/telegram/manual-pair-payload.js";
 
 describe("parseManualPairPayload", () => {
   it("parses valid payload", () => {

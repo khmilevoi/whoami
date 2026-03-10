@@ -8,12 +8,12 @@ import {
   Lifetime,
 } from "awilix";
 import { Bot } from "grammy";
-import { AppConfig, loadConfig } from "./config";
-import { ChatCommandResolver } from "./application/chat-command-resolver";
-import { GameQueryService } from "./application/game-query-service";
-import { GameService } from "./application/game-service";
-import { GameServiceContext } from "./application/game-service-context";
-import { TextService } from "./application/text-service";
+import { AppConfig, loadConfig } from "./config.js";
+import { ChatCommandResolver } from "./application/chat-command-resolver.js";
+import { GameQueryService } from "./application/game-query-service.js";
+import { GameService } from "./application/game-service.js";
+import { GameServiceContext } from "./application/game-service-context.js";
+import { TextService } from "./application/text-service.js";
 import {
   ClockPort,
   GameRepository,
@@ -21,25 +21,25 @@ import {
   LoggerPort,
   NotifierPort,
   TransactionRunner,
-} from "./application/ports";
-import { NormalModeService } from "./application/modes/normal-mode-service";
-import { ReverseModeService } from "./application/modes/reverse-mode-service";
-import { ConfigurationStageService } from "./application/stages/configuration-stage-service";
-import { NormalPairingStageService } from "./application/stages/normal-pairing-stage-service";
-import { ReadyStartStageService } from "./application/stages/ready-start-stage-service";
-import { WordPreparationStageService } from "./application/stages/word-preparation-stage-service";
-import { ConfigDraftStore } from "./application/stores/config-draft-store";
-import { PrivateExpectationStore } from "./application/stores/private-expectation-store";
-import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync";
-import { TelegramNotifier } from "./adapters/telegram/telegram-notifier";
-import { GameEngine } from "./domain/game-engine";
-import { SystemClock } from "./infrastructure/clock";
-import { NanoIdPort } from "./infrastructure/id-port";
-import { TelegramIdentityPort } from "./infrastructure/identity";
-import { ConsoleLogger } from "./infrastructure/logger";
-import { createDatabase } from "./infrastructure/sqlite/db";
-import { SqliteGameRepository } from "./infrastructure/sqlite/game-repository";
-import { SqliteTransactionRunner } from "./infrastructure/sqlite/transaction-runner";
+} from "./application/ports.js";
+import { NormalModeService } from "./application/modes/normal-mode-service.js";
+import { ReverseModeService } from "./application/modes/reverse-mode-service.js";
+import { ConfigurationStageService } from "./application/stages/configuration-stage-service.js";
+import { NormalPairingStageService } from "./application/stages/normal-pairing-stage-service.js";
+import { ReadyStartStageService } from "./application/stages/ready-start-stage-service.js";
+import { WordPreparationStageService } from "./application/stages/word-preparation-stage-service.js";
+import { ConfigDraftStore } from "./application/stores/config-draft-store.js";
+import { PrivateExpectationStore } from "./application/stores/private-expectation-store.js";
+import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync.js";
+import { TelegramNotifier } from "./adapters/telegram/telegram-notifier.js";
+import { GameEngine } from "./domain/game-engine.js";
+import { SystemClock } from "./infrastructure/clock.js";
+import { NanoIdPort } from "./infrastructure/id-port.js";
+import { TelegramIdentityPort } from "./infrastructure/identity.js";
+import { ConsoleLogger } from "./infrastructure/logger.js";
+import { createDatabase } from "./infrastructure/sqlite/db.js";
+import { SqliteGameRepository } from "./infrastructure/sqlite/game-repository.js";
+import { SqliteTransactionRunner } from "./infrastructure/sqlite/transaction-runner.js";
 
 interface BaseCradle {
   config: AppConfig;

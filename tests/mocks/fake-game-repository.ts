@@ -1,5 +1,5 @@
-import { GameRepository } from "../../src/application/ports";
-import { GameStage, GameState } from "../../src/domain/types";
+import { GameRepository } from "../../src/application/ports.js";
+import { GameStage, GameState } from "../../src/domain/types.js";
 
 const activeStages = new Set<GameStage>([
   "LOBBY_OPEN",

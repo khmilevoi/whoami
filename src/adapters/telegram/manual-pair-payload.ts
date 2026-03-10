@@ -1,5 +1,5 @@
-import type { ManualPairPayloadError } from "../../domain/errors";
-import { InvalidManualPairPayloadError } from "../../domain/errors";
+import type { ManualPairPayloadError } from "../../domain/errors.js";
+import { InvalidManualPairPayloadError } from "../../domain/errors.js";
 
 interface ManualPairPayload {
   gameId: string;

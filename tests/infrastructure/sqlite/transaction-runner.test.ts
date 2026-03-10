@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { GameNotFoundError } from "../../../src/domain/errors";
-import { SqliteTransactionRunner } from "../../../src/infrastructure/sqlite/transaction-runner";
+import { GameNotFoundError } from "../../../src/domain/errors.js";
+import { SqliteTransactionRunner } from "../../../src/infrastructure/sqlite/transaction-runner.js";
 
 describe("sqlite transaction runner", () => {
   it("commits when work succeeds", () => {

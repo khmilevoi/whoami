@@ -1,15 +1,15 @@
-import * as appErrors from "../../domain/errors";
+import * as appErrors from "../../domain/errors.js";
 import {
   ConfigureGameInput,
   GameMode,
   PairingMode,
   PlayMode,
-} from "../../domain/types";
-import type { ConfigurationStageError } from "../errors";
-import { GameServiceContext } from "../game-service-context";
-import { ConfigDraftStore } from "../stores/config-draft-store";
-import { NormalPairingStageService } from "./normal-pairing-stage-service";
-import { WordPreparationStageService } from "./word-preparation-stage-service";
+} from "../../domain/types.js";
+import type { ConfigurationStageError } from "../errors.js";
+import { GameServiceContext } from "../game-service-context.js";
+import { ConfigDraftStore } from "../stores/config-draft-store.js";
+import { NormalPairingStageService } from "./normal-pairing-stage-service.js";
+import { WordPreparationStageService } from "./word-preparation-stage-service.js";
 
 export class ConfigurationStageService {
   constructor(

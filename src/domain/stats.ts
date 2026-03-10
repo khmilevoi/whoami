@@ -1,6 +1,6 @@
-import type { StatsError } from "./errors";
-import { GameConfigurationMissingError } from "./errors";
-import { FinalScore, GameResult, GameState, ReverseSummary } from "./types";
+import type { StatsError } from "./errors.js";
+import { GameConfigurationMissingError } from "./errors.js";
+import { FinalScore, GameResult, GameState, ReverseSummary } from "./types.js";
 
 const addCrowns = (scores: FinalScore[]): FinalScore[] => {
   if (scores.length === 0) {

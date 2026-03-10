@@ -1,5 +1,5 @@
-import type { NotificationError } from "../../src/domain/errors";
-import { NotifierPort } from "../../src/application/ports";
+import type { NotificationError } from "../../src/domain/errors.js";
+import { NotifierPort } from "../../src/application/ports.js";
 
 type Button = { text: string; data: string };
 

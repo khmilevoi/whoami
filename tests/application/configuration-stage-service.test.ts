@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createGameServiceComponentHarness } from "./game-service-components.harness";
+import { createGameServiceComponentHarness } from "./game-service-components.harness.js";
 import {
   SentPrivateKeyboard,
   SentPrivateMessage,
-} from "../mocks/fake-notifier";
+} from "../mocks/fake-notifier.js";
 
 describe("configuration stage service", () => {
   it("requests play mode, then pairing mode, then configures normal random game", async () => {

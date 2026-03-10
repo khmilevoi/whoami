@@ -1,12 +1,14 @@
 import * as errore from "errore";
 import express, { type Request, type Response } from "express";
-import { Bot, type Update } from "grammy";
-import { LoggerPort } from "../../application/ports";
-import { WebhookAppError, WebhookHandlingError } from "../../domain/errors";
+import { Bot } from "grammy";
+import { LoggerPort } from "../../application/ports.js";
+import { WebhookAppError, WebhookHandlingError } from "../../domain/errors.js";
 
 type HealthResponse = { ok: boolean };
+type TelegramUpdate = Parameters<Bot["handleUpdate"]>[0];
 
-const toUpdate = (payload: unknown): Update => payload as Update;
+const toUpdate = (payload: unknown): TelegramUpdate =>
+  payload as TelegramUpdate;
 
 const logWebhookError = (logger: LoggerPort, error: WebhookAppError): void => {
   errore.matchError(error, {
