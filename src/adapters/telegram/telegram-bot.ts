@@ -231,6 +231,8 @@ export const registerTelegramHandlers = (
         if (isPrivate(ctx)) {
           return gameService.handlePrivateStart(String(ctx.from!.id));
         }
+
+        return;
       },
       finalizeSync,
     );
@@ -260,6 +262,7 @@ export const registerTelegramHandlers = (
         if (result instanceof Error) return result;
 
         await safeReply(ctx, texts.gameCreatedAck());
+        return;
       },
       finalizeSync,
     );
@@ -288,6 +291,7 @@ export const registerTelegramHandlers = (
         if (result instanceof Error) return result;
 
         await safeReply(ctx, texts.joinedGameAck());
+        return;
       },
       finalizeSync,
     );
@@ -316,6 +320,7 @@ export const registerTelegramHandlers = (
         if (result instanceof Error) return result;
 
         await safeReply(ctx, texts.configSentToCreatorAck());
+        return;
       },
       finalizeSync,
     );
@@ -344,6 +349,7 @@ export const registerTelegramHandlers = (
         if (result instanceof Error) return result;
 
         await safeReply(ctx, texts.gameCancelledAck());
+        return;
       },
       finalizeSync,
     );
@@ -421,6 +427,8 @@ export const registerTelegramHandlers = (
             text,
           );
         }
+
+        return;
       },
       finalizeSync,
     );
@@ -528,6 +536,7 @@ export const registerTelegramHandlers = (
         }
 
         await ctx.answerCallbackQuery();
+        return;
       },
       finalizeSync,
     );

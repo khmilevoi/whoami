@@ -138,4 +138,3 @@ describe("reverse mode service", () => {
     expect(updated.turns.at(-1)?.outcome).toBe("YES");
   });
 });
-

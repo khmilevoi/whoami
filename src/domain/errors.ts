@@ -388,7 +388,7 @@ export type FinalizeWordError =
   | PlayerNotFoundError
   | WordMustBeConfirmedBeforeFinalizationError;
 
-export type StatsError = GameConfigurationMissingError;
+export type StatsError = GameConfigurationMissingError | PlayerNotFoundError;
 
 export type StartGameIfReadyError =
   | NotAllPlayersConfirmedWordsError

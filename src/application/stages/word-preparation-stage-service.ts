@@ -1,3 +1,4 @@
+import { WordEntryForPlayerMissingError } from "../../domain/errors.js";
 import { GameState } from "../../domain/types.js";
 import type {
   PromptWordCollectionError,
@@ -82,9 +83,14 @@ export class WordPreparationStageService {
     });
     if (updated instanceof Error) return updated;
 
+    const entry = updated.words[player.id];
+    if (!entry) {
+      return new WordEntryForPlayerMissingError();
+    }
+
     const sentPrompt = await this.context.notifier.sendPrivateKeyboard(
       telegramUserId,
-      this.context.texts.confirmWordPrompt(updated.words[player.id].word ?? ""),
+      this.context.texts.confirmWordPrompt(entry.word ?? ""),
       [
         [
           {

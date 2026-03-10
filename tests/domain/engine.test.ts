@@ -5,6 +5,7 @@ import {
   GameEngineError,
 } from "../../src/domain/errors.js";
 import { GameState } from "../../src/domain/types.js";
+import { mustBeDefined } from "../support/strict-helpers.js";
 
 const engine = new GameEngine();
 
@@ -109,12 +110,14 @@ describe("game engine", () => {
 
     game = unwrap(engine.startGameIfReady(game, "2026-01-01T00:08:00.000Z"));
 
-    const firstAskerId = game.inProgress.turnOrder[game.inProgress.turnCursor];
-    const firstVoterId = game.players.find(
-      (player) => player.id !== firstAskerId,
-    )?.id;
-    expect(firstAskerId).toBeDefined();
-    expect(firstVoterId).toBeDefined();
+    const firstAskerId = mustBeDefined(
+      game.inProgress.turnOrder[game.inProgress.turnCursor],
+      "Expected first asker id",
+    );
+    const firstVoterId = mustBeDefined(
+      game.players.find((player) => player.id !== firstAskerId)?.id,
+      "Expected first voter id",
+    );
 
     game = unwrap(
       engine.askQuestion(game, {
@@ -127,7 +130,7 @@ describe("game engine", () => {
 
     game = unwrap(
       engine.castVote(game, {
-        voterPlayerId: firstVoterId!,
+        voterPlayerId: firstVoterId,
         decision: "GUESSED",
         voteRecordId: "vr1",
         turnRecordId: "t1",
@@ -139,7 +142,10 @@ describe("game engine", () => {
       game.players.find((player) => player.id === firstAskerId)?.stage,
     ).toBe("GUESSED");
 
-    const secondAskerId = game.inProgress.turnOrder[game.inProgress.turnCursor];
+    const secondAskerId = mustBeDefined(
+      game.inProgress.turnOrder[game.inProgress.turnCursor],
+      "Expected second asker id",
+    );
     expect(secondAskerId).toBe(firstVoterId);
 
     game = unwrap(
@@ -271,4 +277,3 @@ describe("game engine", () => {
     expect(game.result).toBeDefined();
   });
 });
-

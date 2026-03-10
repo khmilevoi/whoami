@@ -1,5 +1,8 @@
 import type { StatsError } from "./errors.js";
-import { GameConfigurationMissingError } from "./errors.js";
+import {
+  GameConfigurationMissingError,
+  PlayerNotFoundError,
+} from "./errors.js";
 import { FinalScore, GameResult, GameState, ReverseSummary } from "./types.js";
 
 const addCrowns = (scores: FinalScore[]): FinalScore[] => {
@@ -22,16 +25,23 @@ const addCrowns = (scores: FinalScore[]): FinalScore[] => {
   });
 };
 
-const computeNormalScores = (game: GameState): FinalScore[] => {
-  const base = game.players.map((player) => {
+const computeNormalScores = (game: GameState): FinalScore[] | StatsError => {
+  const base: FinalScore[] = [];
+
+  for (const player of game.players) {
     const progress = game.progress[player.id];
-    return {
+    if (!progress) {
+      return new PlayerNotFoundError();
+    }
+
+    base.push({
       playerId: player.id,
       rounds: progress.roundsUsed,
       questions: progress.questionsAsked,
       crowns: [],
-    } satisfies FinalScore;
-  });
+    });
+  }
+
   return addCrowns(base);
 };
 
@@ -95,9 +105,12 @@ export const buildGameResult = (
   } satisfies Pick<GameResult, "gameId" | "mode" | "createdAt">;
 
   if (game.config.mode === "NORMAL") {
+    const normal = computeNormalScores(game);
+    if (normal instanceof Error) return normal;
+
     return {
       ...base,
-      normal: computeNormalScores(game),
+      normal,
     } satisfies GameResult;
   }
 

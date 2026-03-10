@@ -17,15 +17,31 @@ export const buildRandomDerangement = (
   const shuffled = [...playerIds];
   for (let i = shuffled.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
-    const temp = shuffled[i];
-    shuffled[i] = shuffled[j];
-    shuffled[j] = temp;
+    const current = shuffled[i];
+    const swap = shuffled[j];
+    if (current === undefined || swap === undefined) {
+      return new NeedAtLeastTwoPlayersForPairingsError();
+    }
+
+    shuffled[i] = swap;
+    shuffled[j] = current;
   }
 
-  const rotated = [...shuffled.slice(1), shuffled[0]];
+  const first = shuffled[0];
+  if (first === undefined) {
+    return new NeedAtLeastTwoPlayersForPairingsError();
+  }
+
+  const rotated = [...shuffled.slice(1), first];
   const pairings: Record<string, string> = {};
   for (let i = 0; i < shuffled.length; i += 1) {
-    pairings[shuffled[i]] = rotated[i];
+    const owner = shuffled[i];
+    const target = rotated[i];
+    if (owner === undefined || target === undefined) {
+      return new NeedAtLeastTwoPlayersForPairingsError();
+    }
+
+    pairings[owner] = target;
   }
 
   for (const [from, to] of Object.entries(pairings)) {

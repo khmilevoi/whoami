@@ -36,6 +36,8 @@ export class TelegramNotifier implements NotifierPort {
     if (result instanceof Error) {
       return result;
     }
+
+    return;
   }
 
   async sendGroupKeyboard(chatId: string, text: string, buttons: Button[][]) {
@@ -53,6 +55,8 @@ export class TelegramNotifier implements NotifierPort {
     if (result instanceof Error) {
       return result;
     }
+
+    return;
   }
 
   async sendPrivateMessage(userId: string, text: string): Promise<boolean> {

@@ -4,6 +4,7 @@ import {
   SentPrivateKeyboard,
   SentPrivateMessage,
 } from "../mocks/fake-notifier.js";
+import { mustBeDefined, mustGetAt } from "../support/strict-helpers.js";
 
 describe("configuration stage service", () => {
   it("requests play mode, then pairing mode, then configures normal random game", async () => {
@@ -14,52 +15,69 @@ describe("configuration stage service", () => {
       components.game.createActor(2),
       components.game.createActor(3),
     ];
+    const creator = mustGetAt(actors, 0, "Expected configuration creator");
+    const secondActor = mustGetAt(
+      actors,
+      1,
+      "Expected second configuration actor",
+    );
+    const thirdActor = mustGetAt(
+      actors,
+      2,
+      "Expected third configuration actor",
+    );
 
-    await components.game.service.startGame(chatId, actors[0]);
-    await components.game.service.joinGame(chatId, actors[1]);
-    await components.game.service.joinGame(chatId, actors[2]);
+    await components.game.service.startGame(chatId, creator);
+    await components.game.service.joinGame(chatId, secondActor);
+    await components.game.service.joinGame(chatId, thirdActor);
     await components.game.service.beginConfiguration(
       chatId,
-      actors[0].telegramUserId,
+      creator.telegramUserId,
     );
 
     const game = components.game.getGameByChat(chatId);
 
     await components.configurationStage.applyConfigStep(
       game.id,
-      actors[0].telegramUserId,
+      creator.telegramUserId,
       "mode",
       "NORMAL",
     );
 
-    const playPrompt = components.game.notifier.sent
-      .filter(
-        (entry): entry is SentPrivateKeyboard =>
-          entry.kind === "private-keyboard" &&
-          entry.userId === actors[0].telegramUserId,
-      )
-      .at(-1);
-    expect(playPrompt?.text).toBe("Выберите формат:");
+    const playPrompt = mustBeDefined(
+      components.game.notifier.sent
+        .filter(
+          (entry): entry is SentPrivateKeyboard =>
+            entry.kind === "private-keyboard" &&
+            entry.userId === creator.telegramUserId,
+        )
+        .at(-1),
+      "Expected play mode prompt",
+    );
+    expect(playPrompt.text).toBe("Выберите формат:");
 
     await components.configurationStage.applyConfigStep(
       game.id,
-      actors[0].telegramUserId,
+      creator.telegramUserId,
       "play",
       "ONLINE",
     );
 
-    const pairPrompt = components.game.notifier.sent
-      .filter(
-        (entry): entry is SentPrivateKeyboard =>
-          entry.kind === "private-keyboard" &&
-          entry.userId === actors[0].telegramUserId,
-      )
-      .at(-1);
-    expect(pairPrompt?.text).toBe("Выберите распределение пар:");
+    const pairPrompt = mustBeDefined(
+      components.game.notifier.sent
+        .filter(
+          (entry): entry is SentPrivateKeyboard =>
+            entry.kind === "private-keyboard" &&
+            entry.userId === creator.telegramUserId,
+        )
+        .at(-1),
+      "Expected pairing prompt",
+    );
+    expect(pairPrompt.text).toBe("Выберите распределение пар:");
 
     await components.configurationStage.applyConfigStep(
       game.id,
-      actors[0].telegramUserId,
+      creator.telegramUserId,
       "pair",
       "RANDOM",
     );
@@ -87,26 +105,33 @@ describe("configuration stage service", () => {
       components.game.createActor(2),
       components.game.createActor(3),
     ];
+    const creator = mustGetAt(
+      actors,
+      0,
+      "Expected reverse configuration creator",
+    );
+    const secondActor = mustGetAt(actors, 1, "Expected second reverse actor");
+    const thirdActor = mustGetAt(actors, 2, "Expected third reverse actor");
 
-    await components.game.service.startGame(chatId, actors[0]);
-    await components.game.service.joinGame(chatId, actors[1]);
-    await components.game.service.joinGame(chatId, actors[2]);
+    await components.game.service.startGame(chatId, creator);
+    await components.game.service.joinGame(chatId, secondActor);
+    await components.game.service.joinGame(chatId, thirdActor);
     await components.game.service.beginConfiguration(
       chatId,
-      actors[0].telegramUserId,
+      creator.telegramUserId,
     );
 
     const game = components.game.getGameByChat(chatId);
 
     await components.configurationStage.applyConfigStep(
       game.id,
-      actors[0].telegramUserId,
+      creator.telegramUserId,
       "mode",
       "REVERSE",
     );
     await components.configurationStage.applyConfigStep(
       game.id,
-      actors[0].telegramUserId,
+      creator.telegramUserId,
       "play",
       "OFFLINE",
     );

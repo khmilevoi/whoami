@@ -8,6 +8,7 @@ import {
   LobbyLimits,
   PendingVote,
   PlayerIdentity,
+  PlayerProgress,
   PlayerState,
   StartGameInput,
   VoteDecision,
@@ -424,11 +425,11 @@ export class GameEngine {
       return new appErrors.NotPlayersTurnError();
     }
 
-    game.progress[asker].questionsAsked += 1;
-    game.progress[asker].roundsUsed = Math.max(
-      game.progress[asker].roundsUsed,
-      round,
-    );
+    const askerProgress = this.mustGetProgress(game, asker);
+    if (askerProgress instanceof Error) return askerProgress;
+
+    askerProgress.questionsAsked += 1;
+    askerProgress.roundsUsed = Math.max(askerProgress.roundsUsed, round);
 
     if (game.config.mode === "NORMAL") {
       const eligible = this.getNormalEligibleVoters(game, asker);
@@ -525,12 +526,12 @@ export class GameEngine {
         return this.touch(game, input.now);
       }
 
+      const progress = this.mustGetProgress(game, input.playerId);
+      if (progress instanceof Error) return progress;
+
       player.stage = "GAVE_UP";
-      game.progress[input.playerId].gaveUpAtRound = round;
-      game.progress[input.playerId].roundsUsed = Math.max(
-        game.progress[input.playerId].roundsUsed,
-        round,
-      );
+      progress.gaveUpAtRound = round;
+      progress.roundsUsed = Math.max(progress.roundsUsed, round);
 
       game.turns.push({
         id: input.turnRecordId,
@@ -564,7 +565,9 @@ export class GameEngine {
       return this.touch(game, input.now);
     }
 
-    const progress = game.progress[input.playerId];
+    const progress = this.mustGetProgress(game, input.playerId);
+    if (progress instanceof Error) return progress;
+
     if (progress.reverseGiveUpsByTarget.includes(targetId)) {
       return this.touch(game, input.now);
     }
@@ -620,12 +623,12 @@ export class GameEngine {
       const player = this.mustGetPlayer(game, pending.askerPlayerId);
       if (player instanceof Error) return player;
 
+      const progress = this.mustGetProgress(game, pending.askerPlayerId);
+      if (progress instanceof Error) return progress;
+
       player.stage = "GUESSED";
-      game.progress[pending.askerPlayerId].guessedAtRound = pending.round;
-      game.progress[pending.askerPlayerId].roundsUsed = Math.max(
-        game.progress[pending.askerPlayerId].roundsUsed,
-        pending.round,
-      );
+      progress.guessedAtRound = pending.round;
+      progress.roundsUsed = Math.max(progress.roundsUsed, pending.round);
       const advanceError = this.advanceNormalTurn(game);
       if (advanceError instanceof Error) return advanceError;
     } else if (outcome === "NO") {
@@ -639,6 +642,8 @@ export class GameEngine {
       if (result instanceof Error) return result;
       game.result = result;
     }
+
+    return;
   }
 
   private resolveReverseVote(
@@ -709,6 +714,8 @@ export class GameEngine {
       if (result instanceof Error) return result;
       game.result = result;
     }
+
+    return;
   }
 
   private resolveCurrentAsker(game: GameState) {
@@ -725,6 +732,10 @@ export class GameEngine {
       let guard = 0;
       while (guard < game.inProgress.turnOrder.length + 1) {
         const playerId = game.inProgress.turnOrder[game.inProgress.turnCursor];
+        if (!playerId) {
+          return new appErrors.UnableToResolveCurrentAskerError();
+        }
+
         if (active.has(playerId)) {
           return playerId;
         }
@@ -784,6 +795,10 @@ export class GameEngine {
       }
 
       const candidate = turnOrder[next];
+      if (!candidate) {
+        return new appErrors.UnableToResolveCurrentAskerError();
+      }
+
       const player = this.mustGetPlayer(game, candidate);
       if (player instanceof Error) return player;
       if (!terminalPlayerStages.has(player.stage)) {
@@ -792,6 +807,8 @@ export class GameEngine {
 
       iterations += 1;
     }
+
+    return;
   }
 
   private getReverseGuessers(
@@ -801,12 +818,12 @@ export class GameEngine {
     return game.players
       .map((player) => player.id)
       .filter((playerId) => playerId !== targetPlayerId)
-      .filter(
-        (playerId) =>
-          !game.progress[playerId].reverseGiveUpsByTarget.includes(
-            targetPlayerId,
-          ),
-      );
+      .filter((playerId) => {
+        const progress = game.progress[playerId];
+        return progress
+          ? !progress.reverseGiveUpsByTarget.includes(targetPlayerId)
+          : false;
+      });
   }
 
   private rebuildReverseTurnOrder(
@@ -877,6 +894,10 @@ export class GameEngine {
     while (checked < ids.length) {
       nextCursor = (nextCursor + 1) % ids.length;
       const candidate = ids[nextCursor];
+      if (candidate === undefined) {
+        break;
+      }
+
       if (!game.words[candidate]?.solved) {
         game.inProgress.targetCursor = nextCursor;
         game.inProgress.currentTargetPlayerId = candidate;
@@ -928,6 +949,8 @@ export class GameEngine {
     if (game.stage !== "PREPARE_WORDS" && game.stage !== "READY_WAIT") {
       return new appErrors.WordActionsNotAvailableInCurrentStageError();
     }
+
+    return;
   }
 
   private mustBeStage(game: GameState, stage: GameState["stage"]) {
@@ -937,6 +960,8 @@ export class GameEngine {
         actualStage: game.stage,
       });
     }
+
+    return;
   }
 
   private mustGetPlayer(game: GameState, playerId: string) {
@@ -945,6 +970,18 @@ export class GameEngine {
       return new appErrors.PlayerNotFoundError();
     }
     return player;
+  }
+
+  private mustGetProgress(
+    game: GameState,
+    playerId: string,
+  ): PlayerProgress | appErrors.PlayerNotFoundError {
+    const progress = game.progress[playerId];
+    if (!progress) {
+      return new appErrors.PlayerNotFoundError();
+    }
+
+    return progress;
   }
 
   private mustGetWordEntry(game: GameState, playerId: string) {

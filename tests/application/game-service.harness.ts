@@ -1,4 +1,5 @@
 import { GameService } from "../../src/application/game-service.js";
+import { mustBeDefined, mustGetAt } from "../support/strict-helpers.js";
 import { TextService } from "../../src/application/text-service.js";
 import { GameEngine } from "../../src/domain/game-engine.js";
 import {
@@ -208,18 +209,20 @@ export const createGameServiceHarness = (
     chatId: string,
     actors: TestActor[],
   ): Promise<GameState> => {
-    await service.startGame(chatId, actors[0]);
+    const creator = mustGetAt(actors, 0, "Expected normal flow creator");
+
+    await service.startGame(chatId, creator);
 
     for (const actor of actors.slice(1)) {
       await service.joinGame(chatId, actor);
     }
 
-    await service.beginConfiguration(chatId, actors[0].telegramUserId);
+    await service.beginConfiguration(chatId, creator.telegramUserId);
 
     const gameAfterBegin = getGameByChat(chatId);
     await configureGame(
       gameAfterBegin.id,
-      actors[0].telegramUserId,
+      creator.telegramUserId,
       "NORMAL",
       "ONLINE",
       "RANDOM",
@@ -242,18 +245,20 @@ export const createGameServiceHarness = (
     chatId: string,
     actors: TestActor[],
   ): Promise<GameState> => {
-    await service.startGame(chatId, actors[0]);
+    const creator = mustGetAt(actors, 0, "Expected reverse flow creator");
+
+    await service.startGame(chatId, creator);
 
     for (const actor of actors.slice(1)) {
       await service.joinGame(chatId, actor);
     }
 
-    await service.beginConfiguration(chatId, actors[0].telegramUserId);
+    await service.beginConfiguration(chatId, creator.telegramUserId);
 
     const gameAfterBegin = getGameByChat(chatId);
     await configureGame(
       gameAfterBegin.id,
-      actors[0].telegramUserId,
+      creator.telegramUserId,
       "REVERSE",
       "OFFLINE",
     );
@@ -282,10 +287,10 @@ export const createGameServiceHarness = (
     }
 
     for (const voterPlayerId of pending.eligibleVoterIds) {
-      const voter = game.players.find((player) => player.id === voterPlayerId);
-      if (!voter) {
-        throw new Error(`Player ${voterPlayerId} not found`);
-      }
+      const voter = mustBeDefined(
+        game.players.find((player) => player.id === voterPlayerId),
+        `Player ${voterPlayerId} not found`,
+      );
 
       const decision = decisionByPlayerId[voterPlayerId] ?? "NO";
       await service.handleVote(gameId, voter.telegramUserId, decision);

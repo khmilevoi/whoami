@@ -1,21 +1,39 @@
 import { describe, expect, it, vi } from "vitest";
+import type { GameModeService } from "../../src/application/modes/game-mode-service.js";
+import type { ConfigurationStageService } from "../../src/application/stages/configuration-stage-service.js";
+import type { NormalPairingStageService } from "../../src/application/stages/normal-pairing-stage-service.js";
+import type { WordPreparationStageService } from "../../src/application/stages/word-preparation-stage-service.js";
 import { createGameServiceHarness } from "./game-service.harness.js";
+import { mustGetAt } from "../support/strict-helpers.js";
+
+type FacadeInternals = {
+  configurationStage: Pick<ConfigurationStageService, "applyConfigStep">;
+  normalPairingStage: Pick<NormalPairingStageService, "applyManualPair">;
+  wordPreparationStage: Pick<
+    WordPreparationStageService,
+    "handlePrivateText" | "handleWordCallback"
+  >;
+  modeServices: Map<"NORMAL", GameModeService>;
+};
 
 describe("game service facade", () => {
   it("delegates stage-specific methods to extracted stage services", async () => {
     const harness = createGameServiceHarness();
-    const service = harness.service as any;
+    const service = harness.service as unknown as FacadeInternals;
 
     const configurationStage = {
       applyConfigStep: vi.fn().mockResolvedValue(undefined),
-    };
+    } satisfies Pick<ConfigurationStageService, "applyConfigStep">;
     const normalPairingStage = {
       applyManualPair: vi.fn().mockResolvedValue(undefined),
-    };
+    } satisfies Pick<NormalPairingStageService, "applyManualPair">;
     const wordPreparationStage = {
       handlePrivateText: vi.fn().mockResolvedValue(undefined),
       handleWordCallback: vi.fn().mockResolvedValue(undefined),
-    };
+    } satisfies Pick<
+      WordPreparationStageService,
+      "handlePrivateText" | "handleWordCallback"
+    >;
 
     service.configurationStage = configurationStage;
     service.normalPairingStage = normalPairingStage;
@@ -56,12 +74,14 @@ describe("game service facade", () => {
 
   it("routes gameplay methods by configured mode", async () => {
     const harness = createGameServiceHarness();
+    const service = harness.service as unknown as FacadeInternals;
     const chatId = "chat-facade-routing";
     const actors = [
       harness.createActor(1),
       harness.createActor(2),
       harness.createActor(3),
     ];
+    const firstActor = mustGetAt(actors, 0, "Expected first facade actor");
     const started = await harness.setupNormalOnlineRandomInProgress(
       chatId,
       actors,
@@ -76,42 +96,40 @@ describe("game service facade", () => {
       announceCurrentTurn: vi.fn().mockResolvedValue(undefined),
       beforeFirstTurn: vi.fn().mockResolvedValue(undefined),
       sendFinalSummary: vi.fn().mockResolvedValue(undefined),
-    };
+    } satisfies GameModeService;
 
-    (harness.service as any).modeServices = new Map([
-      ["NORMAL", normalModeService],
-    ]);
+    service.modeServices = new Map([["NORMAL", normalModeService]]);
 
     await harness.service.handleGroupText(
       chatId,
-      actors[0].telegramUserId,
+      firstActor.telegramUserId,
       "question",
     );
-    await harness.service.askOffline(chatId, actors[0].telegramUserId);
+    await harness.service.askOffline(chatId, firstActor.telegramUserId);
     await harness.service.handleVote(
       started.id,
-      actors[0].telegramUserId,
+      firstActor.telegramUserId,
       "NO",
     );
-    await harness.service.giveUp(chatId, actors[0].telegramUserId);
+    await harness.service.giveUp(chatId, firstActor.telegramUserId);
 
     expect(normalModeService.handleGroupText).toHaveBeenCalledWith(
       chatId,
-      actors[0].telegramUserId,
+      firstActor.telegramUserId,
       "question",
     );
     expect(normalModeService.askOffline).toHaveBeenCalledWith(
       chatId,
-      actors[0].telegramUserId,
+      firstActor.telegramUserId,
     );
     expect(normalModeService.handleVote).toHaveBeenCalledWith(
       started.id,
-      actors[0].telegramUserId,
+      firstActor.telegramUserId,
       "NO",
     );
     expect(normalModeService.giveUp).toHaveBeenCalledWith(
       chatId,
-      actors[0].telegramUserId,
+      firstActor.telegramUserId,
     );
   });
 });

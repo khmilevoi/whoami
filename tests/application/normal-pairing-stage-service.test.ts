@@ -5,6 +5,7 @@ import {
   SentPrivateMessage,
 } from "../mocks/fake-notifier.js";
 import { TextService } from "../../src/application/text-service.js";
+import { mustBeDefined, mustGetAt } from "../support/strict-helpers.js";
 
 const MANUAL_PAIR_PROMPT_TEXT = new TextService("ru").manualPairPrompt();
 
@@ -28,58 +29,71 @@ describe("normal pairing stage service", () => {
       components.game.createActor(3),
       components.game.createActor(4),
     ];
+    const actor1 = mustGetAt(actors, 0, "Expected first manual pairing actor");
+    const actor2 = mustGetAt(actors, 1, "Expected second manual pairing actor");
+    const actor3 = mustGetAt(actors, 2, "Expected third manual pairing actor");
+    const actor4 = mustGetAt(actors, 3, "Expected fourth manual pairing actor");
 
-    await components.game.service.startGame(chatId, actors[0]);
+    await components.game.service.startGame(chatId, actor1);
     for (const actor of actors.slice(1)) {
       await components.game.service.joinGame(chatId, actor);
     }
     await components.game.service.beginConfiguration(
       chatId,
-      actors[0].telegramUserId,
+      actor1.telegramUserId,
     );
 
     const game = components.game.getGameByChat(chatId);
     await components.configurationStage.applyConfigStep(
       game.id,
-      actors[0].telegramUserId,
+      actor1.telegramUserId,
       "mode",
       "NORMAL",
     );
     await components.configurationStage.applyConfigStep(
       game.id,
-      actors[0].telegramUserId,
+      actor1.telegramUserId,
       "play",
       "ONLINE",
     );
     await components.configurationStage.applyConfigStep(
       game.id,
-      actors[0].telegramUserId,
+      actor1.telegramUserId,
       "pair",
       "MANUAL",
     );
 
     const players = components.game.getGameById(game.id).players;
-    const player1 = players.find(
-      (player) => player.telegramUserId === actors[0].telegramUserId,
-    )!;
-    const player2 = players.find(
-      (player) => player.telegramUserId === actors[1].telegramUserId,
-    )!;
-    const player3 = players.find(
-      (player) => player.telegramUserId === actors[2].telegramUserId,
-    )!;
-    const player4 = players.find(
-      (player) => player.telegramUserId === actors[3].telegramUserId,
-    )!;
+    const player1 = mustBeDefined(
+      players.find((player) => player.telegramUserId === actor1.telegramUserId),
+      "Expected first player",
+    );
+    const player2 = mustBeDefined(
+      players.find((player) => player.telegramUserId === actor2.telegramUserId),
+      "Expected second player",
+    );
+    const player3 = mustBeDefined(
+      players.find((player) => player.telegramUserId === actor3.telegramUserId),
+      "Expected third player",
+    );
+    const player4 = mustBeDefined(
+      players.find((player) => player.telegramUserId === actor4.telegramUserId),
+      "Expected fourth player",
+    );
 
     const prompts = components.game.notifier.sent.filter(
       (entry): entry is SentPrivateKeyboard =>
         entry.kind === "private-keyboard" &&
         entry.text === MANUAL_PAIR_PROMPT_TEXT,
     );
+    const firstPrompt = mustGetAt(
+      prompts,
+      0,
+      "Expected first manual pairing prompt",
+    );
     expect(prompts).toHaveLength(1);
-    expect(prompts[0]?.userId).toBe(player1.telegramUserId);
-    expect(extractPairTargetIds(prompts[0].buttons, game.id)).not.toContain(
+    expect(firstPrompt.userId).toBe(player1.telegramUserId);
+    expect(extractPairTargetIds(firstPrompt.buttons, game.id)).not.toContain(
       player1.id,
     );
 
@@ -132,43 +146,47 @@ describe("normal pairing stage service", () => {
       components.game.createActor(3),
       components.game.createActor(4),
     ];
+    const actor1 = mustGetAt(actors, 0, "Expected first recovery actor");
+    const actor2 = mustGetAt(actors, 1, "Expected second recovery actor");
 
-    await components.game.service.startGame(chatId, actors[0]);
+    await components.game.service.startGame(chatId, actor1);
     for (const actor of actors.slice(1)) {
       await components.game.service.joinGame(chatId, actor);
     }
     await components.game.service.beginConfiguration(
       chatId,
-      actors[0].telegramUserId,
+      actor1.telegramUserId,
     );
 
     const game = components.game.getGameByChat(chatId);
     await components.configurationStage.applyConfigStep(
       game.id,
-      actors[0].telegramUserId,
+      actor1.telegramUserId,
       "mode",
       "NORMAL",
     );
     await components.configurationStage.applyConfigStep(
       game.id,
-      actors[0].telegramUserId,
+      actor1.telegramUserId,
       "play",
       "ONLINE",
     );
     await components.configurationStage.applyConfigStep(
       game.id,
-      actors[0].telegramUserId,
+      actor1.telegramUserId,
       "pair",
       "MANUAL",
     );
 
     const players = components.game.getGameById(game.id).players;
-    const player1 = players.find(
-      (player) => player.telegramUserId === actors[0].telegramUserId,
-    )!;
-    const player2 = players.find(
-      (player) => player.telegramUserId === actors[1].telegramUserId,
-    )!;
+    const player1 = mustBeDefined(
+      players.find((player) => player.telegramUserId === actor1.telegramUserId),
+      "Expected recovery player one",
+    );
+    const player2 = mustBeDefined(
+      players.find((player) => player.telegramUserId === actor2.telegramUserId),
+      "Expected recovery player two",
+    );
 
     await components.normalPairingStage.applyManualPair(
       game.id,
@@ -184,9 +202,14 @@ describe("normal pairing stage service", () => {
         entry.kind === "private-keyboard" &&
         entry.text === MANUAL_PAIR_PROMPT_TEXT,
     );
+    const restoredPrompt = mustGetAt(
+      prompts,
+      0,
+      "Expected restored pairing prompt",
+    );
     expect(prompts).toHaveLength(1);
-    expect(prompts[0]?.userId).toBe(player2.telegramUserId);
-    expect(extractPairTargetIds(prompts[0].buttons, game.id)).not.toContain(
+    expect(restoredPrompt.userId).toBe(player2.telegramUserId);
+    expect(extractPairTargetIds(restoredPrompt.buttons, game.id)).not.toContain(
       player2.id,
     );
   });
