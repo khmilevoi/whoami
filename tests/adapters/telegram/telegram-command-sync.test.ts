@@ -333,12 +333,12 @@ describe("telegram command sync", () => {
     state.game = null;
     await sync.syncChat("-1001");
 
-    const lastSetCall =
-      api.setMyCommands.mock.calls[api.setMyCommands.mock.calls.length - 1];
-    expect(lastSetCall[0]).toEqual([
+    const lastSetCall = api.setMyCommands.mock.calls.at(-1) as unknown;
+    const [lastCommands, lastScope] = lastSetCall as [unknown, unknown];
+    expect(lastCommands).toEqual([
       expect.objectContaining({ command: "whoami_start" }),
     ]);
-    expect(lastSetCall[1]).toEqual({
+    expect(lastScope).toEqual({
       scope: {
         type: "chat",
         chat_id: -1001,
@@ -396,3 +396,4 @@ describe("telegram command sync", () => {
     });
   });
 });
+

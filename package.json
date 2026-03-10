@@ -3,11 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "prestart": "pnpm build",
-    "start": "node dist/index.js",
-    "dev": "tsx watch src/index.ts",
+    "start": "node --enable-source-maps dist/index.mjs",
+    "dev:build": "tsdown --watch",
+    "dev:start": "wait-on dist/index.mjs && node --enable-source-maps --watch dist/index.mjs",
+    "dev": "concurrently -k -n BUILD,APP \"pnpm dev:build\" \"pnpm dev:start\"",
     "lint": "eslint src/**/*.ts tests/**/*.ts",
     "lint:fix": "eslint src/**/*.ts tests/**/*.ts --fix",
     "format": "prettier --write .",
@@ -28,15 +34,18 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.6",
     "@types/node": "^25.3.5",
+    "concurrently": "^9.2.1",
     "eslint": "^10.0.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-n": "^17.24.0",
     "globals": "^17.4.0",
     "prettier": "^3.8.1",
+    "tsdown": "^0.21.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.0",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "wait-on": "^9.0.4"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

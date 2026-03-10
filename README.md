@@ -20,7 +20,20 @@ Telegram bot for "Кто я?" game.
 - `pnpm approve-builds`
 - `pnpm rebuild better-sqlite3`
 
-5. Start in dev mode: `pnpm dev`.
+5. Run type checks: `pnpm typecheck`.
+6. Start in dev mode: `pnpm dev`.
+
+## Build and Run
+
+- `pnpm build` - build the app with `tsdown` into `dist/index.mjs`
+- `pnpm start` - build first, then run `node --enable-source-maps dist/index.mjs`
+- `pnpm dev` - watch sources with `tsdown` and restart the Node process from `dist/index.mjs`
+
+## Notes on Runtime Dependencies
+
+- `tsdown` does not bundle `node_modules` in this setup.
+- `better-sqlite3` must remain installed on the runtime machine.
+- If native bindings are missing, `pnpm approve-builds` and `pnpm rebuild better-sqlite3` are still the recovery path.
 
 ## Commands
 

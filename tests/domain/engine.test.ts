@@ -8,9 +8,9 @@ import { GameState } from "../../src/domain/types.js";
 
 const engine = new GameEngine();
 
-const unwrap = <T, E extends GameEngineError>(result: T | E): T => {
+const unwrap = <T>(result: T): Exclude<T, GameEngineError> => {
   expect(result).not.toBeInstanceOf(Error);
-  return result as T;
+  return result as Exclude<T, GameEngineError>;
 };
 
 describe("game engine", () => {
@@ -271,3 +271,4 @@ describe("game engine", () => {
     expect(game.result).toBeDefined();
   });
 });
+
