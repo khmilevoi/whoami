@@ -116,45 +116,6 @@ export class ReverseModeService extends BaseGameModeService {
     });
     if (updated instanceof Error) return updated;
 
-    const pending = updated.inProgress.pendingVote;
-    if (!pending?.targetWordOwnerId) {
-      return;
-    }
-
-    const target = updated.players.find(
-      (player) => player.id === pending.targetWordOwnerId,
-    );
-    if (!target) {
-      return;
-    }
-
-    const sentVote = await this.context.notifier.sendGroupKeyboard(
-      updated.chatId,
-      this.context.texts.reverseVotePrompt(
-        this.context.playerLabel(updated, pending.askerPlayerId),
-        this.context.playerLabel(updated, target.id),
-      ),
-      [
-        [
-          {
-            kind: "callback",
-            text: this.context.texts.voteDecisionButton("YES"),
-            data: `vote:YES:${updated.id}`,
-          },
-          {
-            kind: "callback",
-            text: this.context.texts.voteDecisionButton("NO"),
-            data: `vote:NO:${updated.id}`,
-          },
-          {
-            kind: "callback",
-            text: this.context.texts.voteDecisionButton("GUESSED"),
-            data: `vote:GUESSED:${updated.id}`,
-            style: "success",
-          },
-        ],
-      ],
-    );
-    if (sentVote instanceof Error) return sentVote;
+    return this.context.publishGameStatus(updated);
   }
 }

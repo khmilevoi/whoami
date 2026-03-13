@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { TelegramCommandSync } from "../../../src/adapters/telegram/telegram-command-sync.js";
 import { createBotCommands } from "../../../src/application/bot-commands.js";
+import { InMemoryGameStatusService } from "../../../src/application/game-status-service.js";
 import { ChatCommandResolver } from "../../../src/application/chat-command-resolver.js";
-import { GameQueryService } from "../../../src/application/game-query-service.js";
 import { LoggerPort } from "../../../src/application/ports.js";
 import { TextService } from "../../../src/application/text-service.js";
 import { GameState } from "../../../src/domain/types.js";
+import { FakeGameRepository } from "../../mocks/fake-game-repository.js";
 
 const createInProgressGame = (): GameState => ({
   id: "g1",
@@ -77,38 +78,37 @@ const createLogger = (): LoggerPort => ({
   error: vi.fn(),
 });
 
-const createQueryServiceStub = (state: {
-  game: GameState | null;
-  knownChatIds?: string[];
-  knownUserIdsByChatId?: Record<string, string[]>;
-}) =>
-  ({
-    findActiveGameByChatId: (chatId: string) =>
-      state.game && state.game.chatId === chatId ? state.game : null,
-    listActiveChatIdsByTelegramUser: () => [],
-    listActiveChatIds: () => [],
-    listKnownChatIds: () => state.knownChatIds ?? [],
-    listKnownTelegramUserIdsByChatId: (chatId: string) =>
-      state.knownUserIdsByChatId?.[chatId] ?? [],
-  }) as unknown as GameQueryService;
+const createSyncHarness = (game: GameState | null) => {
+  const api = {
+    setMyCommands: vi.fn(async () => true),
+    deleteMyCommands: vi.fn(async () => true),
+  };
+  const repository = new FakeGameRepository();
+  const logger = createLogger();
+  const statusService = new InMemoryGameStatusService(repository, logger);
+  if (game) {
+    repository.create(game);
+    statusService.publish(game);
+  }
+
+  const sync = new TelegramCommandSync(
+    api,
+    repository,
+    statusService,
+    new ChatCommandResolver(texts),
+    logger,
+    texts,
+  );
+
+  return { api, repository, statusService, sync, logger };
+};
 
 const texts = new TextService("ru");
 const commands = createBotCommands(texts);
 
 describe("telegram command sync", () => {
   it("syncs default group commands for all group chats", async () => {
-    const api = {
-      setMyCommands: vi.fn(async () => true),
-      deleteMyCommands: vi.fn(async () => true),
-    };
-
-    const sync = new TelegramCommandSync(
-      api,
-      createQueryServiceStub({ game: null }),
-      new ChatCommandResolver(texts),
-      createLogger(),
-      texts,
-    );
+    const { api, sync } = createSyncHarness(null);
 
     await sync.syncGroupCommands();
 
@@ -119,18 +119,7 @@ describe("telegram command sync", () => {
   });
 
   it("syncs private commands", async () => {
-    const api = {
-      setMyCommands: vi.fn(async () => true),
-      deleteMyCommands: vi.fn(async () => true),
-    };
-
-    const sync = new TelegramCommandSync(
-      api,
-      createQueryServiceStub({ game: null }),
-      new ChatCommandResolver(texts),
-      createLogger(),
-      texts,
-    );
+    const { api, sync } = createSyncHarness(null);
 
     await sync.syncPrivateCommands();
 
@@ -141,19 +130,8 @@ describe("telegram command sync", () => {
   });
 
   it("keeps only creator cancel override during lobby", async () => {
-    const api = {
-      setMyCommands: vi.fn(async () => true),
-      deleteMyCommands: vi.fn(async () => true),
-    };
     const lobbyGame = { ...createInProgressGame(), stage: "LOBBY_OPEN" as const };
-
-    const sync = new TelegramCommandSync(
-      api,
-      createQueryServiceStub({ game: lobbyGame }),
-      new ChatCommandResolver(texts),
-      createLogger(),
-      texts,
-    );
+    const { api, sync } = createSyncHarness(lobbyGame);
 
     await sync.syncChat("-1001");
 
@@ -172,18 +150,7 @@ describe("telegram command sync", () => {
   });
 
   it("syncs only giveup during in-progress", async () => {
-    const api = {
-      setMyCommands: vi.fn(async () => true),
-      deleteMyCommands: vi.fn(async () => true),
-    };
-
-    const sync = new TelegramCommandSync(
-      api,
-      createQueryServiceStub({ game: createInProgressGame() }),
-      new ChatCommandResolver(texts),
-      createLogger(),
-      texts,
-    );
+    const { api, sync } = createSyncHarness(createInProgressGame());
 
     await sync.syncChat("-1001");
 

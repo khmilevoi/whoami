@@ -94,24 +94,7 @@ export abstract class BaseGameModeService implements GameModeService {
     });
     if (updated instanceof Error) return updated;
 
-    if (updated.inProgress.pendingVote) {
-      return;
-    }
-
-    const lastTurn = updated.turns[updated.turns.length - 1];
-    if (lastTurn) {
-      const sentSummary = await this.context.notifier.sendGroupMessage(
-        updated.chatId,
-        this.context.texts.voteSummary(lastTurn.outcome),
-      );
-      if (sentSummary instanceof Error) return sentSummary;
-    }
-
-    if (updated.stage === "FINISHED") {
-      return this.sendFinalSummary(updated);
-    }
-
-    return this.announceCurrentTurn(updated);
+    return this.context.publishGameStatus(updated);
   }
 
   async giveUp(
@@ -154,22 +137,10 @@ export abstract class BaseGameModeService implements GameModeService {
     });
     if (updated instanceof Error) return updated;
 
-    const sentGiveUp = await this.context.notifier.sendGroupMessage(
-      chatId,
-      this.context.texts.playerGaveUp(player.displayName),
-    );
-    if (sentGiveUp instanceof Error) return sentGiveUp;
-
-    if (updated.stage === "FINISHED") {
-      return this.sendFinalSummary(updated);
-    }
-
-    return this.announceCurrentTurn(updated);
+    return this.context.publishGameStatus(updated);
   }
 
-  abstract announceCurrentTurn(
-    game: GameState,
-  ): Promise<void | NotificationError>;
+  abstract announceCurrentTurn(game: GameState): Promise<void | NotificationError>;
   abstract beforeFirstTurn(game: GameState): Promise<void>;
   abstract sendFinalSummary(game: GameState): Promise<void | NotificationError>;
 
@@ -179,3 +150,4 @@ export abstract class BaseGameModeService implements GameModeService {
     questionText?: string,
   ): Promise<void | StartQuestionError>;
 }
+

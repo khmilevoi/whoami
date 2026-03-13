@@ -2,12 +2,19 @@ import * as errore from "errore";
 import * as appErrors from "./domain/errors.js";
 import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync.js";
 import { GameService } from "./application/game-service.js";
+import {
+  GameStatusService,
+  GameStatusSubscriber,
+} from "./application/game-status-service.js";
 import type { RecoveryStartupError } from "./application/errors.js";
 import { LoggerPort } from "./application/ports.js";
 
 interface StartupDependencies {
   commandSync: TelegramCommandSync;
   gameService: GameService;
+  statusService: GameStatusService;
+  pregameUiSubscriber: GameStatusSubscriber;
+  gameFlowSubscriber: GameStatusSubscriber;
   logger: LoggerPort;
 }
 
@@ -71,11 +78,38 @@ const runRecoveryTask = async (
   }
 };
 
+const runStatusTask = async (
+  task: string,
+  action: () => void | Error,
+  logger: LoggerPort,
+): Promise<void> => {
+  const result = await Promise.resolve()
+    .then(action)
+    .catch((cause) => new appErrors.StartupTaskError({ task, cause }));
+  if (!(result instanceof Error)) {
+    return;
+  }
+
+  logStartupError(
+    logger,
+    result instanceof appErrors.StartupTaskError
+      ? result
+      : new appErrors.StartupTaskError({ task, cause: result }),
+  );
+};
+
 export const runStartupTasks = async ({
   commandSync,
   gameService,
+  statusService,
+  pregameUiSubscriber,
+  gameFlowSubscriber,
   logger,
 }: StartupDependencies): Promise<void> => {
+  statusService.subscribe(commandSync);
+  statusService.subscribe(pregameUiSubscriber);
+  statusService.subscribe(gameFlowSubscriber);
+
   await runCommandSyncTask(
     "syncPrivateCommands",
     () => commandSync.syncPrivateCommands(),
@@ -84,6 +118,11 @@ export const runStartupTasks = async ({
   await runCommandSyncTask(
     "syncGroupCommands",
     () => commandSync.syncGroupCommands(),
+    logger,
+  );
+  await runStatusTask(
+    "rebuildFromRepository",
+    () => statusService.rebuildFromRepository(),
     logger,
   );
   await runCommandSyncTask(

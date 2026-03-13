@@ -1,4 +1,10 @@
 import { GameService } from "../../src/application/game-service.js";
+import { GameServiceContext } from "../../src/application/game-service-context.js";
+import { InMemoryGameStatusService } from "../../src/application/game-status-service.js";
+import { PregameUiStatusSubscriber } from "../../src/application/pregame-ui-status-subscriber.js";
+import { ConfigDraftStore } from "../../src/application/stores/config-draft-store.js";
+import { PrivateExpectationStore } from "../../src/application/stores/private-expectation-store.js";
+import { PregameUiStateStore } from "../../src/application/stores/pregame-ui-state-store.js";
 import { TextService } from "../../src/application/text-service.js";
 import { GameEngine } from "../../src/domain/game-engine.js";
 import {
@@ -66,6 +72,7 @@ export interface GameServiceHarness {
   readonly idPort: FakeIdPort;
   readonly clock: FakeClock;
   readonly logger: FakeLogger;
+  readonly statusService: InMemoryGameStatusService;
   readonly limits: { minPlayers: number; maxPlayers: number };
   createActor: (index: number) => TestActor;
   createActors: (count: number, startIndex?: number) => TestActor[];
@@ -161,6 +168,24 @@ export const createGameServiceHarness = (
     options.clockStepMs ?? 1000,
   );
   const logger = new FakeLogger();
+  const statusService = new InMemoryGameStatusService(repository, logger);
+  const configDraftStore = new ConfigDraftStore();
+  const expectationStore = new PrivateExpectationStore();
+  const uiStateStore = new PregameUiStateStore();
+
+  const context = new GameServiceContext({
+    engine,
+    repository,
+    transactionRunner,
+    notifier,
+    identity,
+    idPort,
+    clock,
+    logger,
+    texts,
+    limits,
+    statusService,
+  });
 
   const service = new GameService(
     engine,
@@ -173,6 +198,18 @@ export const createGameServiceHarness = (
     logger,
     texts,
     limits,
+    statusService,
+    configDraftStore,
+    expectationStore,
+  );
+
+  statusService.subscribe(
+    new PregameUiStatusSubscriber(
+      context,
+      configDraftStore,
+      expectationStore,
+      uiStateStore,
+    ),
   );
 
   const createActors = (count: number, startIndex = 1): TestActor[] =>
@@ -474,6 +511,7 @@ export const createGameServiceHarness = (
     idPort,
     clock,
     logger,
+    statusService,
     limits,
     createActor,
     createActors,
@@ -494,3 +532,12 @@ export const createGameServiceHarness = (
     setupReverseOfflineInProgress,
   };
 };
+
+
+
+
+
+
+
+
+

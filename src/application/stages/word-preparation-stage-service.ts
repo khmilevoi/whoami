@@ -5,7 +5,6 @@ import type {
   WordPreparationStageError,
 } from "../errors.js";
 import { GameServiceContext } from "../game-service-context.js";
-import { PregameUiSyncService } from "../pregame-ui-sync-service.js";
 import { PrivateExpectationStore } from "../stores/private-expectation-store.js";
 import { ReadyStartStageService } from "./ready-start-stage-service.js";
 
@@ -14,7 +13,6 @@ export class WordPreparationStageService {
     private readonly context: GameServiceContext,
     private readonly expectationStore: PrivateExpectationStore,
     private readonly readyStartStage: ReadyStartStageService,
-    private readonly pregameUiSync: PregameUiSyncService,
   ) {}
 
   async handlePrivateText(
@@ -39,7 +37,7 @@ export class WordPreparationStageService {
     }
 
     if (!game.words[player.id]) {
-      return this.pregameUiSync.syncGame(game.id);
+      return this.context.publishGameStatus(game);
     }
 
     if (expected === "CLUE") {
@@ -61,7 +59,7 @@ export class WordPreparationStageService {
       if (updated instanceof Error) return updated;
 
       this.expectationStore.delete(game.id, player.id);
-      return this.pregameUiSync.syncGame(updated.id);
+      return this.context.publishGameStatus(updated);
     }
 
     const updated = this.context.transactionRunner.runInTransaction(() => {
@@ -86,7 +84,7 @@ export class WordPreparationStageService {
       return new WordEntryForPlayerMissingError();
     }
 
-    return this.pregameUiSync.syncGame(updated.id);
+    return this.context.publishGameStatus(updated);
   }
 
   async handleWordCallback(
@@ -126,13 +124,13 @@ export class WordPreparationStageService {
         this.expectationStore.set(gameId, player.id, "WORD");
       }
 
-      return this.pregameUiSync.syncGame(updated.id);
+      return this.context.publishGameStatus(updated);
     }
 
     if (action === "clue") {
       if (value === "YES") {
         this.expectationStore.set(gameId, player.id, "CLUE");
-        return this.pregameUiSync.syncGame(gameId);
+        return this.context.republishGameStatus(gameId);
       }
 
       const updated = this.context.transactionRunner.runInTransaction(() => {
@@ -153,7 +151,7 @@ export class WordPreparationStageService {
       if (updated instanceof Error) return updated;
 
       this.expectationStore.delete(gameId, player.id);
-      return this.pregameUiSync.syncGame(updated.id);
+      return this.context.publishGameStatus(updated);
     }
 
     const updated = this.context.transactionRunner.runInTransaction(() => {
@@ -175,14 +173,11 @@ export class WordPreparationStageService {
 
     if (value === "NO") {
       this.expectationStore.set(gameId, player.id, "WORD");
-      const syncResult = await this.pregameUiSync.syncGame(updated.id);
-      if (syncResult instanceof Error) return syncResult;
-      return;
+      return this.context.publishGameStatus(updated);
     }
 
     this.expectationStore.delete(gameId, player.id);
-    const syncResult = await this.pregameUiSync.syncGame(updated.id);
-    if (syncResult instanceof Error) return syncResult;
+    this.context.publishGameStatus(updated);
     return this.readyStartStage.tryStartGame(updated.id);
   }
 
@@ -193,6 +188,7 @@ export class WordPreparationStageService {
       this.expectationStore.set(game.id, player.id, "WORD");
     }
 
-    return this.pregameUiSync.syncGame(game.id);
+    return this.context.publishGameStatus(game);
   }
 }
+

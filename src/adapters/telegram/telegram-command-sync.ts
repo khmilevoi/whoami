@@ -4,8 +4,13 @@ import {
   createBotCommands,
 } from "../../application/bot-commands.js";
 import { ChatCommandResolver } from "../../application/chat-command-resolver.js";
-import { GameQueryService } from "../../application/game-query-service.js";
-import { LoggerPort } from "../../application/ports.js";
+import {
+  GameStatusService,
+  GameStatusSnapshot,
+  GameStatusSubscriber,
+  GameStatusTransition,
+} from "../../application/game-status-service.js";
+import { GameRepository, LoggerPort } from "../../application/ports.js";
 import { TextService } from "../../application/text-service.js";
 
 type TelegramScope =
@@ -67,14 +72,15 @@ const scopeLabel = (scope: TelegramScope): string => {
 const commandsSignature = (commands: readonly BotCommandDef[]): string =>
   JSON.stringify(commands);
 
-export class TelegramCommandSync {
+export class TelegramCommandSync implements GameStatusSubscriber {
   private readonly appliedScopeCommands = new Map<string, string>();
   private readonly appliedChatMembers = new Map<string, Set<string>>();
   private readonly commands;
 
   constructor(
     private readonly api: TelegramCommandsApi,
-    private readonly queryService: GameQueryService,
+    private readonly repository: GameRepository,
+    private readonly statusService: GameStatusService,
     private readonly resolver: ChatCommandResolver,
     private readonly logger: LoggerPort,
     texts: TextService,
@@ -82,8 +88,15 @@ export class TelegramCommandSync {
     this.commands = createBotCommands(texts);
   }
 
-  listActiveChatIdsByTelegramUser(telegramUserId: string): string[] {
-    return this.queryService.listActiveChatIdsByTelegramUser(telegramUserId);
+  async onGameStatusChanged(
+    transition: GameStatusTransition,
+  ): Promise<void | Error> {
+    const chatId = transition.current?.chatId ?? transition.previous?.chatId;
+    if (!chatId) {
+      return;
+    }
+
+    return this.syncChat(chatId);
   }
 
   async syncPrivateCommands(): Promise<void | appErrors.CommandSyncAppError> {
@@ -102,18 +115,8 @@ export class TelegramCommandSync {
     );
   }
 
-  async syncActiveChats(): Promise<void | appErrors.CommandSyncAppError> {
-    return this.syncChats(this.queryService.listActiveChatIds());
-  }
-
   async syncKnownChats(): Promise<void | appErrors.CommandSyncAppError> {
-    return this.syncChats(this.queryService.listKnownChatIds());
-  }
-
-  async syncChats(
-    chatIds: Iterable<string>,
-  ): Promise<void | appErrors.CommandSyncAppError> {
-    for (const chatId of chatIds) {
+    for (const chatId of this.repository.listKnownChatIds()) {
       const result = await this.syncChat(chatId);
       if (result instanceof Error) return result;
     }
@@ -122,8 +125,8 @@ export class TelegramCommandSync {
   async syncChat(
     chatId: string,
   ): Promise<void | appErrors.CommandSyncAppError> {
-    const game = this.queryService.findActiveGameByChatId(chatId);
-    const resolution = this.resolver.resolve(game);
+    const snapshot = this.statusService.getByChatId(chatId);
+    const resolution = this.resolver.resolve(snapshot);
 
     const chatScopeResult = await this.applyScope(
       {
@@ -166,10 +169,10 @@ export class TelegramCommandSync {
     );
 
     const cleanupCandidates = new Set(previousMembers);
-    const forceDeleteStaleMemberScopes = game === null;
+    const forceDeleteStaleMemberScopes = snapshot === null || !snapshot.hasActiveGame;
 
     if (forceDeleteStaleMemberScopes) {
-      for (const telegramUserId of this.queryService.listKnownTelegramUserIdsByChatId(
+      for (const telegramUserId of this.repository.listKnownTelegramUserIdsByChatId(
         chatId,
       )) {
         cleanupCandidates.add(telegramUserId);
@@ -212,9 +215,10 @@ export class TelegramCommandSync {
 
     if (nextMembers.size > 0) {
       this.appliedChatMembers.set(chatId, nextMembers);
-    } else {
-      this.appliedChatMembers.delete(chatId);
+      return;
     }
+
+    this.appliedChatMembers.delete(chatId);
   }
 
   private async applyScope(

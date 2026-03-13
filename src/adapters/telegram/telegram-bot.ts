@@ -39,66 +39,6 @@ const safeToast = async (ctx: Context, text: string): Promise<void> => {
   });
 };
 
-const syncChatsSafely = async (
-  commandSync: TelegramCommandSync | undefined,
-  logger: LoggerPort,
-  chatIds: Set<string>,
-): Promise<void> => {
-  if (!commandSync || chatIds.size === 0) {
-    return;
-  }
-
-  for (const chatId of chatIds) {
-    const result = await commandSync.syncChat(chatId);
-    if (result instanceof Error) {
-      logger.warn("commands_sync_failed_non_blocking", {
-        chatId,
-        reason: result.message,
-      });
-    }
-  }
-};
-
-const createSyncFinalizer = (
-  ctx: Context,
-  logger: LoggerPort,
-  commandSync: TelegramCommandSync | undefined,
-  actorTelegramUserId?: string,
-): (() => Promise<void>) => {
-  const beforeUserChats =
-    commandSync && actorTelegramUserId
-      ? new Set(
-          commandSync.listActiveChatIdsByTelegramUser(actorTelegramUserId),
-        )
-      : null;
-
-  return async () => {
-    if (!commandSync) {
-      return;
-    }
-
-    const affectedChats = new Set<string>();
-
-    if (isGroupChat(ctx)) {
-      affectedChats.add(String(ctx.chat!.id));
-    }
-
-    if (beforeUserChats && actorTelegramUserId) {
-      for (const chatId of beforeUserChats) {
-        affectedChats.add(chatId);
-      }
-
-      for (const chatId of commandSync.listActiveChatIdsByTelegramUser(
-        actorTelegramUserId,
-      )) {
-        affectedChats.add(chatId);
-      }
-    }
-
-    await syncChatsSafely(commandSync, logger, affectedChats);
-  };
-};
-
 const replyForReturnedError = async (
   ctx: Context,
   logger: LoggerPort,
@@ -166,7 +106,6 @@ const executeWithReply = async (
   logger: LoggerPort,
   texts: TextService,
   action: () => Promise<void | TelegramHandlerError>,
-  onFinally?: () => Promise<void>,
 ): Promise<void> => {
   try {
     const result = await action();
@@ -180,17 +119,6 @@ const executeWithReply = async (
     });
 
     await safeReply(ctx, texts.genericErrorRetry());
-  } finally {
-    if (onFinally) {
-      try {
-        await onFinally();
-      } catch (error) {
-        logger.error("telegram_handler_finalizer_error", {
-          error: error instanceof Error ? error.message : String(error),
-          updateId: ctx.update.update_id,
-        });
-      }
-    }
   }
 };
 
@@ -199,7 +127,6 @@ const executeWithToast = async (
   logger: LoggerPort,
   texts: TextService,
   action: () => Promise<void | TelegramHandlerError>,
-  onFinally?: () => Promise<void>,
 ): Promise<void> => {
   try {
     const result = await action();
@@ -213,17 +140,6 @@ const executeWithToast = async (
     });
 
     await safeToast(ctx, texts.genericErrorRetry());
-  } finally {
-    if (onFinally) {
-      try {
-        await onFinally();
-      } catch (error) {
-        logger.error("telegram_handler_finalizer_error", {
-          error: error instanceof Error ? error.message : String(error),
-          updateId: ctx.update.update_id,
-        });
-      }
-    }
   }
 };
 
@@ -282,7 +198,7 @@ export const registerTelegramHandlers = (
   gameService: GameService,
   logger: LoggerPort,
   texts: TextService,
-  commandSync?: TelegramCommandSync,
+  _commandSync?: TelegramCommandSync,
 ): void => {
   const resolveGroupMessageReadStatus = createGroupMessageReadStatusResolver(
     bot,
@@ -292,250 +208,181 @@ export const registerTelegramHandlers = (
   bot.use(creatorConfigMenu);
 
   bot.command("start", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(
-      ctx,
-      logger,
-      commandSync,
-      ctx.from?.id ? String(ctx.from.id) : undefined,
-    );
-    await executeWithReply(
-      ctx,
-      logger,
-      texts,
-      async () => {
-        if (!isPrivate(ctx)) {
-          return;
-        }
+    await executeWithReply(ctx, logger, texts, async () => {
+      if (!isPrivate(ctx)) {
+        return;
+      }
 
-        const payload = parseStartPayload(ctx.match);
-        if (payload instanceof Error) {
-          return payload;
-        }
+      const payload = parseStartPayload(ctx.match);
+      if (payload instanceof Error) {
+        return payload;
+      }
 
-        return gameService.handlePrivateStart(asActor(ctx), payload);
-      },
-      finalizeSync,
-    );
+      return gameService.handlePrivateStart(asActor(ctx), payload);
+    });
   });
 
   bot.command("whoami_start", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(
-      ctx,
-      logger,
-      commandSync,
-      ctx.from?.id ? String(ctx.from.id) : undefined,
-    );
-    await executeWithReply(
-      ctx,
-      logger,
-      texts,
-      async () => {
-        if (!isGroupChat(ctx)) {
-          await safeReply(ctx, texts.groupOnlyCommand());
-          return;
-        }
+    await executeWithReply(ctx, logger, texts, async () => {
+      if (!isGroupChat(ctx)) {
+        await safeReply(ctx, texts.groupOnlyCommand());
+        return;
+      }
 
-        return gameService.startGame(String(ctx.chat.id), asActor(ctx));
-      },
-      finalizeSync,
-    );
+      return gameService.startGame(String(ctx.chat.id), asActor(ctx));
+    });
   });
 
   bot.command("whoami_cancel", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(
-      ctx,
-      logger,
-      commandSync,
-      ctx.from?.id ? String(ctx.from.id) : undefined,
-    );
-    await executeWithReply(
-      ctx,
-      logger,
-      texts,
-      async () => {
-        if (!isGroupChat(ctx)) {
-          return;
-        }
+    await executeWithReply(ctx, logger, texts, async () => {
+      if (!isGroupChat(ctx)) {
+        return;
+      }
 
-        return gameService.cancel(String(ctx.chat.id), String(ctx.from!.id));
-      },
-      finalizeSync,
-    );
+      return gameService.cancel(String(ctx.chat.id), String(ctx.from!.id));
+    });
   });
 
   bot.command("giveup", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(
-      ctx,
-      logger,
-      commandSync,
-      ctx.from?.id ? String(ctx.from.id) : undefined,
-    );
-    await executeWithReply(
-      ctx,
-      logger,
-      texts,
-      async () => {
-        if (!isGroupChat(ctx)) {
-          return;
-        }
-        return gameService.giveUp(String(ctx.chat.id), String(ctx.from!.id));
-      },
-      finalizeSync,
-    );
+    await executeWithReply(ctx, logger, texts, async () => {
+      if (!isGroupChat(ctx)) {
+        return;
+      }
+      return gameService.giveUp(String(ctx.chat.id), String(ctx.from!.id));
+    });
   });
 
   bot.on("message:text", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(
-      ctx,
-      logger,
-      commandSync,
-      ctx.from?.id ? String(ctx.from.id) : undefined,
-    );
-    await executeWithReply(
-      ctx,
-      logger,
-      texts,
-      async () => {
-        const text = ctx.message.text.trim();
-        if (text.startsWith("/")) {
-          return;
-        }
-
-        if (isPrivate(ctx)) {
-          return gameService.handlePrivateText(String(ctx.from.id), text);
-        }
-        if (isGroupChat(ctx)) {
-          return gameService.handleGroupText(
-            String(ctx.chat.id),
-            String(ctx.from.id),
-            text,
-          );
-        }
-
+    await executeWithReply(ctx, logger, texts, async () => {
+      const text = ctx.message.text.trim();
+      if (text.startsWith("/")) {
         return;
-      },
-      finalizeSync,
-    );
+      }
+
+      if (isPrivate(ctx)) {
+        return gameService.handlePrivateText(String(ctx.from.id), text);
+      }
+      if (isGroupChat(ctx)) {
+        return gameService.handleGroupText(
+          String(ctx.chat.id),
+          String(ctx.from.id),
+          text,
+        );
+      }
+
+      return;
+    });
   });
 
   bot.on("callback_query:data", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(
-      ctx,
-      logger,
-      commandSync,
-      ctx.from?.id ? String(ctx.from.id) : undefined,
-    );
-    await executeWithToast(
-      ctx,
-      logger,
-      texts,
-      async () => {
-        const payload = ctx.callbackQuery.data;
-        const fromUser = String(ctx.from.id);
+    await executeWithToast(ctx, logger, texts, async () => {
+      const payload = ctx.callbackQuery.data;
+      const fromUser = String(ctx.from.id);
 
-        const parts = payload.split(":");
-        if (parts[0] === "cfg") {
-          const [, key, value, gameId] = parts;
-          if (key === "play" && value === "ONLINE") {
-            const status = await resolveGroupMessageReadStatus();
-            if (status !== "enabled") {
-              await safeToast(ctx, status === "disabled"
+      const parts = payload.split(":");
+      if (parts[0] === "cfg") {
+        const [, key, value, gameId] = parts;
+        if (key === "play" && value === "ONLINE") {
+          const status = await resolveGroupMessageReadStatus();
+          if (status !== "enabled") {
+            await safeToast(
+              ctx,
+              status === "disabled"
                 ? texts.onlineModeDisabledAlert()
-                : texts.onlineModeUnknownAlert());
-              return;
-            }
-          }
-
-          const result = await gameService.applyConfigStep(
-            gameId,
-            fromUser,
-            key as "mode" | "play" | "pair",
-            value,
-          );
-          if (result instanceof Error) return result;
-          await ctx.answerCallbackQuery();
-          return;
-        }
-
-        if (parts[0] === "ui") {
-          const [, action, gameId] = parts;
-          if (action === "config") {
-            const result = await gameService.beginConfigurationByGameId(
-              gameId,
-              fromUser,
+                : texts.onlineModeUnknownAlert(),
             );
-            if (result instanceof Error) return result;
-            await ctx.answerCallbackQuery();
-            await ctx.reply(texts.chooseGameModePrompt(), {
-              reply_markup: creatorConfigMenu,
-            });
-            return;
-          }
-
-          if (action === "open-config") {
-            await ctx.answerCallbackQuery();
-            await ctx.reply(texts.chooseGameModePrompt(), {
-              reply_markup: creatorConfigMenu,
-            });
             return;
           }
         }
 
-        if (parts[0] === "pair") {
-          const parsed = parseManualPairPayload(payload);
-          if (parsed instanceof Error) return parsed;
-
-          const result = await gameService.applyManualPair(
-            parsed.gameId,
-            fromUser,
-            parsed.targetPlayerId,
-          );
-          if (result instanceof Error) return result;
-          await ctx.answerCallbackQuery();
-          return;
-        }
-
-        if (parts[0] === "word") {
-          const [, action, value, gameId] = parts;
-          const result = await gameService.handleWordCallback(
-            gameId,
-            fromUser,
-            action as "confirm" | "clue" | "final",
-            value as "YES" | "NO",
-          );
-          if (result instanceof Error) return result;
-          await ctx.answerCallbackQuery();
-          return;
-        }
-
-        if (parts[0] === "vote") {
-          const [, value, gameId] = parts;
-          const result = await gameService.handleVote(
-            gameId,
-            fromUser,
-            value as "YES" | "NO" | "GUESSED",
-          );
-          if (result instanceof Error) return result;
-          await ctx.answerCallbackQuery();
-          return;
-        }
-
-        if (parts[0] === "ask") {
-          if (ctx.chat) {
-            const result = await gameService.askOffline(
-              String(ctx.chat.id),
-              fromUser,
-            );
-            if (result instanceof Error) return result;
-          }
-          await ctx.answerCallbackQuery();
-          return;
-        }
-
+        const result = await gameService.applyConfigStep(
+          gameId,
+          fromUser,
+          key as "mode" | "play" | "pair",
+          value,
+        );
+        if (result instanceof Error) return result;
         await ctx.answerCallbackQuery();
         return;
-      },
-      finalizeSync,
-    );
+      }
+
+      if (parts[0] === "ui") {
+        const [, action, gameId] = parts;
+        if (action === "config") {
+          const result = await gameService.beginConfigurationByGameId(
+            gameId,
+            fromUser,
+          );
+          if (result instanceof Error) return result;
+          await ctx.answerCallbackQuery();
+          await ctx.reply(texts.chooseGameModePrompt(), {
+            reply_markup: creatorConfigMenu,
+          });
+          return;
+        }
+
+        if (action === "open-config") {
+          await ctx.answerCallbackQuery();
+          await ctx.reply(texts.chooseGameModePrompt(), {
+            reply_markup: creatorConfigMenu,
+          });
+          return;
+        }
+      }
+
+      if (parts[0] === "pair") {
+        const parsed = parseManualPairPayload(payload);
+        if (parsed instanceof Error) return parsed;
+
+        const result = await gameService.applyManualPair(
+          parsed.gameId,
+          fromUser,
+          parsed.targetPlayerId,
+        );
+        if (result instanceof Error) return result;
+        await ctx.answerCallbackQuery();
+        return;
+      }
+
+      if (parts[0] === "word") {
+        const [, action, value, gameId] = parts;
+        const result = await gameService.handleWordCallback(
+          gameId,
+          fromUser,
+          action as "confirm" | "clue" | "final",
+          value as "YES" | "NO",
+        );
+        if (result instanceof Error) return result;
+        await ctx.answerCallbackQuery();
+        return;
+      }
+
+      if (parts[0] === "vote") {
+        const [, value, gameId] = parts;
+        const result = await gameService.handleVote(
+          gameId,
+          fromUser,
+          value as "YES" | "NO" | "GUESSED",
+        );
+        if (result instanceof Error) return result;
+        await ctx.answerCallbackQuery();
+        return;
+      }
+
+      if (parts[0] === "ask") {
+        if (ctx.chat) {
+          const result = await gameService.askOffline(
+            String(ctx.chat.id),
+            fromUser,
+          );
+          if (result instanceof Error) return result;
+        }
+        await ctx.answerCallbackQuery();
+        return;
+      }
+
+      await ctx.answerCallbackQuery();
+      return;
+    });
   });
 };

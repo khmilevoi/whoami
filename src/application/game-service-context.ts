@@ -11,6 +11,7 @@ import {
   TransactionRunner,
 } from "./ports.js";
 import { GameEngine } from "../domain/game-engine.js";
+import { GameStatusService } from "./game-status-service.js";
 
 export interface GameServiceDeps {
   engine: GameEngine;
@@ -23,6 +24,7 @@ export interface GameServiceDeps {
   logger: LoggerPort;
   texts: TextService;
   limits: { minPlayers: number; maxPlayers: number };
+  statusService: GameStatusService;
 }
 
 export class GameServiceContext {
@@ -68,6 +70,10 @@ export class GameServiceContext {
     return this.deps.limits;
   }
 
+  get statusService(): GameStatusService {
+    return this.deps.statusService;
+  }
+
   getGameByChatOrError(
     chatId: string,
   ): GameState | appErrors.ActiveGameNotFoundByChatError {
@@ -84,6 +90,17 @@ export class GameServiceContext {
       return new appErrors.GameNotFoundError();
     }
     return game;
+  }
+
+  republishGameStatus(gameId: string): void | appErrors.GameNotFoundError {
+    const game = this.getGameByIdOrError(gameId);
+    if (game instanceof Error) return game;
+
+    return this.statusService.publish(game);
+  }
+
+  publishGameStatus(game: GameState): void {
+    return this.statusService.publish(game);
   }
 
   findActiveGameByTelegramUser(telegramUserId: string): GameState | null {
@@ -121,3 +138,4 @@ export class GameServiceContext {
     return this.texts.voteOutcome(outcome);
   }
 }
+

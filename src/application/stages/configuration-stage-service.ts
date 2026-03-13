@@ -7,7 +7,6 @@ import {
 } from "../../domain/types.js";
 import type { ConfigurationStageError } from "../errors.js";
 import { GameServiceContext } from "../game-service-context.js";
-import { PregameUiSyncService } from "../pregame-ui-sync-service.js";
 import { ConfigDraftStore } from "../stores/config-draft-store.js";
 import { NormalPairingStageService } from "./normal-pairing-stage-service.js";
 import { WordPreparationStageService } from "./word-preparation-stage-service.js";
@@ -18,7 +17,6 @@ export class ConfigurationStageService {
     private readonly configDraftStore: ConfigDraftStore,
     private readonly normalPairingStage: NormalPairingStageService,
     private readonly wordPreparationStage: WordPreparationStageService,
-    private readonly pregameUiSync: PregameUiSyncService,
   ) {}
 
   async applyConfigStep(
@@ -56,11 +54,11 @@ export class ConfigurationStageService {
     this.configDraftStore.set(gameId, draft);
 
     if (!draft.mode || !draft.playMode) {
-      return this.pregameUiSync.syncGame(gameId);
+      return this.context.republishGameStatus(gameId);
     }
 
     if (draft.mode === "NORMAL" && !draft.pairingMode) {
-      return this.pregameUiSync.syncGame(gameId);
+      return this.context.republishGameStatus(gameId);
     }
 
     const configured = this.context.transactionRunner.runInTransaction(() => {
@@ -88,8 +86,7 @@ export class ConfigurationStageService {
 
     this.configDraftStore.delete(gameId);
 
-    const uiSyncResult = await this.pregameUiSync.syncGame(configured.id);
-    if (uiSyncResult instanceof Error) return uiSyncResult;
+    this.context.publishGameStatus(configured);
 
     if (
       configured.config?.mode === "NORMAL" &&

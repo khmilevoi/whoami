@@ -7,6 +7,10 @@ import { buildHttpServer } from "./adapters/http/server.js";
 import { registerTelegramHandlers } from "./adapters/telegram/telegram-bot.js";
 import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync.js";
 import { GameService } from "./application/game-service.js";
+import {
+  GameStatusService,
+  GameStatusSubscriber,
+} from "./application/game-status-service.js";
 import { LoggerPort } from "./application/ports.js";
 import { TextService } from "./application/text-service.js";
 import { loadConfig } from "./config.js";
@@ -29,6 +33,13 @@ const start = (): void | appErrors.StartAppError => {
   const texts = container.resolve<TextService>("texts");
   const gameService = container.resolve<GameService>("gameService");
   const commandSync = container.resolve<TelegramCommandSync>("commandSync");
+  const statusService = container.resolve<GameStatusService>("statusService");
+  const pregameUiSubscriber = container.resolve<GameStatusSubscriber>(
+    "pregameUiSubscriber",
+  );
+  const gameFlowSubscriber = container.resolve<GameStatusSubscriber>(
+    "gameFlowSubscriber",
+  );
 
   registerTelegramHandlers(bot, gameService, logger, texts, commandSync);
 
@@ -37,6 +48,9 @@ const start = (): void | appErrors.StartAppError => {
     await runStartupTasks({
       commandSync,
       gameService,
+      statusService,
+      pregameUiSubscriber,
+      gameFlowSubscriber,
       logger,
     });
 
@@ -81,4 +95,3 @@ if (result instanceof Error) {
   console.error(result);
   process.exit(1);
 }
-

@@ -8,6 +8,11 @@ import { createGameServiceHarness } from "./game-service.harness.js";
 import { parseManualPairPayload } from "../../src/adapters/telegram/manual-pair-payload.js";
 import { mustBeDefined } from "../support/strict-helpers.js";
 
+const flushReactiveEffects = async (): Promise<void> => {
+  await Promise.resolve();
+  await Promise.resolve();
+};
+
 const askCurrentQuestion = async ({
   harness,
   gameId,
@@ -280,6 +285,7 @@ describe("game service", () => {
     await harness.service.joinGame(chatId, actors[1]!);
     await harness.service.joinGame(chatId, actors[2]!);
     await harness.service.beginConfiguration(chatId, actors[0]!.telegramUserId);
+    await flushReactiveEffects();
 
     const game = harness.getGameByChat(chatId);
     expect(game.stage).toBe("CONFIGURING");
@@ -297,6 +303,7 @@ describe("game service", () => {
     await harness.service.joinGame(chatId, actors[1]!);
     await harness.service.joinGame(chatId, actors[2]!);
     await harness.service.beginConfiguration(chatId, actors[0]!.telegramUserId);
+    await flushReactiveEffects();
 
     const game = harness.getGameByChat(chatId);
     harness.notifier.setPrivateMessageFailure(actors[1]!.telegramUserId);
@@ -308,6 +315,7 @@ describe("game service", () => {
       "ONLINE",
       "RANDOM",
     );
+    await flushReactiveEffects();
 
     const updated = harness.getGameById(game.id);
     expect(updated.stage).toBe("PREPARE_WORDS");
@@ -526,5 +534,6 @@ describe("game service", () => {
     );
   });
 });
+
 
 

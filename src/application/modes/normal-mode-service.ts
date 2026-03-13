@@ -105,37 +105,6 @@ export class NormalModeService extends BaseGameModeService {
     });
     if (updated instanceof Error) return updated;
 
-    const pending = updated.inProgress.pendingVote;
-    if (!pending) {
-      return;
-    }
-
-    const sentVote = await this.context.notifier.sendGroupKeyboard(
-      updated.chatId,
-      this.context.texts.votePrompt(
-        this.context.playerLabel(updated, pending.askerPlayerId),
-      ),
-      [
-        [
-          {
-            kind: "callback",
-            text: this.context.texts.voteDecisionButton("YES"),
-            data: `vote:YES:${updated.id}`,
-          },
-          {
-            kind: "callback",
-            text: this.context.texts.voteDecisionButton("NO"),
-            data: `vote:NO:${updated.id}`,
-          },
-          {
-            kind: "callback",
-            text: this.context.texts.voteDecisionButton("GUESSED"),
-            data: `vote:GUESSED:${updated.id}`,
-            style: "success",
-          },
-        ],
-      ],
-    );
-    if (sentVote instanceof Error) return sentVote;
+    return this.context.publishGameStatus(updated);
   }
 }

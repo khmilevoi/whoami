@@ -1,14 +1,12 @@
 import { GameState } from "../../domain/types.js";
 import type { NormalPairingStageError } from "../errors.js";
 import { GameServiceContext } from "../game-service-context.js";
-import { PregameUiSyncService } from "../pregame-ui-sync-service.js";
 import { WordPreparationStageService } from "./word-preparation-stage-service.js";
 
 export class NormalPairingStageService {
   constructor(
     private readonly context: GameServiceContext,
     private readonly wordPreparationStage: WordPreparationStageService,
-    private readonly pregameUiSync: PregameUiSyncService,
   ) {}
 
   async applyManualPair(
@@ -39,12 +37,12 @@ export class NormalPairingStageService {
     });
     if (updated instanceof Error) return updated;
 
+    this.context.publishGameStatus(updated);
+
     if (Object.keys(updated.words).length < updated.players.length) {
-      return this.promptCurrentChooser(updated);
+      return;
     }
 
-    const uiSyncResult = await this.pregameUiSync.syncGame(updated.id);
-    if (uiSyncResult instanceof Error) return uiSyncResult;
     return this.wordPreparationStage.promptWordCollection(updated);
   }
 
@@ -70,17 +68,16 @@ export class NormalPairingStageService {
         continue;
       }
 
-      const result = await this.promptCurrentChooser(game);
-      if (result instanceof Error) {
-        return result;
-      }
+      this.context.publishGameStatus(game);
     }
   }
 
   async promptCurrentChooser(
     game: GameState,
   ): Promise<void | NormalPairingStageError> {
-    const syncResult = await this.pregameUiSync.syncGame(game.id);
-    if (syncResult instanceof Error) return syncResult;
+    return this.context.publishGameStatus(game);
   }
 }
+
+
+

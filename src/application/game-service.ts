@@ -1,8 +1,9 @@
 import * as appErrors from "../domain/errors.js";
 import { GameEngine } from "../domain/game-engine.js";
-import { GameMode, GameState, VoteDecision } from "../domain/types.js";
+import { GameMode, VoteDecision } from "../domain/types.js";
 import type { GameServiceError, RecoveryStartupError } from "./errors.js";
 import { GameServiceContext } from "./game-service-context.js";
+import { GameStatusService, GameStatusSnapshot } from "./game-status-service.js";
 import { NormalModeService } from "./modes/normal-mode-service.js";
 import { ReverseModeService } from "./modes/reverse-mode-service.js";
 import {
@@ -14,7 +15,6 @@ import {
   NotifierPort,
   TransactionRunner,
 } from "./ports.js";
-import { PregameUiSyncService } from "./pregame-ui-sync-service.js";
 import { ConfigurationStageService } from "./stages/configuration-stage-service.js";
 import { NormalPairingStageService } from "./stages/normal-pairing-stage-service.js";
 import { ReadyStartStageService } from "./stages/ready-start-stage-service.js";
@@ -40,7 +40,6 @@ export class GameService {
   private readonly configurationStage: ConfigurationStageService;
   private readonly normalPairingStage: NormalPairingStageService;
   private readonly wordPreparationStage: WordPreparationStageService;
-  private readonly pregameUiSync: PregameUiSyncService;
   private readonly modeServices: Map<GameMode, NormalModeService | ReverseModeService>;
 
   constructor(
@@ -54,6 +53,9 @@ export class GameService {
     private readonly logger: LoggerPort,
     private readonly texts: TextService,
     private readonly limits: { minPlayers: number; maxPlayers: number },
+    private readonly statusService: GameStatusService,
+    configDraftStore = new ConfigDraftStore(),
+    expectationStore = new PrivateExpectationStore(),
   ) {
     this.context = new GameServiceContext({
       engine,
@@ -66,15 +68,8 @@ export class GameService {
       logger,
       texts,
       limits,
+      statusService,
     });
-
-    const configDraftStore = new ConfigDraftStore();
-    const expectationStore = new PrivateExpectationStore();
-    this.pregameUiSync = new PregameUiSyncService(
-      this.context,
-      configDraftStore,
-      expectationStore,
-    );
 
     const normalModeService = new NormalModeService(this.context);
     const reverseModeService = new ReverseModeService(this.context);
@@ -84,26 +79,21 @@ export class GameService {
       [reverseModeService.mode, reverseModeService],
     ]);
 
-    const readyStartStage = new ReadyStartStageService(this.context, this.pregameUiSync, [
-      ...this.modeServices.values(),
-    ]);
+    const readyStartStage = new ReadyStartStageService(this.context);
     this.wordPreparationStage = new WordPreparationStageService(
       this.context,
       expectationStore,
       readyStartStage,
-      this.pregameUiSync,
     );
     this.normalPairingStage = new NormalPairingStageService(
       this.context,
       this.wordPreparationStage,
-      this.pregameUiSync,
     );
     this.configurationStage = new ConfigurationStageService(
       this.context,
       configDraftStore,
       this.normalPairingStage,
       this.wordPreparationStage,
-      this.pregameUiSync,
     );
   }
 
@@ -132,8 +122,7 @@ export class GameService {
     });
     if (game instanceof Error) return game;
 
-    const syncResult = await this.pregameUiSync.syncGame(game.id);
-    if (syncResult instanceof Error) return syncResult;
+    this.statusService.publish(game);
 
     this.logger.info("game_started", {
       gameId: game.id,
@@ -177,8 +166,7 @@ export class GameService {
     });
     if (game instanceof Error) return game;
 
-    const syncResult = await this.pregameUiSync.syncGame(game.id);
-    if (syncResult instanceof Error) return syncResult;
+    return this.statusService.publish(game);
   }
 
   async beginConfiguration(
@@ -210,7 +198,7 @@ export class GameService {
     });
     if (game instanceof Error) return game;
 
-    return this.pregameUiSync.syncGame(game.id);
+    return this.statusService.publish(game);
   }
 
   async beginConfigurationByGameId(
@@ -278,32 +266,28 @@ export class GameService {
       const joinResult = await this.joinGameById(payload.gameId, actor);
       if (joinResult instanceof Error) return joinResult;
 
-      const markResult = this.markPrivateOpened(payload.gameId, actor.telegramUserId);
-      if (markResult instanceof Error) return markResult;
-
-      return this.pregameUiSync.syncGame(payload.gameId);
+      return this.markPrivateOpened(payload.gameId, actor.telegramUserId);
     }
 
     if (payload?.action === "open") {
-      const markResult = this.markPrivateOpened(payload.gameId, actor.telegramUserId);
-      if (markResult instanceof Error) return markResult;
-
-      return this.pregameUiSync.syncGame(payload.gameId);
+      return this.markPrivateOpened(payload.gameId, actor.telegramUserId);
     }
 
-    const games = this.repository.listActiveGames().filter((game) =>
-      game.players.some((player) => player.telegramUserId === actor.telegramUserId),
+    const chatIds = this.statusService.listActiveChatIdsByTelegramUser(
+      actor.telegramUserId,
     );
 
-    for (const game of games) {
+    for (const chatId of chatIds) {
+      const game = this.repository.findActiveByChatId(chatId);
+      if (!game) {
+        continue;
+      }
+
       const markResult = this.markPrivateOpened(game.id, actor.telegramUserId);
       if (markResult instanceof Error) return markResult;
-
-      const syncResult = await this.pregameUiSync.syncGame(game.id);
-      if (syncResult instanceof Error) return syncResult;
     }
 
-    if (games.length === 0) {
+    if (chatIds.length === 0) {
       await this.notifier.sendPrivateMessage(
         actor.telegramUserId,
         this.texts.noActiveGamesForUser(),
@@ -419,23 +403,13 @@ export class GameService {
     });
     if (updated instanceof Error) return updated;
 
-    const sentCancel = await this.notifier.sendGroupMessage(
-      updated.chatId,
-      this.texts.gameCancelledByCreator(),
-    );
-    if (sentCancel instanceof Error) return sentCancel;
+    return this.statusService.publish(updated);
   }
 
-  findConfiguringGameByCreator(telegramUserId: string): GameState | null {
-    return (
-      this.repository
-        .listActiveGames()
-        .find(
-          (game) =>
-            game.creatorTelegramUserId === telegramUserId &&
-            game.stage === "CONFIGURING",
-        ) ?? null
-    );
+  findConfiguringGameByCreator(
+    telegramUserId: string,
+  ): GameStatusSnapshot | null {
+    return this.statusService.findConfiguringGameByCreator(telegramUserId);
   }
 
   private markPrivateOpened(
@@ -464,6 +438,7 @@ export class GameService {
     });
 
     if (updated instanceof Error) return updated;
+    this.statusService.publish(updated);
   }
 
   private getModeService(
@@ -476,3 +451,4 @@ export class GameService {
     return service;
   }
 }
+

@@ -20,7 +20,7 @@ export const createCreatorConfigMenu = (
     range
       .text(`🎲 ${texts.gameModeButton("NORMAL")}`, async (innerCtx) => {
         await gameService.applyConfigStep(
-          game.id,
+          game.gameId,
           asUserId(innerCtx),
           "mode",
           "NORMAL",
@@ -30,7 +30,7 @@ export const createCreatorConfigMenu = (
       })
       .text(`🔄 ${texts.gameModeButton("REVERSE")}`, async (innerCtx) => {
         await gameService.applyConfigStep(
-          game.id,
+          game.gameId,
           asUserId(innerCtx),
           "mode",
           "REVERSE",
@@ -41,7 +41,7 @@ export const createCreatorConfigMenu = (
       .row()
       .text(`💬 ${texts.playModeButton("ONLINE")}`, async (innerCtx) => {
         await gameService.applyConfigStep(
-          game.id,
+          game.gameId,
           asUserId(innerCtx),
           "play",
           "ONLINE",
@@ -51,7 +51,7 @@ export const createCreatorConfigMenu = (
       })
       .text(`🪑 ${texts.playModeButton("OFFLINE")}`, async (innerCtx) => {
         await gameService.applyConfigStep(
-          game.id,
+          game.gameId,
           asUserId(innerCtx),
           "play",
           "OFFLINE",
@@ -60,12 +60,12 @@ export const createCreatorConfigMenu = (
         await innerCtx.menu.update();
       });
 
-    if (game.config?.mode === "NORMAL" || !game.config) {
+    if (game.mode === "NORMAL" || game.mode === null) {
       range
         .row()
         .text(`🎯 ${texts.pairingModeButton("RANDOM")}`, async (innerCtx) => {
           await gameService.applyConfigStep(
-            game.id,
+            game.gameId,
             asUserId(innerCtx),
             "pair",
             "RANDOM",
@@ -75,7 +75,7 @@ export const createCreatorConfigMenu = (
         })
         .text(`🧩 ${texts.pairingModeButton("MANUAL")}`, async (innerCtx) => {
           await gameService.applyConfigStep(
-            game.id,
+            game.gameId,
             asUserId(innerCtx),
             "pair",
             "MANUAL",

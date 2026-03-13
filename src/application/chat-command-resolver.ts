@@ -1,5 +1,5 @@
-import { GameState } from "../domain/types.js";
 import { createBotCommands, ChatCommandResolution } from "./bot-commands.js";
+import { GameStatusSnapshot } from "./game-status-service.js";
 import { TextService } from "./text-service.js";
 
 export class ChatCommandResolver {
@@ -9,47 +9,26 @@ export class ChatCommandResolver {
     this.commands = createBotCommands(texts);
   }
 
-  resolve(game: GameState | null): ChatCommandResolution {
-    if (!game) {
+  resolve(snapshot: GameStatusSnapshot | null): ChatCommandResolution {
+    if (!snapshot || !snapshot.hasActiveGame) {
       return this.commands.noGameResolution();
     }
 
-    if (game.stage === "LOBBY_OPEN") {
-      return {
-        chatCommands: [],
-        memberOverrides: [
-          {
-            telegramUserId: game.creatorTelegramUserId,
-            commands: [this.commands.BOT_COMMANDS.CANCEL],
-          },
-        ],
-      };
-    }
-
-    if (
-      game.stage === "LOBBY_CLOSED" ||
-      game.stage === "CONFIGURING" ||
-      game.stage === "PREPARE_WORDS" ||
-      game.stage === "READY_WAIT"
-    ) {
-      return {
-        chatCommands: [],
-        memberOverrides: [
-          {
-            telegramUserId: game.creatorTelegramUserId,
-            commands: [this.commands.BOT_COMMANDS.CANCEL],
-          },
-        ],
-      };
-    }
-
-    if (game.stage === "IN_PROGRESS") {
+    if (snapshot.stage === "IN_PROGRESS") {
       return {
         chatCommands: [this.commands.BOT_COMMANDS.GIVEUP],
         memberOverrides: [],
       };
     }
 
-    return this.commands.noGameResolution();
+    return {
+      chatCommands: [],
+      memberOverrides: [
+        {
+          telegramUserId: snapshot.creatorTelegramUserId,
+          commands: [this.commands.BOT_COMMANDS.CANCEL],
+        },
+      ],
+    };
   }
 }

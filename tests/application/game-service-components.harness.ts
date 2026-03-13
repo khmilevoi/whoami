@@ -1,4 +1,5 @@
 import { GameServiceContext } from "../../src/application/game-service-context.js";
+import { InMemoryGameStatusService } from "../../src/application/game-status-service.js";
 import { NormalModeService } from "../../src/application/modes/normal-mode-service.js";
 import { ReverseModeService } from "../../src/application/modes/reverse-mode-service.js";
 import { PregameUiSyncService } from "../../src/application/pregame-ui-sync-service.js";
@@ -30,6 +31,7 @@ export interface GameServiceComponentHarness {
 export const createGameServiceComponentHarness =
   (): GameServiceComponentHarness => {
     const game = createGameServiceHarness();
+    const statusService = new InMemoryGameStatusService(game.repository, game.logger);
     const context = new GameServiceContext({
       engine: game.engine,
       repository: game.repository,
@@ -41,6 +43,7 @@ export const createGameServiceComponentHarness =
       logger: game.logger,
       texts: game.texts,
       limits: game.limits,
+      statusService,
     });
 
     const configDraftStore = new ConfigDraftStore();
@@ -52,27 +55,21 @@ export const createGameServiceComponentHarness =
     );
     const normalMode = new NormalModeService(context);
     const reverseMode = new ReverseModeService(context);
-    const readyStartStage = new ReadyStartStageService(context, pregameUiSync, [
-      normalMode,
-      reverseMode,
-    ]);
+    const readyStartStage = new ReadyStartStageService(context);
     const wordPreparationStage = new WordPreparationStageService(
       context,
       expectationStore,
       readyStartStage,
-      pregameUiSync,
     );
     const normalPairingStage = new NormalPairingStageService(
       context,
       wordPreparationStage,
-      pregameUiSync,
     );
     const configurationStage = new ConfigurationStageService(
       context,
       configDraftStore,
       normalPairingStage,
       wordPreparationStage,
-      pregameUiSync,
     );
 
     return {
