@@ -10,6 +10,7 @@
 
 - In this Codex shell, `node` and `pnpm` may be missing from `PATH` even when the project is otherwise usable.
 - First check `node -v` and `pnpm -v`. If either command is missing, do not assume the shell is using the correct runtime.
+- If `pnpm` is available in the user's normal external console but not inside the sandboxed Codex shell, prefer running `pnpm` through the external console with approval instead of searching for alternate executable paths.
 - Do not "fix" missing `node`/`pnpm` by prepending the Visual Studio Node path. That shell exposes Node `20.13.1`, which is incompatible with this repo's native-module setup.
 - If command execution is blocked by an unclear runtime, prefer resolving access to the proper Node `24.13.0` + `pnpm` environment instead of falling back to ad-hoc `node.exe` paths.
 - All project tasks should be run through `pnpm` commands when possible, for example `pnpm test`, `pnpm vitest`, `pnpm tsc`.
@@ -20,6 +21,7 @@
 
 - For this repo inside Codex desktop, a reliable Node fallback is `C:\nvm4w\nodejs\node.exe`. Use it only when `node` is missing from `PATH`, and prefer requesting approval once instead of losing time searching unrelated locations.
 - `pnpm` may also be absent from `PATH` in this shell. If the normal command is unavailable, first confirm the correct Node runtime, then use approved direct invocations only as a temporary execution path.
+- For routine work in this repo, prefer the user's normal external-console `pnpm` command over sandbox-local workarounds whenever the sandbox shell cannot resolve `pnpm`.
 - `@grammyjs/i18n` in this repo is wired through `src/application/app-i18n.ts` and `src/adapters/telegram/telegram-i18n.ts`. Set `localeNegotiator` in the `new I18n(...)` config, not by mutating the instance afterward.
 - Keep `fluentBundleOptions.useIsolating = false` in the base i18n config. Otherwise Fluent inserts Unicode isolation marks and string-based tests will fail unexpectedly.
 - Locale source of truth is not grammY session. It lives in player profile persistence plus `GameState.groupLocale`, because status subscribers render outside `ctx`.
