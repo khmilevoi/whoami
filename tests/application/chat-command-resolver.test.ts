@@ -76,19 +76,14 @@ describe("chat command resolver", () => {
     expect(resolution.memberOverrides).toEqual([]);
   });
 
-  it("returns lobby commands for creator and players", () => {
+  it("returns creator cancel only during lobby", () => {
     const resolution = resolver.resolve(createGame("LOBBY_OPEN"));
 
-    expect(resolution.chatCommands.map((command) => command.command)).toEqual([
-      "join",
-    ]);
+    expect(resolution.chatCommands).toEqual([]);
     expect(resolution.memberOverrides).toEqual([
       {
         telegramUserId: "101",
-        commands: expect.arrayContaining([
-          expect.objectContaining({ command: "whoami_config" }),
-          expect.objectContaining({ command: "whoami_cancel" }),
-        ]),
+        commands: [expect.objectContaining({ command: "whoami_cancel" })],
       },
     ]);
   });
@@ -113,13 +108,8 @@ describe("chat command resolver", () => {
     }
   });
 
-  it("returns online in-progress commands", () => {
+  it("returns only giveup during in-progress", () => {
     const game = createGame("IN_PROGRESS");
-    game.config = {
-      mode: "NORMAL",
-      playMode: "ONLINE",
-      pairingMode: "RANDOM",
-    };
 
     const resolution = resolver.resolve(game);
 
@@ -127,32 +117,6 @@ describe("chat command resolver", () => {
       "giveup",
     ]);
     expect(resolution.memberOverrides).toEqual([]);
-  });
-
-  it("returns /ask only for current offline asker", () => {
-    const game = createGame("IN_PROGRESS");
-    game.config = {
-      mode: "NORMAL",
-      playMode: "OFFLINE",
-      pairingMode: "RANDOM",
-    };
-    game.inProgress.turnOrder = ["p1", "p2"];
-    game.inProgress.turnCursor = 1;
-
-    const resolution = resolver.resolve(game);
-
-    expect(resolution.chatCommands.map((command) => command.command)).toEqual([
-      "giveup",
-    ]);
-    expect(resolution.memberOverrides).toEqual([
-      {
-        telegramUserId: "202",
-        commands: expect.arrayContaining([
-          expect.objectContaining({ command: "giveup" }),
-          expect.objectContaining({ command: "ask" }),
-        ]),
-      },
-    ]);
   });
 
   it("returns start command for finished and canceled games", () => {

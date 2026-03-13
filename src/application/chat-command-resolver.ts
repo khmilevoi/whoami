@@ -2,18 +2,6 @@ import { GameState } from "../domain/types.js";
 import { createBotCommands, ChatCommandResolution } from "./bot-commands.js";
 import { TextService } from "./text-service.js";
 
-const toPlayerTelegramUserId = (
-  game: GameState,
-  playerId: string | undefined,
-): string | null => {
-  if (!playerId) {
-    return null;
-  }
-
-  const player = game.players.find((candidate) => candidate.id === playerId);
-  return player?.telegramUserId ?? null;
-};
-
 export class ChatCommandResolver {
   private readonly commands;
 
@@ -28,14 +16,11 @@ export class ChatCommandResolver {
 
     if (game.stage === "LOBBY_OPEN") {
       return {
-        chatCommands: [this.commands.BOT_COMMANDS.JOIN],
+        chatCommands: [],
         memberOverrides: [
           {
             telegramUserId: game.creatorTelegramUserId,
-            commands: [
-              this.commands.BOT_COMMANDS.CONFIG,
-              this.commands.BOT_COMMANDS.CANCEL,
-            ],
+            commands: [this.commands.BOT_COMMANDS.CANCEL],
           },
         ],
       };
@@ -59,26 +44,9 @@ export class ChatCommandResolver {
     }
 
     if (game.stage === "IN_PROGRESS") {
-      const chatCommands = [this.commands.BOT_COMMANDS.GIVEUP];
-      const memberOverrides = [] as ChatCommandResolution["memberOverrides"];
-
-      if (game.config?.playMode === "OFFLINE") {
-        const askerId = game.inProgress.turnOrder[game.inProgress.turnCursor];
-        const askerTelegramUserId = toPlayerTelegramUserId(game, askerId);
-        if (askerTelegramUserId) {
-          memberOverrides.push({
-            telegramUserId: askerTelegramUserId,
-            commands: [
-              this.commands.BOT_COMMANDS.GIVEUP,
-              this.commands.BOT_COMMANDS.ASK,
-            ],
-          });
-        }
-      }
-
       return {
-        chatCommands,
-        memberOverrides,
+        chatCommands: [this.commands.BOT_COMMANDS.GIVEUP],
+        memberOverrides: [],
       };
     }
 

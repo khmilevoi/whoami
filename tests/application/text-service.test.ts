@@ -15,9 +15,7 @@ describe("text service", () => {
     expect(commands.BOT_COMMANDS.START_GAME.description).toBe(
       "Создать новую игру",
     );
-    expect(commands.BOT_COMMANDS.ASK.description).toBe(
-      "Запустить опрос (оффлайн)",
-    );
+    expect(commands.BOT_COMMANDS.GIVEUP.description).toBe("Сдаться");
   });
 
   it("renders representative runtime messages", () => {
@@ -32,6 +30,7 @@ describe("text service", () => {
       "Выберите игрока, которому загадываете слово:",
     );
     expect(texts.voteSummary("GUESSED")).toBe("Итог голосования: Угадал.");
+    expect(texts.openMainChatButton()).toBe("🎮 Перейти в основной чат");
   });
 
   it("renders every domain error class", () => {

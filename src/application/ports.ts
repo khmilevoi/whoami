@@ -1,5 +1,13 @@
 import type { NotificationError } from "../domain/errors.js";
-import { GameState, PlayerIdentity } from "../domain/types.js";
+import {
+  GameState,
+  PlayerIdentity,
+  UiButton,
+} from "../domain/types.js";
+
+export interface NotificationReceipt {
+  messageId: number;
+}
 
 export interface GameRepository {
   create(game: GameState): void;
@@ -36,19 +44,35 @@ export interface NotifierPort {
   sendGroupMessage(
     chatId: string,
     text: string,
-  ): Promise<void | NotificationError>;
+  ): Promise<NotificationReceipt | NotificationError>;
   sendGroupKeyboard(
     chatId: string,
     text: string,
-    buttons: Array<Array<{ text: string; data: string }>>,
-  ): Promise<void | NotificationError>;
-  sendPrivateMessage(userId: string, text: string): Promise<boolean>;
+    buttons: UiButton[][],
+  ): Promise<NotificationReceipt | NotificationError>;
+  editGroupMessage(
+    chatId: string,
+    messageId: number,
+    text: string,
+    buttons?: UiButton[][],
+  ): Promise<NotificationReceipt | NotificationError>;
+  sendPrivateMessage(
+    userId: string,
+    text: string,
+  ): Promise<false | NotificationReceipt>;
   sendPrivateKeyboard(
     userId: string,
     text: string,
-    buttons: Array<Array<{ text: string; data: string }>>,
-  ): Promise<boolean>;
-  buildBotDeepLink(): string;
+    buttons: UiButton[][],
+  ): Promise<false | NotificationReceipt>;
+  editPrivateMessage(
+    userId: string,
+    messageId: number,
+    text: string,
+    buttons?: UiButton[][],
+  ): Promise<false | NotificationReceipt>;
+  buildBotDeepLink(payload?: string): string;
+  buildGroupMessageLink(chatId: string, messageId: number): string | null;
 }
 
 export interface LoggerPort {

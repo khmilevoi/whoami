@@ -10,6 +10,12 @@ export class InvalidManualPairPayloadError extends errore.createTaggedError({
   extends: DomainAppErrorBase,
 }) {}
 
+export class InvalidStartPayloadError extends errore.createTaggedError({
+  name: "InvalidStartPayloadError",
+  message: "InvalidStartPayloadError",
+  extends: DomainAppErrorBase,
+}) {}
+
 export class ActiveGameNotFoundByChatError extends errore.createTaggedError({
   name: "ActiveGameNotFoundByChatError",
   message: "ActiveGameNotFoundByChatError",
@@ -331,6 +337,7 @@ export class WebhookHandlingError extends errore.createTaggedError({
 }) {}
 
 export type ManualPairPayloadError = InvalidManualPairPayloadError;
+export type StartPayloadError = InvalidStartPayloadError;
 
 export type PairingValidationError =
   | UnknownPlayerInManualPairingError
@@ -446,6 +453,7 @@ export type StartupAppError = CommandSyncError | StartupTaskError;
 
 export const DOMAIN_ERROR_FACTORIES = {
   InvalidManualPairPayloadError: () => new InvalidManualPairPayloadError(),
+  InvalidStartPayloadError: () => new InvalidStartPayloadError(),
   ActiveGameNotFoundByChatError: () => new ActiveGameNotFoundByChatError(),
   GameNotFoundError: () => new GameNotFoundError(),
   PlayerNotFoundInGameError: () => new PlayerNotFoundInGameError(),
@@ -527,3 +535,6 @@ export type InfrastructureAppError =
   | WebhookHandlingError;
 
 export type AppError = DomainAppError | InfrastructureAppError;
+
+
+

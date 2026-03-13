@@ -24,6 +24,7 @@ export class TextService {
   renderError(error: DomainAppError): string {
     return errore.matchError(error, {
       InvalidManualPairPayloadError: () => "Некорректные данные выбора пары",
+      InvalidStartPayloadError: () => "Некорректная ссылка запуска",
       ActiveGameNotFoundByChatError: () =>
         "Активная игра в этом чате не найдена",
       GameNotFoundError: () => "Игра не найдена",
@@ -393,4 +394,117 @@ export class TextService {
   editButton(): string {
     return "Редактировать";
   }
+
+  groupLobbyStatusOpen(joined: number, maxPlayers: number, minPlayers: number): string {
+    return [
+      "👥 Набор игроков открыт",
+      `Игроков: ${joined}/${maxPlayers}`,
+      joined >= minPlayers
+        ? "Создатель может переходить к настройке в ЛС."
+        : `Для старта нужно минимум ${minPlayers} игрока(ов).`,
+    ].join("\n");
+  }
+
+  groupConfiguringStatus(input: {
+    mode?: GameMode;
+    playMode?: PlayMode;
+    pairingMode?: PairingMode;
+  }): string {
+    return [
+      "⚙️ Создатель настраивает игру",
+      `Режим: ${input.mode ? this.gameMode(input.mode) : "-"}`,
+      `Формат: ${input.playMode ? this.playMode(input.playMode) : "-"}`,
+      `Пары: ${input.pairingMode ? this.pairingMode(input.pairingMode) : "-"}`,
+    ].join("\n");
+  }
+
+  groupWordCollectionStatus(readyCount: number, totalPlayers: number): string {
+    return ["📝 Игроки вводят слова", `Готово: ${readyCount}/${totalPlayers}`].join(
+      "\n",
+    );
+  }
+
+  groupInitializationFinished(): string {
+    return ["✅ Инициализация завершена", "Игра началась."].join("\n");
+  }
+
+  groupCanceledStatus(): string {
+    return "✖️ Игра отменена";
+  }
+
+  groupFinishedStatus(): string {
+    return "🏁 Игра завершена";
+  }
+
+  privatePanelPlayerNotFound(): string {
+    return "Игрок не найден.";
+  }
+
+  privateLobbyStatus(playerCount: number, isCreator: boolean): string {
+    return [
+      "👋 Вы в игре",
+      `Комната: ${playerCount} игроков`,
+      isCreator
+        ? "Вы создатель комнаты."
+        : "⏳ Ждём, пока создатель начнёт настройку.",
+    ].join("\n");
+  }
+
+  privateCreatorConfigStatus(): string {
+    return "⚙️ Настройте игру в меню ниже.";
+  }
+
+  privatePlayerConfigStatus(): string {
+    return "⚙️ Создатель настраивает игру. Статус обновится автоматически.";
+  }
+
+  privateEnterWordStatus(readyCount: number, totalPlayers: number): string {
+    return `✍️ Отправьте слово в ответном сообщении.\nГотово: ${readyCount}/${totalPlayers}`;
+  }
+
+  privateEnterClueStatus(readyCount: number, totalPlayers: number): string {
+    return `✍️ Введите пояснение к слову.\nГотово: ${readyCount}/${totalPlayers}`;
+  }
+
+  privateClueDecisionStatus(readyCount: number, totalPlayers: number): string {
+    return `${this.addCluePrompt()}\nГотово: ${readyCount}/${totalPlayers}`;
+  }
+
+  privateReadyWaitingStatus(readyCount: number, totalPlayers: number): string {
+    return `✅ Ваше слово готово.\nОжидаем остальных: ${readyCount}/${totalPlayers}`;
+  }
+
+  privateGameStartedStatus(): string {
+    return "🎮 Игра началась. Возвращайтесь в основной чат.";
+  }
+
+  privateCanceledStatus(): string {
+    return "✖️ Игра отменена.";
+  }
+
+  privateFinishedStatus(): string {
+    return "🏁 Игра завершена.";
+  }
+  joinGameButton(): string {
+    return "➕ Войти";
+  }
+
+  configureGameButton(): string {
+    return "⚙️ Закрыть набор и настроить";
+  }
+
+  openConfigMenuButton(): string {
+    return "⚙️ Открыть настройки";
+  }
+
+  openPrivateChatButton(): string {
+    return "💬 Открыть ЛС бота";
+  }
+
+  openMainChatButton(): string {
+    return "🎮 Перейти в основной чат";
+  }
 }
+
+
+

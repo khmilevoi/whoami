@@ -19,11 +19,8 @@ export interface BotCommandCatalog {
   BOT_COMMANDS: Record<
     | "START_PRIVATE"
     | "START_GAME"
-    | "JOIN"
-    | "CONFIG"
     | "CANCEL"
-    | "GIVEUP"
-    | "ASK",
+    | "GIVEUP",
     BotCommandDef
   >;
   PRIVATE_COMMANDS: BotCommandDef[];
@@ -41,11 +38,6 @@ export const createBotCommands = (texts: TextService): BotCommandCatalog => {
       command: "whoami_start",
       description: texts.commandCreateGameDescription(),
     },
-    JOIN: { command: "join", description: texts.commandJoinGameDescription() },
-    CONFIG: {
-      command: "whoami_config",
-      description: texts.commandConfigureGameDescription(),
-    },
     CANCEL: {
       command: "whoami_cancel",
       description: texts.commandCancelGameDescription(),
@@ -54,7 +46,6 @@ export const createBotCommands = (texts: TextService): BotCommandCatalog => {
       command: "giveup",
       description: texts.commandGiveUpDescription(),
     },
-    ASK: { command: "ask", description: texts.commandAskOfflineDescription() },
   } as const satisfies Record<string, BotCommandDef>;
 
   return {

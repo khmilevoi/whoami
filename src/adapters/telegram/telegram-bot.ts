@@ -6,7 +6,9 @@ import type { TelegramHandlerError } from "../../application/errors.js";
 import { LoggerPort } from "../../application/ports.js";
 import { TextService } from "../../application/text-service.js";
 import { TelegramCommandSync } from "./telegram-command-sync.js";
+import { createCreatorConfigMenu } from "./creator-config-menu.js";
 import { parseManualPairPayload } from "./manual-pair-payload.js";
+import { parseStartPayload } from "./start-payload.js";
 
 type GroupMessageReadStatus = "enabled" | "disabled" | "unknown";
 
@@ -28,6 +30,13 @@ const safeReply = async (ctx: Context, text: string): Promise<void> => {
   if (ctx.chat) {
     await ctx.reply(text);
   }
+};
+
+const safeToast = async (ctx: Context, text: string): Promise<void> => {
+  await ctx.answerCallbackQuery({
+    text: text.slice(0, 180),
+    show_alert: false,
+  });
 };
 
 const syncChatsSafely = async (
@@ -121,7 +130,38 @@ const replyForReturnedError = async (
   });
 };
 
-const execute = async (
+const toastForReturnedError = async (
+  ctx: Context,
+  logger: LoggerPort,
+  texts: TextService,
+  error: TelegramHandlerError,
+): Promise<void> => {
+  if (error instanceof appErrors.DomainAppErrorBase) {
+    await safeToast(ctx, texts.renderError(error));
+    return;
+  }
+
+  await errore.matchError(error, {
+    TelegramApiError: async (typedError) => {
+      logger.error("telegram_handler_error", {
+        error: typedError.message,
+        kind: typedError.name,
+        updateId: ctx.update.update_id,
+      });
+      await safeToast(ctx, texts.genericErrorRetry());
+    },
+    Error: async (unexpected) => {
+      logger.error("telegram_handler_error", {
+        error: unexpected.message,
+        kind: unexpected.name,
+        updateId: ctx.update.update_id,
+      });
+      await safeToast(ctx, texts.genericErrorRetry());
+    },
+  });
+};
+
+const executeWithReply = async (
   ctx: Context,
   logger: LoggerPort,
   texts: TextService,
@@ -140,6 +180,39 @@ const execute = async (
     });
 
     await safeReply(ctx, texts.genericErrorRetry());
+  } finally {
+    if (onFinally) {
+      try {
+        await onFinally();
+      } catch (error) {
+        logger.error("telegram_handler_finalizer_error", {
+          error: error instanceof Error ? error.message : String(error),
+          updateId: ctx.update.update_id,
+        });
+      }
+    }
+  }
+};
+
+const executeWithToast = async (
+  ctx: Context,
+  logger: LoggerPort,
+  texts: TextService,
+  action: () => Promise<void | TelegramHandlerError>,
+  onFinally?: () => Promise<void>,
+): Promise<void> => {
+  try {
+    const result = await action();
+    if (result instanceof Error) {
+      await toastForReturnedError(ctx, logger, texts, result);
+    }
+  } catch (error) {
+    logger.error("telegram_handler_error", {
+      error: error instanceof Error ? error.message : String(error),
+      updateId: ctx.update.update_id,
+    });
+
+    await safeToast(ctx, texts.genericErrorRetry());
   } finally {
     if (onFinally) {
       try {
@@ -215,6 +288,8 @@ export const registerTelegramHandlers = (
     bot,
     logger,
   );
+  const creatorConfigMenu = createCreatorConfigMenu(gameService, texts);
+  bot.use(creatorConfigMenu);
 
   bot.command("start", async (ctx) => {
     const finalizeSync = createSyncFinalizer(
@@ -223,16 +298,21 @@ export const registerTelegramHandlers = (
       commandSync,
       ctx.from?.id ? String(ctx.from.id) : undefined,
     );
-    await execute(
+    await executeWithReply(
       ctx,
       logger,
       texts,
       async () => {
-        if (isPrivate(ctx)) {
-          return gameService.handlePrivateStart(String(ctx.from!.id));
+        if (!isPrivate(ctx)) {
+          return;
         }
 
-        return;
+        const payload = parseStartPayload(ctx.match);
+        if (payload instanceof Error) {
+          return payload;
+        }
+
+        return gameService.handlePrivateStart(asActor(ctx), payload);
       },
       finalizeSync,
     );
@@ -245,7 +325,7 @@ export const registerTelegramHandlers = (
       commandSync,
       ctx.from?.id ? String(ctx.from.id) : undefined,
     );
-    await execute(
+    await executeWithReply(
       ctx,
       logger,
       texts,
@@ -255,72 +335,7 @@ export const registerTelegramHandlers = (
           return;
         }
 
-        const result = await gameService.startGame(
-          String(ctx.chat.id),
-          asActor(ctx),
-        );
-        if (result instanceof Error) return result;
-
-        await safeReply(ctx, texts.gameCreatedAck());
-        return;
-      },
-      finalizeSync,
-    );
-  });
-
-  bot.command("join", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(
-      ctx,
-      logger,
-      commandSync,
-      ctx.from?.id ? String(ctx.from.id) : undefined,
-    );
-    await execute(
-      ctx,
-      logger,
-      texts,
-      async () => {
-        if (!isGroupChat(ctx)) {
-          return;
-        }
-
-        const result = await gameService.joinGame(
-          String(ctx.chat.id),
-          asActor(ctx),
-        );
-        if (result instanceof Error) return result;
-
-        await safeReply(ctx, texts.joinedGameAck());
-        return;
-      },
-      finalizeSync,
-    );
-  });
-
-  bot.command("whoami_config", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(
-      ctx,
-      logger,
-      commandSync,
-      ctx.from?.id ? String(ctx.from.id) : undefined,
-    );
-    await execute(
-      ctx,
-      logger,
-      texts,
-      async () => {
-        if (!isGroupChat(ctx)) {
-          return;
-        }
-
-        const result = await gameService.beginConfiguration(
-          String(ctx.chat.id),
-          String(ctx.from!.id),
-        );
-        if (result instanceof Error) return result;
-
-        await safeReply(ctx, texts.configSentToCreatorAck());
-        return;
+        return gameService.startGame(String(ctx.chat.id), asActor(ctx));
       },
       finalizeSync,
     );
@@ -333,7 +348,7 @@ export const registerTelegramHandlers = (
       commandSync,
       ctx.from?.id ? String(ctx.from.id) : undefined,
     );
-    await execute(
+    await executeWithReply(
       ctx,
       logger,
       texts,
@@ -342,14 +357,7 @@ export const registerTelegramHandlers = (
           return;
         }
 
-        const result = await gameService.cancel(
-          String(ctx.chat.id),
-          String(ctx.from!.id),
-        );
-        if (result instanceof Error) return result;
-
-        await safeReply(ctx, texts.gameCancelledAck());
-        return;
+        return gameService.cancel(String(ctx.chat.id), String(ctx.from!.id));
       },
       finalizeSync,
     );
@@ -362,7 +370,7 @@ export const registerTelegramHandlers = (
       commandSync,
       ctx.from?.id ? String(ctx.from.id) : undefined,
     );
-    await execute(
+    await executeWithReply(
       ctx,
       logger,
       texts,
@@ -376,30 +384,6 @@ export const registerTelegramHandlers = (
     );
   });
 
-  bot.command("ask", async (ctx) => {
-    const finalizeSync = createSyncFinalizer(
-      ctx,
-      logger,
-      commandSync,
-      ctx.from?.id ? String(ctx.from.id) : undefined,
-    );
-    await execute(
-      ctx,
-      logger,
-      texts,
-      async () => {
-        if (!isGroupChat(ctx)) {
-          return;
-        }
-        return gameService.askOffline(
-          String(ctx.chat.id),
-          String(ctx.from!.id),
-        );
-      },
-      finalizeSync,
-    );
-  });
-
   bot.on("message:text", async (ctx) => {
     const finalizeSync = createSyncFinalizer(
       ctx,
@@ -407,7 +391,7 @@ export const registerTelegramHandlers = (
       commandSync,
       ctx.from?.id ? String(ctx.from.id) : undefined,
     );
-    await execute(
+    await executeWithReply(
       ctx,
       logger,
       texts,
@@ -441,7 +425,7 @@ export const registerTelegramHandlers = (
       commandSync,
       ctx.from?.id ? String(ctx.from.id) : undefined,
     );
-    await execute(
+    await executeWithToast(
       ctx,
       logger,
       texts,
@@ -454,21 +438,10 @@ export const registerTelegramHandlers = (
           const [, key, value, gameId] = parts;
           if (key === "play" && value === "ONLINE") {
             const status = await resolveGroupMessageReadStatus();
-            if (status === "disabled") {
-              await safeReply(ctx, texts.onlineModeDisabledMessage());
-              await ctx.answerCallbackQuery({
-                text: texts.onlineModeDisabledAlert(),
-                show_alert: true,
-              });
-              return;
-            }
-
-            if (status === "unknown") {
-              await safeReply(ctx, texts.onlineModeUnknownMessage());
-              await ctx.answerCallbackQuery({
-                text: texts.onlineModeUnknownAlert(),
-                show_alert: true,
-              });
+            if (status !== "enabled") {
+              await safeToast(ctx, status === "disabled"
+                ? texts.onlineModeDisabledAlert()
+                : texts.onlineModeUnknownAlert());
               return;
             }
           }
@@ -482,6 +455,30 @@ export const registerTelegramHandlers = (
           if (result instanceof Error) return result;
           await ctx.answerCallbackQuery();
           return;
+        }
+
+        if (parts[0] === "ui") {
+          const [, action, gameId] = parts;
+          if (action === "config") {
+            const result = await gameService.beginConfigurationByGameId(
+              gameId,
+              fromUser,
+            );
+            if (result instanceof Error) return result;
+            await ctx.answerCallbackQuery();
+            await ctx.reply(texts.chooseGameModePrompt(), {
+              reply_markup: creatorConfigMenu,
+            });
+            return;
+          }
+
+          if (action === "open-config") {
+            await ctx.answerCallbackQuery();
+            await ctx.reply(texts.chooseGameModePrompt(), {
+              reply_markup: creatorConfigMenu,
+            });
+            return;
+          }
         }
 
         if (parts[0] === "pair") {

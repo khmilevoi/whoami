@@ -7,7 +7,7 @@ import { LoggerPort } from "../../../src/application/ports.js";
 import { TextService } from "../../../src/application/text-service.js";
 import { GameState } from "../../../src/domain/types.js";
 
-const createOfflineInProgressGame = (turnCursor: number): GameState => ({
+const createInProgressGame = (): GameState => ({
   id: "g1",
   chatId: "-1001",
   creatorPlayerId: "p1",
@@ -45,7 +45,7 @@ const createOfflineInProgressGame = (turnCursor: number): GameState => ({
   inProgress: {
     round: 1,
     turnOrder: ["p1", "p2"],
-    turnCursor,
+    turnCursor: 0,
     targetCursor: 0,
   },
   progress: {
@@ -66,6 +66,9 @@ const createOfflineInProgressGame = (turnCursor: number): GameState => ({
   voteHistory: [],
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
+  ui: {
+    privatePanels: {},
+  },
 });
 
 const createLogger = (): LoggerPort => ({
@@ -99,11 +102,9 @@ describe("telegram command sync", () => {
       deleteMyCommands: vi.fn(async () => true),
     };
 
-    const query = createQueryServiceStub({ game: null });
-
     const sync = new TelegramCommandSync(
       api,
-      query,
+      createQueryServiceStub({ game: null }),
       new ChatCommandResolver(texts),
       createLogger(),
       texts,
@@ -111,265 +112,74 @@ describe("telegram command sync", () => {
 
     await sync.syncGroupCommands();
 
-    expect(api.setMyCommands).toHaveBeenCalledTimes(1);
     expect(api.setMyCommands).toHaveBeenCalledWith(
-      [
-        expect.objectContaining({
-          command: commands.BOT_COMMANDS.START_GAME.command,
-        }),
-      ],
-      {
-        scope: {
-          type: "all_group_chats",
-        },
-      },
+      [expect.objectContaining({ command: commands.BOT_COMMANDS.START_GAME.command })],
+      { scope: { type: "all_group_chats" } },
     );
-    expect(api.deleteMyCommands).not.toHaveBeenCalled();
   });
 
-  it("does not call Telegram API when group command set did not change", async () => {
+  it("syncs private commands", async () => {
     const api = {
       setMyCommands: vi.fn(async () => true),
       deleteMyCommands: vi.fn(async () => true),
     };
 
-    const query = createQueryServiceStub({ game: null });
-
     const sync = new TelegramCommandSync(
       api,
-      query,
-      new ChatCommandResolver(texts),
-      createLogger(),
-      texts,
-    );
-
-    await sync.syncGroupCommands();
-    await sync.syncGroupCommands();
-
-    expect(api.setMyCommands).toHaveBeenCalledTimes(1);
-    expect(api.deleteMyCommands).not.toHaveBeenCalled();
-  });
-
-  it("applies group defaults in startup flow even when no active chats", async () => {
-    const api = {
-      setMyCommands: vi.fn(async () => true),
-      deleteMyCommands: vi.fn(async () => true),
-    };
-
-    const query = createQueryServiceStub({ game: null });
-
-    const sync = new TelegramCommandSync(
-      api,
-      query,
+      createQueryServiceStub({ game: null }),
       new ChatCommandResolver(texts),
       createLogger(),
       texts,
     );
 
     await sync.syncPrivateCommands();
-    await sync.syncGroupCommands();
-    await sync.syncActiveChats();
 
-    expect(api.setMyCommands).toHaveBeenCalledTimes(2);
-    expect(api.setMyCommands).toHaveBeenNthCalledWith(
-      1,
-      [
-        expect.objectContaining({
-          command: commands.BOT_COMMANDS.START_PRIVATE.command,
-        }),
-      ],
-      {
-        scope: {
-          type: "all_private_chats",
-        },
-      },
+    expect(api.setMyCommands).toHaveBeenCalledWith(
+      [expect.objectContaining({ command: commands.BOT_COMMANDS.START_PRIVATE.command })],
+      { scope: { type: "all_private_chats" } },
     );
-    expect(api.setMyCommands).toHaveBeenNthCalledWith(
-      2,
-      [
-        expect.objectContaining({
-          command: commands.BOT_COMMANDS.START_GAME.command,
-        }),
-      ],
-      {
-        scope: {
-          type: "all_group_chats",
-        },
-      },
+  });
+
+  it("keeps only creator cancel override during lobby", async () => {
+    const api = {
+      setMyCommands: vi.fn(async () => true),
+      deleteMyCommands: vi.fn(async () => true),
+    };
+    const lobbyGame = { ...createInProgressGame(), stage: "LOBBY_OPEN" as const };
+
+    const sync = new TelegramCommandSync(
+      api,
+      createQueryServiceStub({ game: lobbyGame }),
+      new ChatCommandResolver(texts),
+      createLogger(),
+      texts,
     );
+
+    await sync.syncChat("-1001");
+
     expect(api.deleteMyCommands).not.toHaveBeenCalled();
-  });
-
-  it("syncKnownChats syncs every known chat", async () => {
-    const api = {
-      setMyCommands: vi.fn(async () => true),
-      deleteMyCommands: vi.fn(async () => true),
-    };
-
-    const query = createQueryServiceStub({
-      game: null,
-      knownChatIds: ["-1001", "-1002"],
-    });
-
-    const sync = new TelegramCommandSync(
-      api,
-      query,
-      new ChatCommandResolver(texts),
-      createLogger(),
-      texts,
-    );
-
-    await sync.syncKnownChats();
-
-    expect(api.setMyCommands).toHaveBeenCalledTimes(2);
-    expect(api.setMyCommands).toHaveBeenNthCalledWith(
-      1,
-      [expect.objectContaining({ command: "whoami_start" })],
-      {
-        scope: {
-          type: "chat",
-          chat_id: -1001,
-        },
-      },
-    );
-    expect(api.setMyCommands).toHaveBeenNthCalledWith(
-      2,
-      [expect.objectContaining({ command: "whoami_start" })],
-      {
-        scope: {
-          type: "chat",
-          chat_id: -1002,
-        },
-      },
-    );
-  });
-
-  it("does not call Telegram API when command set did not change", async () => {
-    const api = {
-      setMyCommands: vi.fn(async () => true),
-      deleteMyCommands: vi.fn(async () => true),
-    };
-
-    const state = {
-      game: null as GameState | null,
-    };
-
-    const query = createQueryServiceStub(state);
-
-    const sync = new TelegramCommandSync(
-      api,
-      query,
-      new ChatCommandResolver(texts),
-      createLogger(),
-      texts,
-    );
-
-    await sync.syncChat("-1001");
-    await sync.syncChat("-1001");
-
     expect(api.setMyCommands).toHaveBeenCalledTimes(1);
-    expect(api.deleteMyCommands).not.toHaveBeenCalled();
-  });
-
-  it("removes stale chat_member scope when offline asker changes", async () => {
-    const api = {
-      setMyCommands: vi.fn(async () => true),
-      deleteMyCommands: vi.fn(async () => true),
-    };
-
-    const state = {
-      game: createOfflineInProgressGame(0),
-    };
-
-    const query = createQueryServiceStub(state);
-
-    const sync = new TelegramCommandSync(
-      api,
-      query,
-      new ChatCommandResolver(texts),
-      createLogger(),
-      texts,
+    expect(api.setMyCommands).toHaveBeenCalledWith(
+      [expect.objectContaining({ command: "whoami_cancel" })],
+      {
+        scope: {
+          type: "chat_member",
+          chat_id: -1001,
+          user_id: 101,
+        },
+      },
     );
-
-    await sync.syncChat("-1001");
-    state.game = createOfflineInProgressGame(1);
-    await sync.syncChat("-1001");
-
-    expect(api.setMyCommands).toHaveBeenCalledTimes(3);
-    expect(api.deleteMyCommands).toHaveBeenCalledTimes(1);
-    expect(api.deleteMyCommands).toHaveBeenCalledWith({
-      scope: {
-        type: "chat_member",
-        chat_id: -1001,
-        user_id: 101,
-      },
-    });
   });
 
-  it("falls back to /whoami_start and clears member overrides when active game is gone", async () => {
+  it("syncs only giveup during in-progress", async () => {
     const api = {
       setMyCommands: vi.fn(async () => true),
       deleteMyCommands: vi.fn(async () => true),
     };
 
-    const state = {
-      game: createOfflineInProgressGame(0) as GameState | null,
-      knownUserIdsByChatId: {
-        "-1001": ["101", "202"],
-      },
-    };
-
-    const query = createQueryServiceStub(state);
-
     const sync = new TelegramCommandSync(
       api,
-      query,
-      new ChatCommandResolver(texts),
-      createLogger(),
-      texts,
-    );
-
-    await sync.syncChat("-1001");
-    state.game = null;
-    await sync.syncChat("-1001");
-
-    const lastSetCall = api.setMyCommands.mock.calls.at(-1) as unknown;
-    const [lastCommands, lastScope] = lastSetCall as [unknown, unknown];
-    expect(lastCommands).toEqual([
-      expect.objectContaining({ command: "whoami_start" }),
-    ]);
-    expect(lastScope).toEqual({
-      scope: {
-        type: "chat",
-        chat_id: -1001,
-      },
-    });
-
-    expect(api.deleteMyCommands).toHaveBeenCalledWith({
-      scope: {
-        type: "chat_member",
-        chat_id: -1001,
-        user_id: 101,
-      },
-    });
-  });
-
-  it("force-cleans chat_member scopes for known users after restart", async () => {
-    const api = {
-      setMyCommands: vi.fn(async () => true),
-      deleteMyCommands: vi.fn(async () => true),
-    };
-
-    const query = createQueryServiceStub({
-      game: null,
-      knownUserIdsByChatId: {
-        "-1001": ["101"],
-      },
-    });
-
-    const sync = new TelegramCommandSync(
-      api,
-      query,
+      createQueryServiceStub({ game: createInProgressGame() }),
       new ChatCommandResolver(texts),
       createLogger(),
       texts,
@@ -378,7 +188,7 @@ describe("telegram command sync", () => {
     await sync.syncChat("-1001");
 
     expect(api.setMyCommands).toHaveBeenCalledWith(
-      [expect.objectContaining({ command: "whoami_start" })],
+      [expect.objectContaining({ command: "giveup" })],
       {
         scope: {
           type: "chat",
@@ -386,13 +196,5 @@ describe("telegram command sync", () => {
         },
       },
     );
-
-    expect(api.deleteMyCommands).toHaveBeenCalledWith({
-      scope: {
-        type: "chat_member",
-        chat_id: -1001,
-        user_id: 101,
-      },
-    });
   });
 });

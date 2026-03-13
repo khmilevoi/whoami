@@ -14,8 +14,7 @@ export class ReverseModeService extends BaseGameModeService {
   async announceCurrentTurn(
     game: GameState,
   ): Promise<void | NotificationError> {
-    const currentAskerId =
-      game.inProgress.turnOrder[game.inProgress.turnCursor];
+    const currentAskerId = game.inProgress.turnOrder[game.inProgress.turnCursor];
     if (!currentAskerId) {
       return;
     }
@@ -47,8 +46,10 @@ export class ReverseModeService extends BaseGameModeService {
         [
           [
             {
+              kind: "callback",
               text: this.context.texts.startPollButton(),
               data: `ask:${game.id}`,
+              style: "primary",
             },
           ],
         ],
@@ -61,10 +62,11 @@ export class ReverseModeService extends BaseGameModeService {
 
   async sendFinalSummary(game: GameState): Promise<void | NotificationError> {
     if (!game.result) {
-      return this.context.notifier.sendGroupMessage(
+      const sent = await this.context.notifier.sendGroupMessage(
         game.chatId,
         this.context.texts.gameFinished(),
       );
+      return sent instanceof Error ? sent : undefined;
     }
 
     const owner = game.result.reverse?.asWordOwner ?? [];
@@ -85,10 +87,11 @@ export class ReverseModeService extends BaseGameModeService {
       })
       .join("\n");
 
-    return this.context.notifier.sendGroupMessage(
+    const sent = await this.context.notifier.sendGroupMessage(
       game.chatId,
       this.context.texts.reverseSummary(ownerText, guesserText),
     );
+    return sent instanceof Error ? sent : undefined;
   }
 
   protected async startQuestion(
@@ -134,16 +137,20 @@ export class ReverseModeService extends BaseGameModeService {
       [
         [
           {
+            kind: "callback",
             text: this.context.texts.voteDecisionButton("YES"),
             data: `vote:YES:${updated.id}`,
           },
           {
+            kind: "callback",
             text: this.context.texts.voteDecisionButton("NO"),
             data: `vote:NO:${updated.id}`,
           },
           {
+            kind: "callback",
             text: this.context.texts.voteDecisionButton("GUESSED"),
             data: `vote:GUESSED:${updated.id}`,
+            style: "success",
           },
         ],
       ],

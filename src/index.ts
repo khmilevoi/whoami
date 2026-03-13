@@ -1,3 +1,5 @@
+import { autoRetry } from "@grammyjs/auto-retry";
+import { hydrate } from "@grammyjs/hydrate";
 import * as appErrors from "./domain/errors.js";
 import { AwilixContainer } from "awilix";
 import { Bot } from "grammy";
@@ -20,6 +22,9 @@ const start = (): void | appErrors.StartAppError => {
 
   const container: AwilixContainer = buildContainer(config);
   const bot = container.resolve<Bot>("bot");
+  bot.api.config.use(autoRetry());
+  bot.use(hydrate() as never);
+
   const logger = container.resolve<LoggerPort>("logger");
   const texts = container.resolve<TextService>("texts");
   const gameService = container.resolve<GameService>("gameService");
@@ -76,3 +81,4 @@ if (result instanceof Error) {
   console.error(result);
   process.exit(1);
 }
+

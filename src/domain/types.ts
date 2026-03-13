@@ -22,6 +22,33 @@ export type PlayerStage =
   | "BLOCKED_DM";
 
 export type VoteDecision = "YES" | "NO" | "GUESSED";
+export type ButtonStyle = "primary" | "success" | "danger";
+
+export interface CallbackButton {
+  kind: "callback";
+  text: string;
+  data: string;
+  style?: ButtonStyle;
+}
+
+export interface UrlButton {
+  kind: "url";
+  text: string;
+  url: string;
+  style?: ButtonStyle;
+}
+
+export type UiButton = CallbackButton | UrlButton;
+
+export interface PrivatePanelState {
+  chatId: string;
+  messageId: number;
+}
+
+export interface GameUiState {
+  groupStatusMessageId?: number;
+  privatePanels: Record<string, PrivatePanelState>;
+}
 
 export interface PlayerState {
   id: string;
@@ -141,6 +168,7 @@ export interface GameState {
   voteHistory: VoteRecord[];
   result?: GameResult;
   canceledReason?: string;
+  ui?: GameUiState;
   createdAt: string;
   updatedAt: string;
 }

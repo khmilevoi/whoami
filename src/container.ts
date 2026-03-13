@@ -13,6 +13,7 @@ import { ChatCommandResolver } from "./application/chat-command-resolver.js";
 import { GameQueryService } from "./application/game-query-service.js";
 import { GameService } from "./application/game-service.js";
 import { GameServiceContext } from "./application/game-service-context.js";
+import { PregameUiSyncService } from "./application/pregame-ui-sync-service.js";
 import { TextService } from "./application/text-service.js";
 import {
   ClockPort,
@@ -65,6 +66,7 @@ interface InternalCradle extends ServiceCradle {
   expectationStore: PrivateExpectationStore;
   normalModeService: NormalModeService;
   reverseModeService: ReverseModeService;
+  pregameUiSync: PregameUiSyncService;
   readyStartStage: ReadyStartStageService;
   wordPreparationStage: WordPreparationStageService;
   normalPairingStage: NormalPairingStageService;
@@ -148,6 +150,15 @@ export const buildContainer = (externalConfig?: AppConfig) => {
     expectationStore: asClass(PrivateExpectationStore, {
       lifetime: Lifetime.SINGLETON,
     }),
+    pregameUiSync: asFunction(
+      ({ gameServiceContext, configDraftStore, expectationStore }: InternalCradle) =>
+        new PregameUiSyncService(
+          gameServiceContext,
+          configDraftStore,
+          expectationStore,
+        ),
+      { lifetime: Lifetime.SINGLETON },
+    ),
     normalModeService: asFunction(
       ({ gameServiceContext }: { gameServiceContext: GameServiceContext }) =>
         new NormalModeService(gameServiceContext),
@@ -161,10 +172,11 @@ export const buildContainer = (externalConfig?: AppConfig) => {
     readyStartStage: asFunction(
       ({
         gameServiceContext,
+        pregameUiSync,
         normalModeService,
         reverseModeService,
       }: InternalCradle) =>
-        new ReadyStartStageService(gameServiceContext, [
+        new ReadyStartStageService(gameServiceContext, pregameUiSync, [
           normalModeService,
           reverseModeService,
         ]),
@@ -175,17 +187,23 @@ export const buildContainer = (externalConfig?: AppConfig) => {
         gameServiceContext,
         expectationStore,
         readyStartStage,
+        pregameUiSync,
       }: InternalCradle) =>
         new WordPreparationStageService(
           gameServiceContext,
           expectationStore,
           readyStartStage,
+          pregameUiSync,
         ),
       { lifetime: Lifetime.SINGLETON },
     ),
     normalPairingStage: asFunction(
-      ({ gameServiceContext, wordPreparationStage }: InternalCradle) =>
-        new NormalPairingStageService(gameServiceContext, wordPreparationStage),
+      ({ gameServiceContext, wordPreparationStage, pregameUiSync }: InternalCradle) =>
+        new NormalPairingStageService(
+          gameServiceContext,
+          wordPreparationStage,
+          pregameUiSync,
+        ),
       { lifetime: Lifetime.SINGLETON },
     ),
     configurationStage: asFunction(
@@ -194,12 +212,14 @@ export const buildContainer = (externalConfig?: AppConfig) => {
         configDraftStore,
         normalPairingStage,
         wordPreparationStage,
+        pregameUiSync,
       }: InternalCradle) =>
         new ConfigurationStageService(
           gameServiceContext,
           configDraftStore,
           normalPairingStage,
           wordPreparationStage,
+          pregameUiSync,
         ),
       { lifetime: Lifetime.SINGLETON },
     ),

@@ -7,6 +7,7 @@ import {
 } from "../../domain/types.js";
 import type { ConfigurationStageError } from "../errors.js";
 import { GameServiceContext } from "../game-service-context.js";
+import { PregameUiSyncService } from "../pregame-ui-sync-service.js";
 import { ConfigDraftStore } from "../stores/config-draft-store.js";
 import { NormalPairingStageService } from "./normal-pairing-stage-service.js";
 import { WordPreparationStageService } from "./word-preparation-stage-service.js";
@@ -17,6 +18,7 @@ export class ConfigurationStageService {
     private readonly configDraftStore: ConfigDraftStore,
     private readonly normalPairingStage: NormalPairingStageService,
     private readonly wordPreparationStage: WordPreparationStageService,
+    private readonly pregameUiSync: PregameUiSyncService,
   ) {}
 
   async applyConfigStep(
@@ -42,6 +44,7 @@ export class ConfigurationStageService {
 
     if (key === "mode") {
       draft.mode = value as GameMode;
+      draft.pairingMode = undefined;
     }
     if (key === "play") {
       draft.playMode = value as PlayMode;
@@ -52,70 +55,12 @@ export class ConfigurationStageService {
 
     this.configDraftStore.set(gameId, draft);
 
-    if (!draft.mode) {
-      return;
-    }
-
-    if (!draft.playMode) {
-      const sentPrompt = await this.context.notifier.sendPrivateKeyboard(
-        actorTelegramUserId,
-        this.context.texts.choosePlayModePrompt(),
-        [
-          [
-            {
-              text: this.context.texts.playModeButton("ONLINE"),
-              data: `cfg:play:ONLINE:${gameId}`,
-            },
-          ],
-          [
-            {
-              text: this.context.texts.playModeButton("OFFLINE"),
-              data: `cfg:play:OFFLINE:${gameId}`,
-            },
-          ],
-        ],
-      );
-      if (!sentPrompt) {
-        const sentFallback = await this.context.notifier.sendGroupMessage(
-          game.chatId,
-          this.context.texts.creatorDmRequired(
-            this.context.notifier.buildBotDeepLink(),
-          ),
-        );
-        if (sentFallback instanceof Error) return sentFallback;
-      }
-      return;
+    if (!draft.mode || !draft.playMode) {
+      return this.pregameUiSync.syncGame(gameId);
     }
 
     if (draft.mode === "NORMAL" && !draft.pairingMode) {
-      const sentPrompt = await this.context.notifier.sendPrivateKeyboard(
-        actorTelegramUserId,
-        this.context.texts.choosePairingModePrompt(),
-        [
-          [
-            {
-              text: this.context.texts.pairingModeButton("RANDOM"),
-              data: `cfg:pair:RANDOM:${gameId}`,
-            },
-          ],
-          [
-            {
-              text: this.context.texts.pairingModeButton("MANUAL"),
-              data: `cfg:pair:MANUAL:${gameId}`,
-            },
-          ],
-        ],
-      );
-      if (!sentPrompt) {
-        const sentFallback = await this.context.notifier.sendGroupMessage(
-          game.chatId,
-          this.context.texts.creatorDmRequired(
-            this.context.notifier.buildBotDeepLink(),
-          ),
-        );
-        if (sentFallback instanceof Error) return sentFallback;
-      }
-      return;
+      return this.pregameUiSync.syncGame(gameId);
     }
 
     const configured = this.context.transactionRunner.runInTransaction(() => {
@@ -143,15 +88,8 @@ export class ConfigurationStageService {
 
     this.configDraftStore.delete(gameId);
 
-    const sentConfig = await this.context.notifier.sendGroupMessage(
-      configured.chatId,
-      this.context.texts.configSaved({
-        mode: configured.config!.mode,
-        playMode: configured.config!.playMode,
-        pairingMode: configured.config!.pairingMode,
-      }),
-    );
-    if (sentConfig instanceof Error) return sentConfig;
+    const uiSyncResult = await this.pregameUiSync.syncGame(configured.id);
+    if (uiSyncResult instanceof Error) return uiSyncResult;
 
     if (
       configured.config?.mode === "NORMAL" &&
@@ -164,3 +102,4 @@ export class ConfigurationStageService {
     return this.wordPreparationStage.promptWordCollection(configured);
   }
 }
+

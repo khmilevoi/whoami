@@ -2,12 +2,14 @@ import { GameMode } from "../../domain/types.js";
 import type { ReadyStartError } from "../errors.js";
 import { GameServiceContext } from "../game-service-context.js";
 import { GameModeService } from "../modes/game-mode-service.js";
+import { PregameUiSyncService } from "../pregame-ui-sync-service.js";
 
 export class ReadyStartStageService {
   private readonly modeServices = new Map<GameMode, GameModeService>();
 
   constructor(
     private readonly context: GameServiceContext,
+    private readonly pregameUiSync: PregameUiSyncService,
     services: GameModeService[],
   ) {
     for (const service of services) {
@@ -39,6 +41,9 @@ export class ReadyStartStageService {
     ) {
       return;
     }
+
+    const uiSyncResult = await this.pregameUiSync.syncGame(started.game.id);
+    if (uiSyncResult instanceof Error) return uiSyncResult;
 
     const modeService = this.modeServices.get(started.game.config.mode);
     if (!modeService) {

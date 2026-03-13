@@ -1,6 +1,7 @@
 import { GameServiceContext } from "../../src/application/game-service-context.js";
 import { NormalModeService } from "../../src/application/modes/normal-mode-service.js";
 import { ReverseModeService } from "../../src/application/modes/reverse-mode-service.js";
+import { PregameUiSyncService } from "../../src/application/pregame-ui-sync-service.js";
 import { ConfigurationStageService } from "../../src/application/stages/configuration-stage-service.js";
 import { NormalPairingStageService } from "../../src/application/stages/normal-pairing-stage-service.js";
 import { ReadyStartStageService } from "../../src/application/stages/ready-start-stage-service.js";
@@ -17,6 +18,7 @@ export interface GameServiceComponentHarness {
   readonly context: GameServiceContext;
   readonly normalMode: NormalModeService;
   readonly reverseMode: ReverseModeService;
+  readonly pregameUiSync: PregameUiSyncService;
   readonly readyStartStage: ReadyStartStageService;
   readonly wordPreparationStage: WordPreparationStageService;
   readonly normalPairingStage: NormalPairingStageService;
@@ -43,9 +45,14 @@ export const createGameServiceComponentHarness =
 
     const configDraftStore = new ConfigDraftStore();
     const expectationStore = new PrivateExpectationStore();
+    const pregameUiSync = new PregameUiSyncService(
+      context,
+      configDraftStore,
+      expectationStore,
+    );
     const normalMode = new NormalModeService(context);
     const reverseMode = new ReverseModeService(context);
-    const readyStartStage = new ReadyStartStageService(context, [
+    const readyStartStage = new ReadyStartStageService(context, pregameUiSync, [
       normalMode,
       reverseMode,
     ]);
@@ -53,16 +60,19 @@ export const createGameServiceComponentHarness =
       context,
       expectationStore,
       readyStartStage,
+      pregameUiSync,
     );
     const normalPairingStage = new NormalPairingStageService(
       context,
       wordPreparationStage,
+      pregameUiSync,
     );
     const configurationStage = new ConfigurationStageService(
       context,
       configDraftStore,
       normalPairingStage,
       wordPreparationStage,
+      pregameUiSync,
     );
 
     return {
@@ -70,6 +80,7 @@ export const createGameServiceComponentHarness =
       context,
       normalMode,
       reverseMode,
+      pregameUiSync,
       readyStartStage,
       wordPreparationStage,
       normalPairingStage,

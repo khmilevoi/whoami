@@ -71,6 +71,9 @@ export class GameEngine {
       },
       turns: [],
       voteHistory: [],
+      ui: {
+        privatePanels: {},
+      },
       createdAt: input.now,
       updatedAt: input.now,
     };
@@ -1010,3 +1013,6 @@ export class GameEngine {
     return game;
   }
 }
+
+
+

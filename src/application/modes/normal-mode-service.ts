@@ -34,8 +34,10 @@ export class NormalModeService extends BaseGameModeService {
         [
           [
             {
+              kind: "callback",
               text: this.context.texts.startPollButton(),
               data: `ask:${game.id}`,
+              style: "primary",
             },
           ],
         ],
@@ -62,10 +64,11 @@ export class NormalModeService extends BaseGameModeService {
 
   async sendFinalSummary(game: GameState): Promise<void | NotificationError> {
     if (!game.result) {
-      return this.context.notifier.sendGroupMessage(
+      const sent = await this.context.notifier.sendGroupMessage(
         game.chatId,
         this.context.texts.gameFinished(),
       );
+      return sent instanceof Error ? sent : undefined;
     }
 
     const lines = (game.result.normal ?? []).map((row) => {
@@ -73,10 +76,11 @@ export class NormalModeService extends BaseGameModeService {
       return `- ${this.context.playerLabel(game, row.playerId)}: ${row.rounds}/${row.questions}${crown}`;
     });
 
-    return this.context.notifier.sendGroupMessage(
+    const sent = await this.context.notifier.sendGroupMessage(
       game.chatId,
       this.context.texts.normalSummary(lines),
     );
+    return sent instanceof Error ? sent : undefined;
   }
 
   protected async startQuestion(
@@ -114,16 +118,20 @@ export class NormalModeService extends BaseGameModeService {
       [
         [
           {
+            kind: "callback",
             text: this.context.texts.voteDecisionButton("YES"),
             data: `vote:YES:${updated.id}`,
           },
           {
+            kind: "callback",
             text: this.context.texts.voteDecisionButton("NO"),
             data: `vote:NO:${updated.id}`,
           },
           {
+            kind: "callback",
             text: this.context.texts.voteDecisionButton("GUESSED"),
             data: `vote:GUESSED:${updated.id}`,
+            style: "success",
           },
         ],
       ],

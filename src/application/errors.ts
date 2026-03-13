@@ -20,6 +20,7 @@ import type {
   SelectManualPairError,
   StartGameIfReadyError,
   StartupAppError,
+  StartPayloadError,
   SubmitClueError,
   SubmitWordError,
   ConfirmWordError,
@@ -57,6 +58,7 @@ export type ModeServiceError =
 export type ReadyStartError =
   | GameNotFoundError
   | StartGameIfReadyError
+  | MarkDmError
   | NotificationError;
 
 export type PromptWordCollectionError =
@@ -106,9 +108,16 @@ export type GameServiceError =
   | NotificationError;
 
 export type RecoveryStartupError = NormalPairingStageError;
-export type TelegramHandlerError = GameServiceError | ManualPairPayloadError;
+export type TelegramHandlerError =
+  | GameServiceError
+  | ManualPairPayloadError
+  | StartPayloadError;
 export type AppBoundaryError = StartupAppError | WebhookAppError;
 export type KnownAppError =
   | DomainAppError
   | GameServiceError
   | CommandSyncAppError;
+
+
+
+

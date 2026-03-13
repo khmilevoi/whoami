@@ -1,12 +1,14 @@
 import { GameState } from "../../domain/types.js";
 import type { NormalPairingStageError } from "../errors.js";
 import { GameServiceContext } from "../game-service-context.js";
+import { PregameUiSyncService } from "../pregame-ui-sync-service.js";
 import { WordPreparationStageService } from "./word-preparation-stage-service.js";
 
 export class NormalPairingStageService {
   constructor(
     private readonly context: GameServiceContext,
     private readonly wordPreparationStage: WordPreparationStageService,
+    private readonly pregameUiSync: PregameUiSyncService,
   ) {}
 
   async applyManualPair(
@@ -41,11 +43,8 @@ export class NormalPairingStageService {
       return this.promptCurrentChooser(updated);
     }
 
-    const sentCompletion = await this.context.notifier.sendGroupMessage(
-      updated.chatId,
-      this.context.texts.manualPairingCompleted(),
-    );
-    if (sentCompletion instanceof Error) return sentCompletion;
+    const uiSyncResult = await this.pregameUiSync.syncGame(updated.id);
+    if (uiSyncResult instanceof Error) return uiSyncResult;
     return this.wordPreparationStage.promptWordCollection(updated);
   }
 
@@ -81,38 +80,7 @@ export class NormalPairingStageService {
   async promptCurrentChooser(
     game: GameState,
   ): Promise<void | NormalPairingStageError> {
-    const chooserId =
-      game.preparation.manualPairingQueue[game.preparation.manualPairingCursor];
-    const chooser = game.players.find((player) => player.id === chooserId);
-    if (!chooser) {
-      return;
-    }
-
-    const usedTargets = new Set(Object.values(game.pairings));
-    const buttons = game.players
-      .filter((player) => player.id !== chooser.id)
-      .filter((player) => !usedTargets.has(player.id))
-      .map((player) => [
-        {
-          text: this.context.playerLabel(game, player.id),
-          data: `pair:${player.id}:${game.id}`,
-        },
-      ]);
-
-    const ok = await this.context.notifier.sendPrivateKeyboard(
-      chooser.telegramUserId,
-      this.context.texts.manualPairPrompt(),
-      buttons,
-    );
-    if (!ok) {
-      const sentFallback = await this.context.notifier.sendGroupMessage(
-        game.chatId,
-        this.context.texts.dmLinkRequired(
-          this.context.playerLabel(game, chooser.id),
-          this.context.notifier.buildBotDeepLink(),
-        ),
-      );
-      if (sentFallback instanceof Error) return sentFallback;
-    }
+    const syncResult = await this.pregameUiSync.syncGame(game.id);
+    if (syncResult instanceof Error) return syncResult;
   }
 }

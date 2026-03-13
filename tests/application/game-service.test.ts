@@ -471,7 +471,7 @@ describe("game service", () => {
       pairingMode: "RANDOM",
     });
 
-    await harness.service.handlePrivateStart(sharedActor.telegramUserId);
+    await harness.service.handlePrivateStart(sharedActor);
 
     expect(
       harness.getPlayerByTelegram(gameOne.id, sharedActor.telegramUserId).dmOpened,
@@ -526,4 +526,5 @@ describe("game service", () => {
     );
   });
 });
+
 
