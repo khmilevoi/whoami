@@ -41,3 +41,28 @@ describe("game service public entrypoints", () => {
     ).resolves.toBeInstanceOf(GameConfigurationNotSetError);
   });
 });
+
+it("persists fallback locale and locale source when the public api receives a bare telegram id", async () => {
+  const harness = createGameServiceHarness();
+  harness.identity.toPlayerIdentity = ({ telegramUserId }) => ({
+    id: `tg:${telegramUserId}`,
+    telegramUserId,
+    displayName: telegramUserId,
+    locale: undefined,
+    localeSource: undefined,
+  });
+
+  await harness.service.startGame("chat-entrypoint-string-actor", "99");
+
+  const game = harness.getGameByChat("chat-entrypoint-string-actor");
+  expect(game.players[0]).toMatchObject({
+    telegramUserId: "99",
+    displayName: "99",
+    locale: harness.texts.locale,
+    localeSource: "telegram",
+  });
+  expect(harness.repository.findPlayerProfileByTelegramUserId("99")).toMatchObject({
+    locale: harness.texts.locale,
+    localeSource: "telegram",
+  });
+});

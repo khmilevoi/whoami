@@ -104,3 +104,51 @@ describe("configuration stage service", () => {
     }
   });
 });
+
+it("rejects non-creator config changes without mutating the draft or game", async () => {
+  const { components, actors, game } = await setupLobby();
+
+  const result = await components.configurationStage.applyConfigStep(
+    game.id,
+    actors[1]!.telegramUserId,
+    "mode",
+    "REVERSE",
+  );
+
+  expect(result).toBeInstanceOf(Error);
+  expect(components.configDraftStore.get(game.id)).toEqual({});
+  expect(components.game.getGameById(game.id).config).toBeUndefined();
+});
+
+it("publishes chooser state for manual pairing without priming word expectations", async () => {
+  const { components, actors, game } = await setupLobby();
+  const creator = actors[0]!;
+
+  await components.configurationStage.applyConfigStep(
+    game.id,
+    creator.telegramUserId,
+    "mode",
+    "NORMAL",
+  );
+  await components.configurationStage.applyConfigStep(
+    game.id,
+    creator.telegramUserId,
+    "play",
+    "ONLINE",
+  );
+  await components.configurationStage.applyConfigStep(
+    game.id,
+    creator.telegramUserId,
+    "pair",
+    "MANUAL",
+  );
+
+  const configured = components.game.getGameById(game.id);
+  const snapshot = components.context.statusService.getByGameId(game.id);
+
+  expect(configured.stage).toBe("PREPARE_WORDS");
+  expect(configured.words).toEqual({});
+  expect(snapshot?.manualPairingPending).toBe(true);
+  expect(snapshot?.manualPairingChooserPlayerId).toBe(configured.players[0]!.id);
+  expect(components.expectationStore.get(game.id, configured.players[0]!.id)).toBeUndefined();
+});

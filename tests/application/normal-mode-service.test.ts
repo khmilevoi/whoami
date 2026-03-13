@@ -71,3 +71,73 @@ describe("normal mode service", () => {
     expect(components.game.getCurrentAsker(started.id).id).not.toBe(firstAsker.id);
   });
 });
+
+it("includes clues in the visible-word list before the first turn", async () => {
+  const components = createGameServiceComponentHarness();
+  const actors = components.game.createActors(3);
+  const started = await components.game.setupInProgressGame({
+    chatId: "chat-normal-clues",
+    actors,
+    mode: "NORMAL",
+    playMode: "ONLINE",
+    pairingMode: "RANDOM",
+    wordsByTelegramUserId: {
+      [actors[0]!.telegramUserId]: { word: "lion", clue: "savannah" },
+      [actors[1]!.telegramUserId]: { word: "tiger" },
+      [actors[2]!.telegramUserId]: { word: "bear" },
+    },
+  });
+
+  components.game.notifier.sent.length = 0;
+  await components.normalMode.beforeFirstTurn(started);
+
+  expect(
+    components.game.notifier.sent.some(
+      (notification) =>
+        notification.kind === "private-message" &&
+        notification.text.includes("lion (savannah)"),
+    ),
+  ).toBe(true);
+});
+
+it("formats crownless summary rows and propagates send errors without mutating the result", async () => {
+  const components = createGameServiceComponentHarness();
+  const started = await components.game.setupInProgressGame({
+    chatId: "chat-normal-summary-extra",
+    actors: components.game.createActors(3),
+    mode: "NORMAL",
+    playMode: "ONLINE",
+    pairingMode: "RANDOM",
+  });
+  const finished = structuredClone(started);
+  finished.stage = "FINISHED";
+  finished.result = {
+    gameId: finished.id,
+    mode: "NORMAL",
+    createdAt: finished.updatedAt,
+    normal: [
+      {
+        playerId: finished.players[0]!.id,
+        rounds: 2,
+        questions: 3,
+        crowns: [],
+      },
+    ],
+  };
+
+  components.game.notifier.sent.length = 0;
+  await components.normalMode.sendFinalSummary(finished);
+
+  expect(components.game.notifier.sent.at(-1)?.text).toContain(
+    `${components.context.playerLabel(finished, finished.players[0]!.id)}: 2/3`,
+  );
+
+  components.game.notifier.sent.length = 0;
+  components.game.notifier.setGroupMessageFailure(finished.chatId);
+  const result = await components.normalMode.sendFinalSummary(finished);
+
+  expect(result).toBeInstanceOf(Error);
+  expect(finished.result?.normal?.[0]?.crowns).toEqual([]);
+});
+
+

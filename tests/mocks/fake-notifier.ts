@@ -30,6 +30,9 @@ export class FakeNotifier implements NotifierPort {
   readonly failedPrivateKeyboards = new Set<string>();
   readonly failedPrivateEdits = new Set<string>();
   readonly failedGroupEdits = new Set<string>();
+  readonly failedGroupMessages = new Set<string>();
+  readonly zeroMessageIdGroupEdits = new Set<string>();
+  readonly zeroMessageIdPrivateEdits = new Set<string>();
   private messageId = 1;
 
   constructor(private readonly deepLink = "https://t.me/fake_bot") {}
@@ -50,10 +53,29 @@ export class FakeNotifier implements NotifierPort {
     this.failedGroupEdits.add(chatId);
   }
 
+  setGroupMessageFailure(chatId: string): void {
+    this.failedGroupMessages.add(chatId);
+  }
+
+  setGroupEditZeroMessageId(chatId: string): void {
+    this.zeroMessageIdGroupEdits.add(chatId);
+  }
+
+  setPrivateEditZeroMessageId(userId: string): void {
+    this.zeroMessageIdPrivateEdits.add(userId);
+  }
+
   async sendGroupMessage(
     chatId: string,
     text: string,
   ): Promise<NotificationReceipt | NotificationError> {
+    if (this.failedGroupMessages.has(chatId)) {
+      return new TelegramApiError({
+        operation: "sendMessage",
+        cause: new Error(`group-message-failed:${chatId}`),
+      });
+    }
+
     const receipt = { messageId: this.messageId++ };
     this.sent.push({ kind: "group-message", chatId, text, messageId: receipt.messageId });
     return receipt;
@@ -64,6 +86,13 @@ export class FakeNotifier implements NotifierPort {
     text: string,
     buttons: UiButton[][],
   ): Promise<NotificationReceipt | NotificationError> {
+    if (this.failedGroupMessages.has(chatId)) {
+      return new TelegramApiError({
+        operation: "sendMessage",
+        cause: new Error(`group-message-failed:${chatId}`),
+      });
+    }
+
     const receipt = { messageId: this.messageId++ };
     this.sent.push({
       kind: "group-message",
@@ -95,7 +124,9 @@ export class FakeNotifier implements NotifierPort {
       buttons: cloneButtons(buttons),
       messageId,
     });
-    return { messageId };
+    return {
+      messageId: this.zeroMessageIdGroupEdits.has(chatId) ? 0 : messageId,
+    };
   }
 
   async sendPrivateMessage(
@@ -155,7 +186,9 @@ export class FakeNotifier implements NotifierPort {
       buttons: cloneButtons(buttons),
       messageId,
     });
-    return { messageId };
+    return {
+      messageId: this.zeroMessageIdPrivateEdits.has(userId) ? 0 : messageId,
+    };
   }
 
   buildBotDeepLink(payload?: string): string {

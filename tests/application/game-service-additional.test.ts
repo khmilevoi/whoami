@@ -88,3 +88,76 @@ describe("game service additional state flows", () => {
     expect(harness.repository.listActiveGames()).toEqual([]);
   });
 });
+
+it("falls back to the text service default locale when identity resolution omits locale data", async () => {
+  const harness = createGameServiceHarness();
+  harness.identity.toPlayerIdentity = ({ telegramUserId, username, firstName, lastName }) => ({
+    id: `tg:${telegramUserId}`,
+    telegramUserId,
+    username,
+    displayName: [firstName, lastName].filter(Boolean).join(" ").trim() || telegramUserId,
+    locale: undefined,
+    localeSource: undefined,
+  });
+
+  await harness.service.handlePrivateStart({
+    telegramUserId: "42",
+    firstName: "NoLocale",
+  });
+
+  expect(harness.notifier.sent).toEqual([
+    expect.objectContaining({
+      kind: "private-message",
+      userId: "42",
+      text: harness.texts.forLocale(harness.texts.locale).noActiveGamesForUser(),
+    }),
+  ]);
+  expect(harness.repository.findPlayerProfileByTelegramUserId("42")).toMatchObject({
+    locale: harness.texts.locale,
+    localeSource: "telegram",
+  });
+});
+
+it("refreshes usernames across active games without overwriting explicit locale preferences", async () => {
+  const harness = createGameServiceHarness();
+  const sharedActor = {
+    telegramUserId: "7",
+    username: "user7",
+    firstName: "Alice",
+    languageCode: "ru",
+  };
+
+  const gameOne = await harness.setupConfiguredGame({
+    chatId: "chat-username-1",
+    actors: [sharedActor, harness.createActor(2), harness.createActor(3)],
+    mode: "REVERSE",
+    playMode: "ONLINE",
+  });
+  const gameTwo = await harness.setupConfiguredGame({
+    chatId: "chat-username-2",
+    actors: [sharedActor, harness.createActor(4), harness.createActor(5)],
+    mode: "NORMAL",
+    playMode: "OFFLINE",
+    pairingMode: "RANDOM",
+  });
+
+  await harness.service.setUserLocalePreference(sharedActor, "en");
+  await harness.service.handlePrivateStart({
+    ...sharedActor,
+    username: "renamed7",
+    firstName: "Alicia",
+  });
+
+  expect(harness.getPlayerByTelegram(gameOne.id, sharedActor.telegramUserId)).toMatchObject({
+    username: "renamed7",
+    displayName: "Alicia",
+    locale: "en",
+    localeSource: "explicit",
+  });
+  expect(harness.getPlayerByTelegram(gameTwo.id, sharedActor.telegramUserId)).toMatchObject({
+    username: "renamed7",
+    displayName: "Alicia",
+    locale: "en",
+    localeSource: "explicit",
+  });
+});

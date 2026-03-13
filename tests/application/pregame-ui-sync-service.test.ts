@@ -126,3 +126,151 @@ describe("pregame ui sync service", () => {
     );
   });
 });
+
+it("sends plain group and private messages for in-progress views without buttons and skips unopened or blocked players", async () => {
+  const components = createGameServiceComponentHarness();
+  const actors = components.game.createActors(3);
+  const started = await components.game.setupInProgressGame({
+    chatId: "chat-ui-plain",
+    actors,
+    mode: "NORMAL",
+    playMode: "ONLINE",
+    pairingMode: "RANDOM",
+  });
+
+  const game = components.game.getGameById(started.id);
+  game.ui = { privatePanels: {} };
+  game.players[0]!.dmOpened = true;
+  game.players[1]!.dmOpened = false;
+  game.players[2]!.dmOpened = true;
+  game.players[2]!.stage = "BLOCKED_DM";
+  components.game.repository.update(game);
+  components.game.notifier.sent.length = 0;
+
+  await components.pregameUiSync.syncGame(started.id);
+
+  const synced = components.game.getGameById(started.id);
+  expect(synced.ui?.groupStatusMessageId).toBeDefined();
+  expect(synced.ui?.privatePanels).toEqual({
+    "tg:1": expect.objectContaining({ chatId: actors[0]!.telegramUserId }),
+  });
+  expect(
+    components.game.notifier.sent.some(
+      (notification) =>
+        notification.kind === "group-message" && notification.buttons === undefined,
+    ),
+  ).toBe(true);
+  expect(
+    components.game.notifier.sent.some(
+      (notification) =>
+        notification.kind === "private-message" &&
+        notification.userId === actors[0]!.telegramUserId &&
+        notification.buttons === undefined,
+    ),
+  ).toBe(true);
+});
+
+it("keeps existing message ids when edits succeed without returning a fresh id", async () => {
+  const components = createGameServiceComponentHarness();
+  const actors = components.game.createActors(3);
+  const started = await components.game.setupInProgressGame({
+    chatId: "chat-ui-existing-ids",
+    actors,
+    mode: "REVERSE",
+    playMode: "ONLINE",
+  });
+
+  const game = components.game.getGameById(started.id);
+  game.players[0]!.dmOpened = true;
+  game.ui = {
+    groupStatusMessageId: 77,
+    privatePanels: {
+      "tg:1": {
+        chatId: actors[0]!.telegramUserId,
+        messageId: 88,
+      },
+    },
+  };
+  components.game.repository.update(game);
+  components.game.notifier.sent.length = 0;
+  components.game.notifier.setGroupEditZeroMessageId(game.chatId);
+  components.game.notifier.setPrivateEditZeroMessageId(actors[0]!.telegramUserId);
+
+  await components.pregameUiSync.syncGame(started.id);
+
+  const synced = components.game.getGameById(started.id);
+  expect(synced.ui?.groupStatusMessageId).toBe(77);
+  expect(synced.ui?.privatePanels["tg:1"]?.messageId).toBe(88);
+});
+
+it("propagates a group-send error without mutating persisted ui state", async () => {
+  const components = createGameServiceComponentHarness();
+  const actors = components.game.createActors(3);
+  const started = await components.game.setupInProgressGame({
+    chatId: "chat-ui-send-error",
+    actors,
+    mode: "NORMAL",
+    playMode: "ONLINE",
+    pairingMode: "RANDOM",
+  });
+
+  const game = components.game.getGameById(started.id);
+  game.ui = { privatePanels: {} };
+  components.game.repository.update(game);
+  components.game.notifier.sent.length = 0;
+  components.game.notifier.setGroupMessageFailure(game.chatId);
+
+  const result = await components.pregameUiSync.syncGame(started.id);
+
+  expect(result).toBeInstanceOf(Error);
+  expect(components.game.getGameById(started.id).ui).toEqual({ privatePanels: {} });
+  expect(components.game.notifier.sent).toEqual([]);
+});
+
+it("adds a main-chat link row when the synced group message is linkable", async () => {
+  const components = createGameServiceComponentHarness();
+  const actors = components.game.createActors(3);
+
+  await components.game.service.startGame("-1002233445566", actors[0]!);
+  await components.game.service.joinGame("-1002233445566", actors[1]!);
+  await components.game.service.joinGame("-1002233445566", actors[2]!);
+  await components.game.service.beginConfiguration("-1002233445566", actors[0]!);
+
+  const game = components.game.getGameByChat("-1002233445566");
+  game.players[0]!.dmOpened = true;
+  game.ui = { privatePanels: {} };
+  components.game.repository.update(game);
+  components.game.notifier.sent.length = 0;
+
+  await components.pregameUiSync.syncGame(game.id);
+
+  const panel = mustBeDefined(
+    components.game.getGameById(game.id).ui?.privatePanels["tg:1"],
+    "Expected creator panel state",
+  );
+  const notification = mustBeDefined(
+    components.game.notifier.sent.find(
+      (entry) =>
+        entry.kind === "private-keyboard" &&
+        entry.userId === actors[0]!.telegramUserId &&
+        entry.messageId === panel.messageId,
+    ),
+    "Expected creator panel notification",
+  );
+
+  expect(notification.buttons).toEqual([
+    [
+      expect.objectContaining({
+        kind: "callback",
+        data: `ui:open-config:${game.id}`,
+      }),
+    ],
+    [
+      expect.objectContaining({
+        kind: "url",
+        url: expect.stringContaining("https://t.me/c/2233445566/"),
+      }),
+    ],
+  ]);
+});
+

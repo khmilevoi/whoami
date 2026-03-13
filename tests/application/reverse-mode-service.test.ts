@@ -80,3 +80,77 @@ describe("reverse mode service", () => {
     expect(components.game.getCurrentTarget(started.id)?.id).not.toBe(initialTarget.id);
   });
 });
+
+it("formats reverse summaries with zero defaults and no crowns", async () => {
+  const components = createGameServiceComponentHarness();
+  const started = await components.game.setupInProgressGame({
+    chatId: "chat-reverse-summary-extra",
+    actors: components.game.createActors(3),
+    mode: "REVERSE",
+    playMode: "ONLINE",
+  });
+  const finished = structuredClone(started);
+  finished.stage = "FINISHED";
+  finished.result = {
+    gameId: finished.id,
+    mode: "REVERSE",
+    createdAt: finished.updatedAt,
+    reverse: {
+      asWordOwner: [
+        {
+          playerId: finished.players[0]!.id,
+          rounds: 2,
+          questions: 4,
+          crowns: [],
+        },
+      ],
+      asGuesser: [
+        {
+          playerId: finished.players[1]!.id,
+          rounds: 0,
+          questions: 0,
+          crowns: [],
+        },
+      ],
+    },
+  };
+
+  components.game.notifier.sent.length = 0;
+  await components.reverseMode.sendFinalSummary(finished);
+
+  const summaryText = components.game.notifier.sent.at(-1)?.text ?? "";
+  expect(summaryText).toContain(
+    `${components.context.playerLabel(finished, finished.players[0]!.id)}: 2/4`,
+  );
+  expect(summaryText).toContain(
+    `${components.context.playerLabel(finished, finished.players[1]!.id)}: 0/0`,
+  );
+  expect(summaryText.includes("👑")).toBe(false);
+});
+
+it("returns notifier errors for reverse summaries without mutating the stored result", async () => {
+  const components = createGameServiceComponentHarness();
+  const started = await components.game.setupInProgressGame({
+    chatId: "chat-reverse-summary-error",
+    actors: components.game.createActors(3),
+    mode: "REVERSE",
+    playMode: "ONLINE",
+  });
+  const finished = structuredClone(started);
+  finished.stage = "FINISHED";
+  finished.result = {
+    gameId: finished.id,
+    mode: "REVERSE",
+    createdAt: finished.updatedAt,
+    reverse: {
+      asWordOwner: [],
+      asGuesser: [],
+    },
+  };
+  components.game.notifier.setGroupMessageFailure(finished.chatId);
+
+  const result = await components.reverseMode.sendFinalSummary(finished);
+
+  expect(result).toBeInstanceOf(Error);
+  expect(finished.result?.reverse).toEqual({ asWordOwner: [], asGuesser: [] });
+});
