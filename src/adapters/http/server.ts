@@ -1,11 +1,12 @@
 import * as errore from "errore";
 import express, { type Request, type Response } from "express";
 import { Bot } from "grammy";
+import { BotContext } from "../telegram/bot-context.js";
 import { LoggerPort } from "../../application/ports.js";
 import { WebhookAppError, WebhookHandlingError } from "../../domain/errors.js";
 
 type HealthResponse = { ok: boolean };
-type TelegramUpdate = Parameters<Bot["handleUpdate"]>[0];
+type TelegramUpdate = Parameters<Bot<BotContext>["handleUpdate"]>[0];
 
 const toUpdate = (payload: unknown): TelegramUpdate =>
   payload as TelegramUpdate;
@@ -25,7 +26,7 @@ const logWebhookError = (logger: LoggerPort, error: WebhookAppError): void => {
   });
 };
 
-export const buildHttpServer = (bot: Bot, logger: LoggerPort) => {
+export const buildHttpServer = (bot: Bot<BotContext>, logger: LoggerPort) => {
   const app = express();
 
   app.use(express.json());

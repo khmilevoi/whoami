@@ -29,9 +29,13 @@ const migrationSql = [
     telegram_user_id TEXT NOT NULL UNIQUE,
     username TEXT,
     display_name TEXT NOT NULL,
+    locale TEXT,
+    locale_source TEXT,
     created_at TEXT NOT NULL
   );
   `,
+  `ALTER TABLE players ADD COLUMN locale TEXT;`,
+  `ALTER TABLE players ADD COLUMN locale_source TEXT;`,
   `
   CREATE TABLE IF NOT EXISTS game_players (
     game_id TEXT NOT NULL,
@@ -123,6 +127,13 @@ const migrationSql = [
 
 export const runMigrations = (db: Database.Database): void => {
   for (const sql of migrationSql) {
-    db.exec(sql);
+    try {
+      db.exec(sql);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("duplicate column name")) {
+        throw error;
+      }
+    }
   }
 };

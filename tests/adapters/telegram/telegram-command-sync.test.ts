@@ -13,6 +13,7 @@ const createInProgressGame = (): GameState => ({
   chatId: "-1001",
   creatorPlayerId: "p1",
   creatorTelegramUserId: "101",
+  groupLocale: "en",
   stage: "IN_PROGRESS",
   config: {
     mode: "NORMAL",
@@ -24,6 +25,8 @@ const createInProgressGame = (): GameState => ({
       id: "p1",
       telegramUserId: "101",
       displayName: "P1",
+      locale: "en",
+      localeSource: "telegram",
       stage: "JOINED",
       dmOpened: true,
       joinedAt: "2026-01-01T00:00:00.000Z",
@@ -32,6 +35,8 @@ const createInProgressGame = (): GameState => ({
       id: "p2",
       telegramUserId: "202",
       displayName: "P2",
+      locale: "ru",
+      localeSource: "telegram",
       stage: "JOINED",
       dmOpened: true,
       joinedAt: "2026-01-01T00:00:00.000Z",
@@ -95,7 +100,7 @@ const createSyncHarness = (game: GameState | null) => {
     api,
     repository,
     statusService,
-    new ChatCommandResolver(texts),
+    new ChatCommandResolver(),
     logger,
     texts,
   );
@@ -104,28 +109,36 @@ const createSyncHarness = (game: GameState | null) => {
 };
 
 const texts = new TextService("ru");
-const commands = createBotCommands(texts);
+const ruCommands = createBotCommands(texts.forLocale("ru"));
+const enCommands = createBotCommands(texts.forLocale("en"));
 
 describe("telegram command sync", () => {
-  it("syncs default group commands for all group chats", async () => {
+  it("syncs localized default group commands for all group chats", async () => {
     const { api, sync } = createSyncHarness(null);
 
     await sync.syncGroupCommands();
 
     expect(api.setMyCommands).toHaveBeenCalledWith(
-      [expect.objectContaining({ command: commands.BOT_COMMANDS.START_GAME.command })],
-      { scope: { type: "all_group_chats" } },
+      [expect.objectContaining({ command: ruCommands.BOT_COMMANDS.START_GAME.command })],
+      { scope: { type: "all_group_chats" }, language_code: "ru" },
+    );
+    expect(api.setMyCommands).toHaveBeenCalledWith(
+      [expect.objectContaining({ command: enCommands.BOT_COMMANDS.START_GAME.command })],
+      { scope: { type: "all_group_chats" }, language_code: "en" },
     );
   });
 
-  it("syncs private commands", async () => {
+  it("syncs private commands including language command", async () => {
     const { api, sync } = createSyncHarness(null);
 
     await sync.syncPrivateCommands();
 
     expect(api.setMyCommands).toHaveBeenCalledWith(
-      [expect.objectContaining({ command: commands.BOT_COMMANDS.START_PRIVATE.command })],
-      { scope: { type: "all_private_chats" } },
+      expect.arrayContaining([
+        expect.objectContaining({ command: ruCommands.BOT_COMMANDS.START_PRIVATE.command }),
+        expect.objectContaining({ command: ruCommands.BOT_COMMANDS.LANGUAGE.command }),
+      ]),
+      { scope: { type: "all_private_chats" }, language_code: "ru" },
     );
   });
 
@@ -136,31 +149,32 @@ describe("telegram command sync", () => {
     await sync.syncChat("-1001");
 
     expect(api.deleteMyCommands).not.toHaveBeenCalled();
-    expect(api.setMyCommands).toHaveBeenCalledTimes(1);
     expect(api.setMyCommands).toHaveBeenCalledWith(
-      [expect.objectContaining({ command: "whoami_cancel" })],
+      [expect.objectContaining({ command: "whoami_cancel", description: enCommands.BOT_COMMANDS.CANCEL.description })],
       {
         scope: {
           type: "chat_member",
           chat_id: -1001,
           user_id: 101,
         },
+        language_code: undefined,
       },
     );
   });
 
-  it("syncs only giveup during in-progress", async () => {
+  it("syncs in-progress chat scope using game locale", async () => {
     const { api, sync } = createSyncHarness(createInProgressGame());
 
     await sync.syncChat("-1001");
 
     expect(api.setMyCommands).toHaveBeenCalledWith(
-      [expect.objectContaining({ command: "giveup" })],
+      [expect.objectContaining({ command: "giveup", description: enCommands.BOT_COMMANDS.GIVEUP.description })],
       {
         scope: {
           type: "chat",
           chat_id: -1001,
         },
+        language_code: undefined,
       },
     );
   });

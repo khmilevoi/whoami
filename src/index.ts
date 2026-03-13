@@ -1,11 +1,14 @@
 import { autoRetry } from "@grammyjs/auto-retry";
 import { hydrate } from "@grammyjs/hydrate";
+import { I18n } from "@grammyjs/i18n";
 import * as appErrors from "./domain/errors.js";
 import { AwilixContainer } from "awilix";
 import { Bot } from "grammy";
 import { buildHttpServer } from "./adapters/http/server.js";
 import { registerTelegramHandlers } from "./adapters/telegram/telegram-bot.js";
 import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync.js";
+import { bindResolvedLocale } from "./adapters/telegram/telegram-i18n.js";
+import { BotContext } from "./adapters/telegram/bot-context.js";
 import { GameService } from "./application/game-service.js";
 import {
   GameStatusService,
@@ -25,9 +28,12 @@ const start = (): void | appErrors.StartAppError => {
   }
 
   const container: AwilixContainer = buildContainer(config);
-  const bot = container.resolve<Bot>("bot");
+  const bot = container.resolve<Bot<BotContext>>("bot");
   bot.api.config.use(autoRetry());
   bot.use(hydrate() as never);
+  const i18n = container.resolve<I18n<BotContext>>("i18n");
+  bot.use(i18n);
+  bot.use(bindResolvedLocale());
 
   const logger = container.resolve<LoggerPort>("logger");
   const texts = container.resolve<TextService>("texts");
@@ -41,7 +47,14 @@ const start = (): void | appErrors.StartAppError => {
     "gameFlowSubscriber",
   );
 
-  registerTelegramHandlers(bot, gameService, logger, texts, commandSync);
+  registerTelegramHandlers(
+    bot,
+    gameService,
+    logger,
+    texts,
+    config.botUsername,
+    commandSync,
+  );
 
   const app = buildHttpServer(bot, logger);
   const initializeRuntime = async (): Promise<void> => {

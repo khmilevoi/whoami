@@ -4,6 +4,7 @@ import { TextService } from "../../src/application/text-service.js";
 import { DOMAIN_ERROR_FACTORIES } from "../../src/domain/errors.js";
 
 const texts = new TextService("ru");
+const englishTexts = texts.forLocale("en");
 
 describe("text service", () => {
   it("renders command descriptions through the command catalog", () => {
@@ -16,9 +17,10 @@ describe("text service", () => {
       "Создать новую игру",
     );
     expect(commands.BOT_COMMANDS.GIVEUP.description).toBe("Сдаться");
+    expect(commands.BOT_COMMANDS.LANGUAGE.description).toBe("Сменить язык");
   });
 
-  it("renders representative runtime messages", () => {
+  it("renders representative runtime messages in russian", () => {
     expect(
       texts.configSaved({
         mode: "NORMAL",
@@ -31,6 +33,12 @@ describe("text service", () => {
     );
     expect(texts.voteSummary("GUESSED")).toBe("Итог голосования: Угадал.");
     expect(texts.openMainChatButton()).toBe("🎮 Перейти в основной чат");
+  });
+
+  it("renders english locale through the same facade", () => {
+    expect(englishTexts.commandLanguageDescription()).toBe("Change language");
+    expect(englishTexts.voteSummary("NO")).toBe("Vote result: No.");
+    expect(englishTexts.openMainChatButton()).toBe("🎮 Open main chat");
   });
 
   it("renders every domain error class", () => {

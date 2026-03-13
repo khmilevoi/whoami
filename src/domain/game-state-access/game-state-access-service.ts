@@ -1,4 +1,5 @@
 import * as appErrors from "../errors.js";
+import { LEGACY_LOCALE, normalizeLocaleSource, normalizeSupportedLocale } from "../locale.js";
 import { buildGameResult } from "../stats.js";
 import { GameStateAccessPort } from "./game-state-access-port.js";
 import { GameState, PlayerIdentity, PlayerProgress, PlayerState, WordEntry } from "../types.js";
@@ -67,6 +68,11 @@ export class GameStateAccessService implements GameStateAccessPort {
       telegramUserId: player.telegramUserId,
       username: player.username,
       displayName: player.displayName,
+      locale: normalizeSupportedLocale({ value: player.locale, fallback: LEGACY_LOCALE }),
+      localeSource: normalizeLocaleSource({
+        value: player.localeSource,
+        fallback: "telegram",
+      }),
       stage: "JOINED",
       dmOpened: false,
       joinedAt: now,
@@ -117,4 +123,3 @@ export class GameStateAccessService implements GameStateAccessPort {
     return;
   }
 }
-

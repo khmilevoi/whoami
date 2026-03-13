@@ -1,5 +1,6 @@
 import * as appErrors from "../../domain/errors.js";
 import { Bot } from "grammy";
+import { BotContext } from "./bot-context.js";
 import {
   LoggerPort,
   NotificationReceipt,
@@ -51,7 +52,7 @@ const toInternalChatId = (chatId: string): string | null => {
 
 export class TelegramNotifier implements NotifierPort {
   constructor(
-    private readonly bot: Bot,
+    private readonly bot: Bot<BotContext>,
     private readonly logger: LoggerPort,
     private readonly botUsername?: string,
   ) {}

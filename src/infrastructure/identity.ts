@@ -1,4 +1,5 @@
 import { IdentityPort } from "../application/ports.js";
+import { LEGACY_LOCALE, normalizeLocaleSource, normalizeSupportedLocale } from "../domain/locale.js";
 import { PlayerIdentity } from "../domain/types.js";
 
 export class TelegramIdentityPort implements IdentityPort {
@@ -7,6 +8,9 @@ export class TelegramIdentityPort implements IdentityPort {
     username?: string;
     firstName?: string;
     lastName?: string;
+    languageCode?: string;
+    locale?: PlayerIdentity["locale"];
+    localeSource?: PlayerIdentity["localeSource"];
   }): PlayerIdentity {
     const display =
       [input.firstName, input.lastName].filter(Boolean).join(" ").trim() ||
@@ -18,6 +22,14 @@ export class TelegramIdentityPort implements IdentityPort {
       telegramUserId: input.telegramUserId,
       username: input.username,
       displayName: display,
+      locale: normalizeSupportedLocale({
+        value: input.locale ?? input.languageCode,
+        fallback: LEGACY_LOCALE,
+      }),
+      localeSource: normalizeLocaleSource({
+        value: input.localeSource,
+        fallback: "telegram",
+      }),
     };
   }
 }

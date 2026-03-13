@@ -33,6 +33,8 @@ export class GameFlowStatusSubscriber implements GameStatusSubscriber {
       return new appErrors.GameConfigurationMissingError();
     }
 
+    const texts = this.context.textsForGame(game);
+
     if (
       transition.changed.stageChanged &&
       transition.current?.stage === "IN_PROGRESS"
@@ -45,7 +47,7 @@ export class GameFlowStatusSubscriber implements GameStatusSubscriber {
       await modeService.beforeFirstTurn(game);
       const sentStart = await this.context.notifier.sendGroupMessage(
         game.chatId,
-        this.context.texts.allReadyGameStarts(),
+        texts.allReadyGameStarts(),
       );
       if (sentStart instanceof Error) return sentStart;
       return modeService.announceCurrentTurn(game);
@@ -69,15 +71,13 @@ export class GameFlowStatusSubscriber implements GameStatusSubscriber {
       if (lastOutcome === "GIVEUP" && lastAskerId) {
         const sentGiveUp = await this.context.notifier.sendGroupMessage(
           game.chatId,
-          this.context.texts.playerGaveUp(
-            this.context.playerLabel(game, lastAskerId),
-          ),
+          texts.playerGaveUp(this.context.playerLabel(game, lastAskerId)),
         );
         if (sentGiveUp instanceof Error) return sentGiveUp;
       } else {
         const sentSummary = await this.context.notifier.sendGroupMessage(
           game.chatId,
-          this.context.texts.voteSummary(lastOutcome),
+          texts.voteSummary(lastOutcome),
         );
         if (sentSummary instanceof Error) return sentSummary;
       }
@@ -96,7 +96,7 @@ export class GameFlowStatusSubscriber implements GameStatusSubscriber {
     if (transition.changed.stageChanged && transition.current?.stage === "CANCELED") {
       const sentCancel = await this.context.notifier.sendGroupMessage(
         game.chatId,
-        this.context.texts.gameCancelledByCreator(),
+        texts.gameCancelledByCreator(),
       );
       return sentCancel instanceof Error ? sentCancel : undefined;
     }
@@ -114,21 +114,22 @@ export class GameFlowStatusSubscriber implements GameStatusSubscriber {
       return;
     }
 
+    const texts = this.context.textsForGame(game);
     const buttons = [
       [
         {
           kind: "callback" as const,
-          text: this.context.texts.voteDecisionButton("YES"),
+          text: texts.voteDecisionButton("YES"),
           data: `vote:YES:${game.id}`,
         },
         {
           kind: "callback" as const,
-          text: this.context.texts.voteDecisionButton("NO"),
+          text: texts.voteDecisionButton("NO"),
           data: `vote:NO:${game.id}`,
         },
         {
           kind: "callback" as const,
-          text: this.context.texts.voteDecisionButton("GUESSED"),
+          text: texts.voteDecisionButton("GUESSED"),
           data: `vote:GUESSED:${game.id}`,
           style: "success" as const,
         },
@@ -143,7 +144,7 @@ export class GameFlowStatusSubscriber implements GameStatusSubscriber {
 
       const sentVote = await this.context.notifier.sendGroupKeyboard(
         game.chatId,
-        this.context.texts.reverseVotePrompt(
+        texts.reverseVotePrompt(
           this.context.playerLabel(game, pending.askerPlayerId),
           this.context.playerLabel(game, targetId),
         ),
@@ -154,9 +155,7 @@ export class GameFlowStatusSubscriber implements GameStatusSubscriber {
 
     const sentVote = await this.context.notifier.sendGroupKeyboard(
       game.chatId,
-      this.context.texts.votePrompt(
-        this.context.playerLabel(game, pending.askerPlayerId),
-      ),
+      texts.votePrompt(this.context.playerLabel(game, pending.askerPlayerId)),
       buttons,
     );
     return sentVote instanceof Error ? sentVote : undefined;

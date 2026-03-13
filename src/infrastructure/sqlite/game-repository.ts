@@ -1,5 +1,11 @@
 import Database from "better-sqlite3";
-import { GameRepository } from "../../application/ports.js";
+import { GameRepository, StoredPlayerProfile } from "../../application/ports.js";
+import {
+  DEFAULT_LOCALE,
+  LEGACY_LOCALE,
+  normalizeLocaleSource,
+  normalizeSupportedLocale,
+} from "../../domain/locale.js";
 import { FinalScore, GameState } from "../../domain/types.js";
 
 const activeStages = [
@@ -29,7 +35,7 @@ export class SqliteGameRepository implements GameRepository {
     if (!row) {
       return null;
     }
-    return JSON.parse(row.state_json) as GameState;
+    return this.normalizeGameState(JSON.parse(row.state_json) as GameState);
   }
 
   findActiveByChatId(chatId: string): GameState | null {
@@ -49,7 +55,7 @@ export class SqliteGameRepository implements GameRepository {
       return null;
     }
 
-    return JSON.parse(row.state_json) as GameState;
+    return this.normalizeGameState(JSON.parse(row.state_json) as GameState);
   }
 
   listActiveGames(): GameState[] {
@@ -63,7 +69,7 @@ export class SqliteGameRepository implements GameRepository {
     const rows = this.db.prepare(sql).all(...activeStages) as Array<{
       state_json: string;
     }>;
-    return rows.map((row) => JSON.parse(row.state_json) as GameState);
+    return rows.map((row) => this.normalizeGameState(JSON.parse(row.state_json) as GameState));
   }
 
   listKnownChatIds(): string[] {
@@ -96,6 +102,95 @@ export class SqliteGameRepository implements GameRepository {
       .all(chatId) as Array<{ telegram_user_id: string }>;
 
     return rows.map((row) => row.telegram_user_id);
+  }
+
+  findPlayerProfileByTelegramUserId(telegramUserId: string): StoredPlayerProfile | null {
+    const row = this.db
+      .prepare(
+        `
+        SELECT id, telegram_user_id, username, display_name, locale, locale_source, created_at
+        FROM players
+        WHERE telegram_user_id = ?
+      `,
+      )
+      .get(telegramUserId) as
+      | {
+          id: string;
+          telegram_user_id: string;
+          username: string | null;
+          display_name: string;
+          locale: string | null;
+          locale_source: string | null;
+          created_at: string;
+        }
+      | undefined;
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      telegramUserId: row.telegram_user_id,
+      username: row.username ?? undefined,
+      displayName: row.display_name,
+      locale: normalizeSupportedLocale({ value: row.locale, fallback: LEGACY_LOCALE }),
+      localeSource: normalizeLocaleSource({ value: row.locale_source, fallback: "telegram" }),
+      createdAt: row.created_at,
+    };
+  }
+
+  upsertPlayerProfile(profile: StoredPlayerProfile): void {
+    this.db
+      .prepare(
+        `
+        INSERT INTO players (
+          id, telegram_user_id, username, display_name, locale, locale_source, created_at
+        ) VALUES (
+          @id, @telegramUserId, @username, @displayName, @locale, @localeSource, @createdAt
+        )
+        ON CONFLICT(id) DO UPDATE SET
+          telegram_user_id = excluded.telegram_user_id,
+          username = excluded.username,
+          display_name = excluded.display_name,
+          locale = excluded.locale,
+          locale_source = excluded.locale_source
+      `,
+      )
+      .run({
+        id: profile.id,
+        telegramUserId: profile.telegramUserId,
+        username: profile.username ?? null,
+        displayName: profile.displayName,
+        locale: profile.locale,
+        localeSource: profile.localeSource,
+        createdAt: profile.createdAt,
+      });
+  }
+
+  private normalizeGameState(game: GameState): GameState {
+    const normalizedPlayers = game.players.map((player) => {
+      const profile = this.findPlayerProfileByTelegramUserId(player.telegramUserId);
+      return {
+        ...player,
+        locale: normalizeSupportedLocale({
+          value: player.locale ?? profile?.locale,
+          fallback: LEGACY_LOCALE,
+        }),
+        localeSource: normalizeLocaleSource({
+          value: player.localeSource ?? profile?.localeSource,
+          fallback: "telegram",
+        }),
+      };
+    });
+
+    return {
+      ...game,
+      groupLocale: normalizeSupportedLocale({
+        value: game.groupLocale,
+        fallback: LEGACY_LOCALE,
+      }),
+      players: normalizedPlayers,
+    };
   }
 
   private save(game: GameState, isUpdate: boolean): void {
@@ -185,12 +280,16 @@ export class SqliteGameRepository implements GameRepository {
   private syncPlayers(game: GameState): void {
     const stmt = this.db.prepare(
       `
-      INSERT INTO players (id, telegram_user_id, username, display_name, created_at)
-      VALUES (@id, @telegramUserId, @username, @displayName, @createdAt)
+      INSERT INTO players (
+        id, telegram_user_id, username, display_name, locale, locale_source, created_at
+      )
+      VALUES (@id, @telegramUserId, @username, @displayName, @locale, @localeSource, @createdAt)
       ON CONFLICT(id) DO UPDATE SET
         telegram_user_id = excluded.telegram_user_id,
         username = excluded.username,
-        display_name = excluded.display_name
+        display_name = excluded.display_name,
+        locale = excluded.locale,
+        locale_source = excluded.locale_source
     `,
     );
 
@@ -200,6 +299,11 @@ export class SqliteGameRepository implements GameRepository {
         telegramUserId: player.telegramUserId,
         username: player.username ?? null,
         displayName: player.displayName,
+        locale: normalizeSupportedLocale({ value: player.locale, fallback: DEFAULT_LOCALE }),
+        localeSource: normalizeLocaleSource({
+          value: player.localeSource,
+          fallback: "telegram",
+        }),
         createdAt: player.joinedAt,
       });
     }

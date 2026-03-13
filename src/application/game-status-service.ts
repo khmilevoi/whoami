@@ -1,5 +1,6 @@
 import { LoggerPort, GameRepository } from "./ports.js";
-import { GameMode, GameState, PlayMode, TurnRecord } from "../domain/types.js";
+import { GameMode, GameState, PlayMode, SupportedLocale, TurnRecord } from "../domain/types.js";
+import { resolveGameLocale } from "../domain/locale.js";
 
 export interface GameStatusSnapshot {
   gameId: string;
@@ -7,6 +8,7 @@ export interface GameStatusSnapshot {
   stage: GameState["stage"];
   mode: GameMode | null;
   playMode: PlayMode | null;
+  groupLocale: SupportedLocale;
   updatedAt: string;
   creatorPlayerId: string;
   creatorTelegramUserId: string;
@@ -68,10 +70,10 @@ const snapshotCommandKey = (snapshot: GameStatusSnapshot | null): string => {
   }
 
   if (snapshot.stage === "IN_PROGRESS") {
-    return "in-progress";
+    return `in-progress:${snapshot.groupLocale}`;
   }
 
-  return `pregame:${snapshot.creatorTelegramUserId}`;
+  return `pregame:${snapshot.creatorTelegramUserId}:${snapshot.groupLocale}`;
 };
 
 const toSorted = (values: Iterable<string>): string[] => [...values].sort();
@@ -122,6 +124,7 @@ const buildSnapshot = (game: GameState): GameStatusSnapshot => {
     stage: game.stage,
     mode: game.config?.mode ?? null,
     playMode: game.config?.playMode ?? null,
+    groupLocale: resolveGameLocale({ game }),
     updatedAt: game.updatedAt,
     creatorPlayerId: game.creatorPlayerId,
     creatorTelegramUserId: game.creatorTelegramUserId,

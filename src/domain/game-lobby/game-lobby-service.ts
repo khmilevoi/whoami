@@ -1,7 +1,29 @@
 import * as appErrors from "../errors.js";
+import { LEGACY_LOCALE, normalizeLocaleSource, normalizeSupportedLocale } from "../locale.js";
 import { GameStateAccessPort } from "../game-state-access/index.js";
 import { GameLobbyPort } from "./game-lobby-port.js";
 import { GameState, LobbyLimits, PlayerIdentity, StartGameInput } from "../types.js";
+
+const mergePlayerIdentity = (
+  existing: GameState["players"][number],
+  player: PlayerIdentity,
+): void => {
+  existing.username = player.username;
+  existing.displayName = player.displayName;
+  const nextLocale = normalizeSupportedLocale({
+    value: player.locale,
+    fallback: existing.locale ?? LEGACY_LOCALE,
+  });
+  const nextLocaleSource = normalizeLocaleSource({
+    value: player.localeSource,
+    fallback: existing.localeSource ?? "telegram",
+  });
+
+  if (existing.localeSource !== "explicit" || nextLocaleSource === "explicit") {
+    existing.locale = nextLocale;
+    existing.localeSource = nextLocaleSource;
+  }
+};
 
 export class GameLobbyService implements GameLobbyPort {
   constructor(private readonly state: GameStateAccessPort) {}
@@ -14,6 +36,10 @@ export class GameLobbyService implements GameLobbyPort {
       chatId: input.chatId,
       creatorPlayerId: creator.id,
       creatorTelegramUserId: creator.telegramUserId,
+      groupLocale: normalizeSupportedLocale({
+        value: input.creator.locale,
+        fallback: LEGACY_LOCALE,
+      }),
       stage: "LOBBY_OPEN",
       players: [creator],
       pairings: {},
@@ -89,6 +115,7 @@ export class GameLobbyService implements GameLobbyPort {
         candidate.telegramUserId === player.telegramUserId,
     );
     if (existing) {
+      mergePlayerIdentity(existing, player);
       return this.state.touch(game, now);
     }
 
@@ -138,5 +165,3 @@ export class GameLobbyService implements GameLobbyPort {
     return this.state.touch(game, now);
   }
 }
-
-

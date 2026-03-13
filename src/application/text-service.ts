@@ -1,14 +1,16 @@
 import * as errore from "errore";
+import { createBaseI18n, TranslationBackend } from "./app-i18n.js";
 import { DomainAppError } from "../domain/errors.js";
 import {
+  LocaleSource,
   GameMode,
   PairingMode,
   PlayMode,
+  SupportedLocale,
   TurnRecord,
   VoteDecision,
 } from "../domain/types.js";
-
-export type SupportedLocale = "ru";
+import { LEGACY_LOCALE } from "../domain/locale.js";
 
 interface ConfigSavedInput {
   mode: GameMode;
@@ -18,390 +20,451 @@ interface ConfigSavedInput {
 
 type VoteOutcome = TurnRecord["outcome"];
 
+type TextServiceInit =
+  | SupportedLocale
+  | {
+      locale?: SupportedLocale;
+      i18n?: TranslationBackend;
+    };
+
+const defaultI18n = createBaseI18n();
+
+const joinOptionalLine = (value: string | undefined): string => (value ? `, ${value}` : "");
+
 export class TextService {
-  constructor(readonly locale: SupportedLocale) {}
+  readonly locale: SupportedLocale;
+  private readonly i18n: TranslationBackend;
+
+  constructor(init: TextServiceInit = LEGACY_LOCALE) {
+    if (typeof init === "string") {
+      this.locale = init;
+      this.i18n = defaultI18n;
+      return;
+    }
+
+    this.locale = init.locale ?? LEGACY_LOCALE;
+    this.i18n = init.i18n ?? defaultI18n;
+  }
+
+  forLocale(locale: SupportedLocale): TextService {
+    return new TextService({ locale, i18n: this.i18n });
+  }
 
   renderError(error: DomainAppError): string {
-    return errore.matchError(error, {
-      InvalidManualPairPayloadError: () => "Некорректные данные выбора пары",
-      InvalidStartPayloadError: () => "Некорректная ссылка запуска",
-      ActiveGameNotFoundByChatError: () =>
-        "Активная игра в этом чате не найдена",
-      GameNotFoundError: () => "Игра не найдена",
-      PlayerNotFoundInGameError: () => "Игрок не найден в этой игре",
-      ActiveGameAlreadyExistsInChatError: () =>
-        "В этом чате уже идет активная игра. Завершите ее перед стартом новой.",
-      GameConfigurationNotSetError: () => "Конфигурация игры не задана",
-      GameConfigurationMissingError: () => "Конфигурация игры не задана",
-      OnlyGameCreatorCanCancelError: () =>
-        "Только создатель игры может отменить игру",
-      UnknownGameModeError: (typedError) =>
-        `Неизвестный режим игры: ${typedError.mode}`,
-      OnlyGameCreatorCanConfigureError: () =>
-        "Только создатель игры может настраивать режим",
-      JoinAllowedOnlyWhenLobbyOpenError: () =>
-        "Присоединиться можно только пока открыт набор игроков",
-      MaxPlayersReachedError: (typedError) =>
-        `Достигнут максимум игроков: ${typedError.maxPlayers}.`,
-      LobbyAlreadyClosedError: () => "Набор игроков уже закрыт",
-      OnlyGameCreatorCanCloseLobbyError: () =>
-        "Только создатель игры может закрыть набор игроков",
-      MinPlayersRequiredToStartError: (typedError) =>
-        `Для старта нужно минимум ${typedError.minPlayers} игрока(ов).`,
-      GameCanBeConfiguredOnlyAfterLobbyClosedError: () =>
-        "Настраивать игру можно только после закрытия набора игроков",
-      PairingModeRequiredForNormalModeError: () =>
-        "Для обычного режима нужно выбрать распределение пар",
-      ManualPairingAvailableOnlyForNormalManualModeError: () =>
-        "Ручное распределение доступно только для обычного режима с ручным выбором пар",
-      NotPlayersTurnToPickPairError: () =>
-        "Сейчас не ход этого игрока для выбора пары",
-      WordCannotBeEmptyError: () => "Слово не может быть пустым",
-      WordMustBeSubmittedBeforeConfirmationError: () =>
-        "Сначала нужно ввести слово",
-      WordMustBeConfirmedBeforeClueSubmissionError: () =>
-        "Сначала подтвердите слово, потом добавляйте пояснение",
-      WordMustBeConfirmedBeforeFinalizationError: () =>
-        "Сначала подтвердите слово",
-      NotAllPlayersConfirmedWordsError: () => "Не все игроки подтвердили слова",
-      PendingVoteMustBeResolvedFirstError: () =>
-        "Сначала нужно завершить текущее голосование",
-      QuestionTextRequiredInOnlineModeError: () =>
-        "В онлайн-режиме нужно отправить текст вопроса",
-      NotPlayersTurnError: () => "Сейчас не ход этого игрока",
-      ReverseModeTargetMissingError: () =>
-        "Не удалось определить игрока, чье слово сейчас угадывают",
-      NoPendingVoteError: () => "Нет активного голосования",
-      PlayerNotAllowedToVoteError: () =>
-        "Этот игрок не может голосовать в текущем опросе",
-      ReverseVoteTargetMissingError: () =>
-        "Не удалось определить цель голосования в обратном режиме",
-      NoActivePlayersLeftError: () => "Не осталось активных игроков",
-      UnableToResolveCurrentAskerError: () =>
-        "Не удалось определить текущего задающего вопрос",
-      ReverseModeAskerMissingError: () =>
-        "Не удалось определить текущего задающего вопрос в обратном режиме",
-      WordActionsNotAvailableInCurrentStageError: () =>
-        "Сейчас нельзя выполнять действия со словом",
-      ExpectedStageMismatchError: (typedError) =>
-        `Ожидался этап ${typedError.expectedStage}, получен ${typedError.actualStage}`,
-      PlayerNotFoundError: () => "Игрок не найден",
-      WordEntryForPlayerMissingError: () => "Для игрока не найдено слово",
-      NeedAtLeastTwoPlayersForPairingsError: () =>
-        "Для распределения пар нужно минимум два игрока",
-      UnknownPlayerInManualPairingError: () =>
-        "В ручном распределении указан неизвестный игрок",
-      PlayerCannotPairWithSelfError: () =>
-        "Нельзя назначить игрока самому себе",
-      PlayerHasAlreadySelectedAPairError: () => "Игрок уже выбрал пару",
-      SelectedTargetIsAlreadyTakenError: () => "Выбранный игрок уже занят",
-      Error: () => this.genericErrorRetry(),
+    const translation: {
+      key: string;
+      vars?: Record<string, unknown>;
+    } = errore.matchError(error, {
+      InvalidManualPairPayloadError: () => ({ key: "error-invalid-manual-pair-payload" }),
+      InvalidStartPayloadError: () => ({ key: "error-invalid-start-payload" }),
+      ActiveGameNotFoundByChatError: () => ({ key: "error-active-game-not-found-by-chat" }),
+      GameNotFoundError: () => ({ key: "error-game-not-found" }),
+      PlayerNotFoundInGameError: () => ({ key: "error-player-not-found-in-game" }),
+      ActiveGameAlreadyExistsInChatError: () => ({ key: "error-active-game-already-exists" }),
+      GameConfigurationNotSetError: () => ({ key: "error-game-configuration-not-set" }),
+      GameConfigurationMissingError: () => ({ key: "error-game-configuration-missing" }),
+      OnlyGameCreatorCanCancelError: () => ({ key: "error-only-game-creator-can-cancel" }),
+      UnknownGameModeError: (typedError) => ({
+        key: "error-unknown-game-mode",
+        vars: { mode: typedError.mode },
+      }),
+      OnlyGameCreatorCanConfigureError: () => ({ key: "error-only-game-creator-can-configure" }),
+      JoinAllowedOnlyWhenLobbyOpenError: () => ({ key: "error-join-allowed-only-when-lobby-open" }),
+      MaxPlayersReachedError: (typedError) => ({
+        key: "error-max-players-reached",
+        vars: { maxPlayers: typedError.maxPlayers },
+      }),
+      LobbyAlreadyClosedError: () => ({ key: "error-lobby-already-closed" }),
+      OnlyGameCreatorCanCloseLobbyError: () => ({ key: "error-only-game-creator-can-close-lobby" }),
+      MinPlayersRequiredToStartError: (typedError) => ({
+        key: "error-min-players-required",
+        vars: { minPlayers: typedError.minPlayers },
+      }),
+      GameCanBeConfiguredOnlyAfterLobbyClosedError: () => ({
+        key: "error-game-can-be-configured-only-after-lobby-closed",
+      }),
+      PairingModeRequiredForNormalModeError: () => ({
+        key: "error-pairing-mode-required-for-normal-mode",
+      }),
+      ManualPairingAvailableOnlyForNormalManualModeError: () => ({
+        key: "error-manual-pairing-available-only-for-normal-manual-mode",
+      }),
+      NotPlayersTurnToPickPairError: () => ({ key: "error-not-players-turn-to-pick-pair" }),
+      WordCannotBeEmptyError: () => ({ key: "error-word-cannot-be-empty" }),
+      WordMustBeSubmittedBeforeConfirmationError: () => ({
+        key: "error-word-must-be-submitted-before-confirmation",
+      }),
+      WordMustBeConfirmedBeforeClueSubmissionError: () => ({
+        key: "error-word-must-be-confirmed-before-clue-submission",
+      }),
+      WordMustBeConfirmedBeforeFinalizationError: () => ({
+        key: "error-word-must-be-confirmed-before-finalization",
+      }),
+      NotAllPlayersConfirmedWordsError: () => ({ key: "error-not-all-players-confirmed-words" }),
+      PendingVoteMustBeResolvedFirstError: () => ({
+        key: "error-pending-vote-must-be-resolved-first",
+      }),
+      QuestionTextRequiredInOnlineModeError: () => ({
+        key: "error-question-text-required-in-online-mode",
+      }),
+      NotPlayersTurnError: () => ({ key: "error-not-players-turn" }),
+      ReverseModeTargetMissingError: () => ({ key: "error-reverse-mode-target-missing" }),
+      NoPendingVoteError: () => ({ key: "error-no-pending-vote" }),
+      PlayerNotAllowedToVoteError: () => ({ key: "error-player-not-allowed-to-vote" }),
+      ReverseVoteTargetMissingError: () => ({ key: "error-reverse-vote-target-missing" }),
+      NoActivePlayersLeftError: () => ({ key: "error-no-active-players-left" }),
+      UnableToResolveCurrentAskerError: () => ({ key: "error-unable-to-resolve-current-asker" }),
+      ReverseModeAskerMissingError: () => ({ key: "error-reverse-mode-asker-missing" }),
+      WordActionsNotAvailableInCurrentStageError: () => ({
+        key: "error-word-actions-not-available-in-current-stage",
+      }),
+      ExpectedStageMismatchError: (typedError) => ({
+        key: "error-expected-stage-mismatch",
+        vars: {
+          expectedStage: typedError.expectedStage,
+          actualStage: typedError.actualStage,
+        },
+      }),
+      PlayerNotFoundError: () => ({ key: "error-player-not-found" }),
+      WordEntryForPlayerMissingError: () => ({ key: "error-word-entry-for-player-missing" }),
+      NeedAtLeastTwoPlayersForPairingsError: () => ({
+        key: "error-need-at-least-two-players-for-pairings",
+      }),
+      UnknownPlayerInManualPairingError: () => ({ key: "error-unknown-player-in-manual-pairing" }),
+      PlayerCannotPairWithSelfError: () => ({ key: "error-player-cannot-pair-with-self" }),
+      PlayerHasAlreadySelectedAPairError: () => ({
+        key: "error-player-has-already-selected-a-pair",
+      }),
+      SelectedTargetIsAlreadyTakenError: () => ({ key: "error-selected-target-is-already-taken" }),
+      Error: () => ({ key: "generic-error-retry" }),
     });
+
+    return this.t(translation.key, translation.vars);
   }
 
   commandOpenPrivateChatDescription(): string {
-    return "Открыть личный чат с ботом";
+    return this.t("command-open-private-chat-description");
   }
 
   commandCreateGameDescription(): string {
-    return "Создать новую игру";
+    return this.t("command-create-game-description");
   }
 
   commandJoinGameDescription(): string {
-    return "Войти в игру";
+    return this.t("command-join-game-description");
   }
 
   commandConfigureGameDescription(): string {
-    return "Закрыть набор и настроить";
+    return this.t("command-configure-game-description");
   }
 
   commandCancelGameDescription(): string {
-    return "Отменить игру";
+    return this.t("command-cancel-game-description");
   }
 
   commandGiveUpDescription(): string {
-    return "Сдаться";
+    return this.t("command-giveup-description");
   }
 
   commandAskOfflineDescription(): string {
-    return "Запустить опрос (оффлайн)";
+    return this.t("command-ask-offline-description");
+  }
+
+  commandLanguageDescription(): string {
+    return this.t("command-language-description");
   }
 
   genericErrorRetry(): string {
-    return "Произошла ошибка. Попробуйте еще раз.";
+    return this.t("generic-error-retry");
   }
 
   groupOnlyCommand(): string {
-    return "Эта команда доступна только в групповом чате.";
+    return this.t("group-only-command");
   }
 
   gameCreatedAck(): string {
-    return "Игра создана.";
+    return this.t("game-created-ack");
   }
 
   joinedGameAck(): string {
-    return "Вы в игре.";
+    return this.t("joined-game-ack");
   }
 
   configSentToCreatorAck(): string {
-    return "Настройка отправлена в ЛС создателю.";
+    return this.t("config-sent-to-creator-ack");
   }
 
   gameCancelledAck(): string {
-    return "Игра отменена.";
+    return this.t("game-cancelled-ack");
   }
 
   onlineModeDisabledMessage(): string {
-    return [
-      "Онлайн-режим недоступен: у бота включен privacy mode, поэтому он не видит обычные сообщения в группе.",
-      "Отключите его в @BotFather: /mybots -> ваш бот -> Bot Settings -> Group Privacy -> Turn off.",
-      "После этого повторите выбор онлайн-режима.",
-    ].join("\n");
+    return this.t("online-mode-disabled-message");
   }
 
   onlineModeDisabledAlert(): string {
-    return "Онлайн недоступен: отключите Group Privacy";
+    return this.t("online-mode-disabled-alert");
   }
 
   onlineModeUnknownMessage(): string {
-    return [
-      "Онлайн-режим временно недоступен: не удалось проверить, может ли бот читать сообщения в группе.",
-      "Проверьте настройки в @BotFather (Group Privacy: Turn off) и повторите попытку.",
-    ].join("\n");
+    return this.t("online-mode-unknown-message");
   }
 
   onlineModeUnknownAlert(): string {
-    return "Онлайн недоступен: не удалось проверить настройки";
+    return this.t("online-mode-unknown-alert");
   }
 
   gameStarted(creatorName: string): string {
-    return `Игра запущена. Создатель: ${creatorName}. Для входа используйте /join.`;
+    return this.t("game-started", { creatorName });
   }
 
   playerJoined(name: string, count: number): string {
-    return `${name} присоединился. Игроков: ${count}.`;
+    return this.t("player-joined", { name, count });
   }
 
   lobbyClosedConfiguringInPrivate(): string {
-    return "Набор игроков закрыт. Создатель настраивает режим в ЛС бота.";
+    return this.t("lobby-closed-configuring-in-private");
   }
 
   chooseGameModePrompt(): string {
-    return "Выберите режим игры:";
+    return this.t("choose-game-mode-prompt");
   }
 
   gameModeButton(mode: GameMode): string {
-    return mode === "NORMAL" ? "Обычный" : "Обратный";
+    return mode === "NORMAL"
+      ? this.t("game-mode-button-normal")
+      : this.t("game-mode-button-reverse");
   }
 
   creatorDmRequired(deepLink: string): string {
-    return `Создатель не открыл ЛС с ботом. Откройте: ${deepLink}`;
+    return this.t("creator-dm-required", { deepLink });
   }
 
   dmLinkRequired(playerLabel: string, deepLink: string): string {
-    return `${playerLabel} не открыл ЛС. Откройте: ${deepLink}`;
+    return this.t("dm-link-required", { playerLabel, deepLink });
   }
 
   dmLinkWithLabel(playerLabel: string, deepLink: string): string {
-    return `${playerLabel} не открыл ЛС. Ссылка: ${deepLink}`;
+    return this.t("dm-link-with-label", { playerLabel, deepLink });
   }
 
   noActiveGamesForUser(): string {
-    return "Активных игр для вас не найдено.";
+    return this.t("no-active-games-for-user");
   }
 
   privateChatActivated(): string {
-    return "ЛС активирован. Если вы в игре, продолжайте шаги здесь.";
+    return this.t("private-chat-activated");
   }
 
   giveUpOnlyDuringGame(): string {
-    return "Команда /giveup доступна только во время игрового этапа.";
+    return this.t("give-up-only-during-game");
   }
 
   gameCancelledByCreator(): string {
-    return "Игра отменена создателем.";
+    return this.t("game-cancelled-by-creator");
   }
 
   voteOutcome(outcome: VoteOutcome): string {
     if (outcome === "YES") {
-      return "Да";
+      return this.t("vote-outcome-yes");
     }
     if (outcome === "NO") {
-      return "Нет";
+      return this.t("vote-outcome-no");
     }
     if (outcome === "GUESSED") {
-      return "Угадал";
+      return this.t("vote-outcome-guessed");
     }
-    return "Сдался";
+    return this.t("vote-outcome-giveup");
   }
 
   voteDecisionButton(decision: VoteDecision): string {
     if (decision === "YES") {
-      return "Да";
+      return this.t("vote-outcome-yes");
     }
     if (decision === "NO") {
-      return "Нет";
+      return this.t("vote-outcome-no");
     }
-    return "Угадал";
+    return this.t("vote-outcome-guessed");
   }
 
   voteSummary(outcome: VoteOutcome): string {
-    return `Итог голосования: ${this.voteOutcome(outcome)}.`;
+    return this.t("vote-summary", { outcome: this.voteOutcome(outcome) });
   }
 
   playerGaveUp(name: string): string {
-    return `${name} сдался.`;
+    return this.t("player-gave-up", { name });
   }
 
   currentTurn(label: string): string {
-    return `Ход игрока ${label}.`;
+    return this.t("current-turn", { label });
   }
 
   askOfflinePrompt(label: string): string {
-    return `${label}, нажмите, когда хотите запустить опрос по вопросу.`;
+    return this.t("ask-offline-prompt", { label });
   }
 
   startPollButton(): string {
-    return "Запустить опрос";
+    return this.t("start-poll-button");
   }
 
   otherPlayersWordsList(visibleWords: string): string {
-    return `Список слов других игроков:\n${visibleWords || "(нет данных)"}`;
+    return this.t("other-players-words-list", {
+      visibleWords: visibleWords || this.t("other-players-words-list-empty"),
+    });
   }
 
   gameFinished(): string {
-    return "Игра завершена.";
+    return this.t("game-finished");
   }
 
   normalSummary(lines: string[]): string {
-    return `Сводка (обычный режим):\n${lines.join("\n")}`;
+    return `${this.t("normal-summary-title")}\n${lines.join("\n")}`;
   }
 
   votePrompt(askerLabel: string): string {
-    return `${askerLabel} задал вопрос. Голосуем:`;
+    return this.t("vote-prompt", { askerLabel });
   }
 
   reverseTargetTurn(targetLabel: string, askerLabel: string): string {
-    return `Сейчас угадываем слово игрока ${targetLabel}. Ход задавать вопрос у ${askerLabel}.`;
+    return this.t("reverse-target-turn", { targetLabel, askerLabel });
   }
 
   reverseSummary(ownerText: string, guesserText: string): string {
-    return `Сводка (обратный режим):\nЗагадывали:\n${ownerText || "-"}\n\nУгадывали:\n${guesserText || "-"}`;
+    return [
+      this.t("reverse-summary-title"),
+      this.t("reverse-summary-owned"),
+      ownerText || "-",
+      "",
+      this.t("reverse-summary-guessed"),
+      guesserText || "-",
+    ].join("\n");
   }
 
   reverseVotePrompt(askerLabel: string, targetLabel: string): string {
-    return `${askerLabel} задал вопрос. Отвечает ${targetLabel}:`;
+    return this.t("reverse-vote-prompt", { askerLabel, targetLabel });
   }
 
   choosePlayModePrompt(): string {
-    return "Выберите формат:";
+    return this.t("choose-play-mode-prompt");
   }
 
   playModeButton(mode: PlayMode): string {
-    return mode === "ONLINE" ? "Онлайн" : "Оффлайн";
+    return mode === "ONLINE"
+      ? this.t("play-mode-button-online")
+      : this.t("play-mode-button-offline");
   }
 
   choosePairingModePrompt(): string {
-    return "Выберите распределение пар:";
+    return this.t("choose-pairing-mode-prompt");
   }
 
   pairingModeButton(mode: PairingMode): string {
-    return mode === "RANDOM" ? "Случайно" : "Ручной";
+    return mode === "RANDOM"
+      ? this.t("pairing-mode-button-random")
+      : this.t("pairing-mode-button-manual");
   }
 
   gameMode(mode: GameMode): string {
-    return mode === "NORMAL" ? "обычный" : "обратный";
+    return mode === "NORMAL" ? this.t("game-mode-normal") : this.t("game-mode-reverse");
   }
 
   playMode(mode: PlayMode): string {
-    return mode === "ONLINE" ? "онлайн" : "оффлайн";
+    return mode === "ONLINE" ? this.t("play-mode-online") : this.t("play-mode-offline");
   }
 
   pairingMode(mode: PairingMode): string {
-    return mode === "RANDOM" ? "случайно" : "ручной";
+    return mode === "RANDOM" ? this.t("pairing-mode-random") : this.t("pairing-mode-manual");
   }
 
   configSaved(input: ConfigSavedInput): string {
-    return `Конфигурация сохранена: ${this.gameMode(input.mode)}, ${this.playMode(input.playMode)}${
-      input.pairingMode ? `, пары: ${this.pairingMode(input.pairingMode)}` : ""
-    }.`;
+    return this.t("config-saved", {
+      mode: this.gameMode(input.mode),
+      playMode: this.playMode(input.playMode),
+      pairingMode: joinOptionalLine(
+        input.pairingMode
+          ? this.t("config-saved-pairing-mode", {
+              pairingMode: this.pairingMode(input.pairingMode),
+            })
+          : undefined,
+      ),
+    });
   }
 
   manualPairPrompt(): string {
-    return "Выберите игрока, которому загадываете слово:";
+    return this.t("manual-pair-prompt");
   }
 
   manualPairingCompleted(): string {
-    return "Ручное распределение завершено. Переходим к вводу слов.";
+    return this.t("manual-pairing-completed");
   }
 
   allReadyGameStarts(): string {
-    return "Все готовы. Игра начинается.";
+    return this.t("all-ready-game-starts");
   }
 
   waitForPairingCompletion(): string {
-    return "Ожидайте завершения распределения пар.";
+    return this.t("wait-for-pairing-completion");
   }
 
   confirmWordPrompt(word: string): string {
-    return `Подтвердите слово: \"${word}\"`;
+    return this.t("confirm-word-prompt", { word });
   }
 
   yesButton(): string {
-    return "Да";
+    return this.t("yes-button");
   }
 
   noButton(): string {
-    return "Нет";
+    return this.t("no-button");
   }
 
   reenterWordPrompt(): string {
-    return "Введите слово заново:";
+    return this.t("reenter-word-prompt");
   }
 
   addCluePrompt(): string {
-    return "Добавить пояснение к слову?";
+    return this.t("add-clue-prompt");
   }
 
   enterCluePrompt(): string {
-    return "Введите пояснение:";
+    return this.t("enter-clue-prompt");
   }
 
   restartWordPrompt(): string {
-    return "Ок, заполним слово заново. Введите слово:";
+    return this.t("restart-word-prompt");
   }
 
   readyWaitingOthers(): string {
-    return "Готово. Ожидаем остальных игроков.";
+    return this.t("ready-waiting-others");
   }
 
   enterWordPrompt(): string {
-    return "Введите слово для игры:";
+    return this.t("enter-word-prompt");
   }
 
   wordSummary(word: string | undefined, clue: string | undefined): string {
     return [
-      `Слово: ${word ?? "-"}`,
-      `Пояснение: ${clue ?? "(нет)"}`,
-      "Подтвердить?",
+      this.t("word-summary-word", { word: word ?? "-" }),
+      this.t("word-summary-clue", { clue: clue ?? this.t("word-summary-clue-empty") }),
+      this.t("word-summary-confirm"),
     ].join("\n");
   }
 
   confirmButton(): string {
-    return "Подтвердить";
+    return this.t("confirm-button");
   }
 
   editButton(): string {
-    return "Редактировать";
+    return this.t("edit-button");
   }
 
   groupLobbyStatusOpen(joined: number, maxPlayers: number, minPlayers: number): string {
     return [
-      "👥 Набор игроков открыт",
-      `Игроков: ${joined}/${maxPlayers}`,
+      this.t("group-lobby-status-open-title"),
+      this.t("group-lobby-status-open-count", { joined, maxPlayers }),
       joined >= minPlayers
-        ? "Создатель может переходить к настройке в ЛС."
-        : `Для старта нужно минимум ${minPlayers} игрока(ов).`,
+        ? this.t("group-lobby-status-open-ready")
+        : this.t("group-lobby-status-open-min-players", { minPlayers }),
     ].join("\n");
   }
 
@@ -411,100 +474,135 @@ export class TextService {
     pairingMode?: PairingMode;
   }): string {
     return [
-      "⚙️ Создатель настраивает игру",
-      `Режим: ${input.mode ? this.gameMode(input.mode) : "-"}`,
-      `Формат: ${input.playMode ? this.playMode(input.playMode) : "-"}`,
-      `Пары: ${input.pairingMode ? this.pairingMode(input.pairingMode) : "-"}`,
+      this.t("group-configuring-status-title"),
+      this.t("group-configuring-status-mode", {
+        mode: input.mode ? this.gameMode(input.mode) : "-",
+      }),
+      this.t("group-configuring-status-play-mode", {
+        playMode: input.playMode ? this.playMode(input.playMode) : "-",
+      }),
+      this.t("group-configuring-status-pairing-mode", {
+        pairingMode: input.pairingMode ? this.pairingMode(input.pairingMode) : "-",
+      }),
     ].join("\n");
   }
 
   groupWordCollectionStatus(readyCount: number, totalPlayers: number): string {
-    return ["📝 Игроки вводят слова", `Готово: ${readyCount}/${totalPlayers}`].join(
-      "\n",
-    );
+    return [
+      this.t("group-word-collection-status-title"),
+      this.t("group-word-collection-status-count", { readyCount, totalPlayers }),
+    ].join("\n");
   }
 
   groupInitializationFinished(): string {
-    return ["✅ Инициализация завершена", "Игра началась."].join("\n");
+    return [
+      this.t("group-initialization-finished-title"),
+      this.t("group-initialization-finished-subtitle"),
+    ].join("\n");
   }
 
   groupCanceledStatus(): string {
-    return "✖️ Игра отменена";
+    return this.t("group-canceled-status");
   }
 
   groupFinishedStatus(): string {
-    return "🏁 Игра завершена";
+    return this.t("group-finished-status");
   }
 
   privatePanelPlayerNotFound(): string {
-    return "Игрок не найден.";
+    return this.t("private-panel-player-not-found");
   }
 
   privateLobbyStatus(playerCount: number, isCreator: boolean): string {
     return [
-      "👋 Вы в игре",
-      `Комната: ${playerCount} игроков`,
+      this.t("private-lobby-status-title"),
+      this.t("private-lobby-status-room", { playerCount }),
       isCreator
-        ? "Вы создатель комнаты."
-        : "⏳ Ждём, пока создатель начнёт настройку.",
+        ? this.t("private-lobby-status-creator")
+        : this.t("private-lobby-status-player"),
     ].join("\n");
   }
 
   privateCreatorConfigStatus(): string {
-    return "⚙️ Настройте игру в меню ниже.";
+    return this.t("private-creator-config-status");
   }
 
   privatePlayerConfigStatus(): string {
-    return "⚙️ Создатель настраивает игру. Статус обновится автоматически.";
+    return this.t("private-player-config-status");
   }
 
   privateEnterWordStatus(readyCount: number, totalPlayers: number): string {
-    return `✍️ Отправьте слово в ответном сообщении.\nГотово: ${readyCount}/${totalPlayers}`;
+    return this.t("private-enter-word-status", { readyCount, totalPlayers });
   }
 
   privateEnterClueStatus(readyCount: number, totalPlayers: number): string {
-    return `✍️ Введите пояснение к слову.\nГотово: ${readyCount}/${totalPlayers}`;
+    return this.t("private-enter-clue-status", { readyCount, totalPlayers });
   }
 
   privateClueDecisionStatus(readyCount: number, totalPlayers: number): string {
-    return `${this.addCluePrompt()}\nГотово: ${readyCount}/${totalPlayers}`;
+    return `${this.addCluePrompt()}\n${this.t("group-word-collection-status-count", {
+      readyCount,
+      totalPlayers,
+    })}`;
   }
 
   privateReadyWaitingStatus(readyCount: number, totalPlayers: number): string {
-    return `✅ Ваше слово готово.\nОжидаем остальных: ${readyCount}/${totalPlayers}`;
+    return this.t("private-ready-waiting-status", { readyCount, totalPlayers });
   }
 
   privateGameStartedStatus(): string {
-    return "🎮 Игра началась. Возвращайтесь в основной чат.";
+    return this.t("private-game-started-status");
   }
 
   privateCanceledStatus(): string {
-    return "✖️ Игра отменена.";
+    return this.t("private-canceled-status");
   }
 
   privateFinishedStatus(): string {
-    return "🏁 Игра завершена.";
+    return this.t("private-finished-status");
   }
+
   joinGameButton(): string {
-    return "➕ Войти";
+    return this.t("join-game-button");
   }
 
   configureGameButton(): string {
-    return "⚙️ Закрыть набор и настроить";
+    return this.t("configure-game-button");
   }
 
   openConfigMenuButton(): string {
-    return "⚙️ Открыть настройки";
+    return this.t("open-config-menu-button");
   }
 
   openPrivateChatButton(): string {
-    return "💬 Открыть ЛС бота";
+    return this.t("open-private-chat-button");
   }
 
   openMainChatButton(): string {
-    return "🎮 Перейти в основной чат";
+    return this.t("open-main-chat-button");
+  }
+
+  chooseLanguagePrompt(): string {
+    return this.t("choose-language-prompt");
+  }
+
+  languageUpdated(locale: SupportedLocale): string {
+    return this.t("language-updated", { language: this.localeName(locale) });
+  }
+
+  languagePrivateOnly(deepLink: string): string {
+    return this.t("language-private-only", { deepLink });
+  }
+
+  languageButton(locale: SupportedLocale): string {
+    return locale === "ru" ? this.t("language-button-ru") : this.t("language-button-en");
+  }
+
+  localeName(locale: SupportedLocale): string {
+    return locale === "ru" ? this.t("locale-name-ru") : this.t("locale-name-en");
+  }
+
+  private t(key: string, variables?: Record<string, unknown>): string {
+    return this.i18n.t(this.locale, key, variables);
   }
 }
-
-
-

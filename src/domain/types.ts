@@ -1,3 +1,6 @@
+export type SupportedLocale = "ru" | "en";
+export type LocaleSource = "explicit" | "telegram";
+
 export type GameStage =
   | "LOBBY_OPEN"
   | "LOBBY_CLOSED"
@@ -55,6 +58,8 @@ export interface PlayerState {
   telegramUserId: string;
   username?: string;
   displayName: string;
+  locale?: SupportedLocale;
+  localeSource?: LocaleSource;
   stage: PlayerStage;
   dmOpened: boolean;
   joinedAt: string;
@@ -156,6 +161,7 @@ export interface GameState {
   chatId: string;
   creatorPlayerId: string;
   creatorTelegramUserId: string;
+  groupLocale?: SupportedLocale;
   stage: GameStage;
   config?: GameConfig;
   players: PlayerState[];
@@ -178,6 +184,8 @@ export interface PlayerIdentity {
   telegramUserId: string;
   username?: string;
   displayName: string;
+  locale?: SupportedLocale;
+  localeSource?: LocaleSource;
 }
 
 export interface StartGameInput {

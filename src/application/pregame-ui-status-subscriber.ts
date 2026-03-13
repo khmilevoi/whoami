@@ -73,9 +73,10 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
   }
 
   private renderGroupView(game: GameState): RenderedView {
+    const texts = this.context.textsForGame(game);
     if (game.stage === "LOBBY_OPEN") {
       return {
-        text: this.context.texts.groupLobbyStatusOpen(
+        text: texts.groupLobbyStatusOpen(
           game.players.length,
           this.context.limits.maxPlayers,
           this.context.limits.minPlayers,
@@ -84,7 +85,7 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
           [
             {
               kind: "url",
-              text: this.context.texts.joinGameButton(),
+              text: texts.joinGameButton(),
               url: this.context.notifier.buildBotDeepLink(`join-${game.id}`),
               style: "primary",
             },
@@ -96,7 +97,7 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
     if (game.stage === "CONFIGURING") {
       const draft = this.configDraftStore.get(game.id);
       return {
-        text: this.context.texts.groupConfiguringStatus({
+        text: texts.groupConfiguringStatus({
           mode: draft.mode,
           playMode: draft.playMode,
           pairingMode: draft.pairingMode,
@@ -109,24 +110,18 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
         (entry) => entry.finalConfirmed,
       ).length;
       return {
-        text: this.context.texts.groupWordCollectionStatus(
-          readyCount,
-          game.players.length,
-        ),
+        text: texts.groupWordCollectionStatus(readyCount, game.players.length),
       };
     }
 
     if (game.stage === "IN_PROGRESS") {
       return {
-        text: this.context.texts.groupInitializationFinished(),
+        text: texts.groupInitializationFinished(),
       };
     }
 
     return {
-      text:
-        game.stage === "CANCELED"
-          ? this.context.texts.groupCanceledStatus()
-          : this.context.texts.groupFinishedStatus(),
+      text: game.stage === "CANCELED" ? texts.groupCanceledStatus() : texts.groupFinishedStatus(),
     };
   }
 
@@ -135,9 +130,10 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
     state: PregameUiGameState,
     playerId: string,
   ): RenderedView {
+    const texts = this.context.textsForPlayer(game, playerId);
     const player = game.players.find((candidate) => candidate.id === playerId);
     if (!player) {
-      return { text: this.context.texts.privatePanelPlayerNotFound() };
+      return { text: texts.privatePanelPlayerNotFound() };
     }
 
     const gameLink = state.groupStatusMessageId
@@ -150,7 +146,7 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
       ? [
           {
             kind: "url" as const,
-            text: this.context.texts.openMainChatButton(),
+            text: texts.openMainChatButton(),
             url: gameLink,
             style: "primary" as const,
           },
@@ -166,7 +162,7 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
         buttons.push([
           {
             kind: "callback",
-            text: this.context.texts.configureGameButton(),
+            text: texts.configureGameButton(),
             data: `ui:config:${game.id}`,
             style: "primary",
           },
@@ -177,7 +173,7 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
       }
 
       return {
-        text: this.context.texts.privateLobbyStatus(
+        text: texts.privateLobbyStatus(
           game.players.length,
           player.id === game.creatorPlayerId,
         ),
@@ -191,7 +187,7 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
         buttons.push([
           {
             kind: "callback",
-            text: this.context.texts.openConfigMenuButton(),
+            text: texts.openConfigMenuButton(),
             data: `ui:open-config:${game.id}`,
             style: "primary",
           },
@@ -203,8 +199,8 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
       return {
         text:
           player.id === game.creatorPlayerId
-            ? this.context.texts.privateCreatorConfigStatus()
-            : this.context.texts.privatePlayerConfigStatus(),
+            ? texts.privateCreatorConfigStatus()
+            : texts.privatePlayerConfigStatus(),
         buttons: buttons.length > 0 ? buttons : undefined,
       };
     }
@@ -224,14 +220,8 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
           return {
             text:
               expectation === "CLUE"
-                ? this.context.texts.privateEnterClueStatus(
-                    readyCount,
-                    game.players.length,
-                  )
-                : this.context.texts.privateEnterWordStatus(
-                    readyCount,
-                    game.players.length,
-                  ),
+                ? texts.privateEnterClueStatus(readyCount, game.players.length)
+                : texts.privateEnterWordStatus(readyCount, game.players.length),
             buttons: buttons.length > 0 ? buttons : undefined,
           };
         }
@@ -243,19 +233,19 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
           buttons.unshift([
             {
               kind: "callback",
-              text: `✅ ${this.context.texts.yesButton()}`,
+              text: `✅ ${texts.yesButton()}`,
               data: `word:confirm:YES:${game.id}`,
               style: "success",
             },
             {
               kind: "callback",
-              text: `✏️ ${this.context.texts.noButton()}`,
+              text: `✏️ ${texts.noButton()}`,
               data: `word:confirm:NO:${game.id}`,
               style: "danger",
             },
           ]);
           return {
-            text: this.context.texts.confirmWordPrompt(entry.word),
+            text: texts.confirmWordPrompt(entry.word),
             buttons,
           };
         }
@@ -269,21 +259,18 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
             buttons.unshift([
               {
                 kind: "callback",
-                text: `💡 ${this.context.texts.yesButton()}`,
+                text: `💡 ${texts.yesButton()}`,
                 data: `word:clue:YES:${game.id}`,
                 style: "primary",
               },
               {
                 kind: "callback",
-                text: `➡️ ${this.context.texts.noButton()}`,
+                text: `➡️ ${texts.noButton()}`,
                 data: `word:clue:NO:${game.id}`,
               },
             ]);
             return {
-              text: this.context.texts.privateClueDecisionStatus(
-                readyCount,
-                game.players.length,
-              ),
+              text: texts.privateClueDecisionStatus(readyCount, game.players.length),
               buttons,
             };
           }
@@ -294,19 +281,19 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
           buttons.unshift([
             {
               kind: "callback",
-              text: `✅ ${this.context.texts.confirmButton()}`,
+              text: `✅ ${texts.confirmButton()}`,
               data: `word:final:YES:${game.id}`,
               style: "success",
             },
             {
               kind: "callback",
-              text: `✏️ ${this.context.texts.editButton()}`,
+              text: `✏️ ${texts.editButton()}`,
               data: `word:final:NO:${game.id}`,
               style: "danger",
             },
           ]);
           return {
-            text: this.context.texts.wordSummary(entry.word, entry.clue),
+            text: texts.wordSummary(entry.word, entry.clue),
             buttons,
           };
         }
@@ -316,10 +303,7 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
         buttons.push(gameLinkRow);
       }
       return {
-        text: this.context.texts.privateReadyWaitingStatus(
-          readyCount,
-          game.players.length,
-        ),
+        text: texts.privateReadyWaitingStatus(readyCount, game.players.length),
         buttons: buttons.length > 0 ? buttons : undefined,
       };
     }
@@ -327,16 +311,13 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
     if (game.stage === "IN_PROGRESS") {
       const buttons = gameLinkRow ? [gameLinkRow] : undefined;
       return {
-        text: this.context.texts.privateGameStartedStatus(),
+        text: texts.privateGameStartedStatus(),
         buttons,
       };
     }
 
     return {
-      text:
-        game.stage === "CANCELED"
-          ? this.context.texts.privateCanceledStatus()
-          : this.context.texts.privateFinishedStatus(),
+      text: game.stage === "CANCELED" ? texts.privateCanceledStatus() : texts.privateFinishedStatus(),
       buttons: gameLinkRow ? [gameLinkRow] : undefined,
     };
   }
@@ -448,5 +429,3 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
     return this.context.publishGameStatus(updated);
   }
 }
-
-

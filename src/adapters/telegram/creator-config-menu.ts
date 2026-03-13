@@ -1,15 +1,16 @@
 import { Menu } from "@grammyjs/menu";
-import { Context } from "grammy";
 import { GameService } from "../../application/game-service.js";
 import { TextService } from "../../application/text-service.js";
+import { BotContext } from "./bot-context.js";
 
-const asUserId = (ctx: Context): string => String(ctx.from?.id ?? "");
+const asUserId = (ctx: BotContext): string => String(ctx.from?.id ?? "");
+const textsFor = (texts: TextService, ctx: BotContext): TextService => texts.forLocale(ctx.locale);
 
 export const createCreatorConfigMenu = (
   gameService: GameService,
   texts: TextService,
 ) => {
-  const menu = new Menu<Context>("creator-config-menu", {
+  const menu = new Menu<BotContext>("creator-config-menu", {
     autoAnswer: false,
   }).dynamic((ctx, range) => {
     const game = gameService.findConfiguringGameByCreator(asUserId(ctx));
@@ -17,21 +18,35 @@ export const createCreatorConfigMenu = (
       return range;
     }
 
+    const localizedTexts = textsFor(texts, ctx);
+
     range
-      .text(`🎲 ${texts.gameModeButton("NORMAL")}`, async (innerCtx) => {
+      .text(`🎲 ${localizedTexts.gameModeButton("NORMAL")}`, async (innerCtx) => {
         await gameService.applyConfigStep(
           game.gameId,
-          asUserId(innerCtx),
+          {
+            telegramUserId: asUserId(innerCtx),
+            username: innerCtx.from?.username,
+            firstName: innerCtx.from?.first_name,
+            lastName: innerCtx.from?.last_name,
+            languageCode: innerCtx.from?.language_code,
+          },
           "mode",
           "NORMAL",
         );
         await innerCtx.answerCallbackQuery();
         await innerCtx.menu.update();
       })
-      .text(`🔄 ${texts.gameModeButton("REVERSE")}`, async (innerCtx) => {
+      .text(`🔄 ${localizedTexts.gameModeButton("REVERSE")}`, async (innerCtx) => {
         await gameService.applyConfigStep(
           game.gameId,
-          asUserId(innerCtx),
+          {
+            telegramUserId: asUserId(innerCtx),
+            username: innerCtx.from?.username,
+            firstName: innerCtx.from?.first_name,
+            lastName: innerCtx.from?.last_name,
+            languageCode: innerCtx.from?.language_code,
+          },
           "mode",
           "REVERSE",
         );
@@ -39,20 +54,32 @@ export const createCreatorConfigMenu = (
         await innerCtx.menu.update();
       })
       .row()
-      .text(`💬 ${texts.playModeButton("ONLINE")}`, async (innerCtx) => {
+      .text(`💬 ${localizedTexts.playModeButton("ONLINE")}`, async (innerCtx) => {
         await gameService.applyConfigStep(
           game.gameId,
-          asUserId(innerCtx),
+          {
+            telegramUserId: asUserId(innerCtx),
+            username: innerCtx.from?.username,
+            firstName: innerCtx.from?.first_name,
+            lastName: innerCtx.from?.last_name,
+            languageCode: innerCtx.from?.language_code,
+          },
           "play",
           "ONLINE",
         );
         await innerCtx.answerCallbackQuery();
         await innerCtx.menu.update();
       })
-      .text(`🪑 ${texts.playModeButton("OFFLINE")}`, async (innerCtx) => {
+      .text(`🪑 ${localizedTexts.playModeButton("OFFLINE")}`, async (innerCtx) => {
         await gameService.applyConfigStep(
           game.gameId,
-          asUserId(innerCtx),
+          {
+            telegramUserId: asUserId(innerCtx),
+            username: innerCtx.from?.username,
+            firstName: innerCtx.from?.first_name,
+            lastName: innerCtx.from?.last_name,
+            languageCode: innerCtx.from?.language_code,
+          },
           "play",
           "OFFLINE",
         );
@@ -60,23 +87,35 @@ export const createCreatorConfigMenu = (
         await innerCtx.menu.update();
       });
 
-    if (game.mode === "NORMAL" || game.mode === null) {
+    if (game.mode === "NORMAL" || !game.mode) {
       range
         .row()
-        .text(`🎯 ${texts.pairingModeButton("RANDOM")}`, async (innerCtx) => {
+        .text(`🎯 ${localizedTexts.pairingModeButton("RANDOM")}`, async (innerCtx) => {
           await gameService.applyConfigStep(
             game.gameId,
-            asUserId(innerCtx),
+            {
+              telegramUserId: asUserId(innerCtx),
+              username: innerCtx.from?.username,
+              firstName: innerCtx.from?.first_name,
+              lastName: innerCtx.from?.last_name,
+              languageCode: innerCtx.from?.language_code,
+            },
             "pair",
             "RANDOM",
           );
           await innerCtx.answerCallbackQuery();
           await innerCtx.menu.update();
         })
-        .text(`🧩 ${texts.pairingModeButton("MANUAL")}`, async (innerCtx) => {
+        .text(`🧩 ${localizedTexts.pairingModeButton("MANUAL")}`, async (innerCtx) => {
           await gameService.applyConfigStep(
             game.gameId,
-            asUserId(innerCtx),
+            {
+              telegramUserId: asUserId(innerCtx),
+              username: innerCtx.from?.username,
+              firstName: innerCtx.from?.first_name,
+              lastName: innerCtx.from?.last_name,
+              languageCode: innerCtx.from?.language_code,
+            },
             "pair",
             "MANUAL",
           );

@@ -1,4 +1,5 @@
 import * as appErrors from "../domain/errors.js";
+import { resolveGameLocale, resolvePlayerLocale } from "../domain/locale.js";
 import { GameState, TurnRecord } from "../domain/types.js";
 import { TextService } from "./text-service.js";
 import {
@@ -64,6 +65,19 @@ export class GameServiceContext {
 
   get texts(): TextService {
     return this.deps.texts;
+  }
+
+  textsForLocale(locale: TextService["locale"]): TextService {
+    return this.deps.texts.forLocale(locale);
+  }
+
+  textsForGame(game: GameState): TextService {
+    return this.textsForLocale(resolveGameLocale({ game }));
+  }
+
+  textsForPlayer(game: GameState, playerId: string): TextService {
+    const player = game.players.find((candidate) => candidate.id === playerId);
+    return this.textsForLocale(resolvePlayerLocale({ player }));
   }
 
   get limits(): { minPlayers: number; maxPlayers: number } {
@@ -134,8 +148,7 @@ export class GameServiceContext {
     return `${player.displayName}${player.username ? ` (@${player.username})` : ""}`;
   }
 
-  outcomeLabel(outcome: TurnRecord["outcome"]): string {
-    return this.texts.voteOutcome(outcome);
+  outcomeLabel(game: GameState, outcome: TurnRecord["outcome"]): string {
+    return this.textsForGame(game).voteOutcome(outcome);
   }
 }
-

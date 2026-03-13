@@ -20,22 +20,23 @@ export class NormalModeService extends BaseGameModeService {
       return;
     }
 
+    const texts = this.context.textsForGame(game);
     const label = this.context.playerLabel(game, currentAskerId);
     const sentTurn = await this.context.notifier.sendGroupMessage(
       game.chatId,
-      this.context.texts.currentTurn(label),
+      texts.currentTurn(label),
     );
     if (sentTurn instanceof Error) return sentTurn;
 
     if (game.config?.playMode === "OFFLINE") {
       const sentPrompt = await this.context.notifier.sendGroupKeyboard(
         game.chatId,
-        this.context.texts.askOfflinePrompt(label),
+        texts.askOfflinePrompt(label),
         [
           [
             {
               kind: "callback",
-              text: this.context.texts.startPollButton(),
+              text: texts.startPollButton(),
               data: `ask:${game.id}`,
               style: "primary",
             },
@@ -57,16 +58,17 @@ export class NormalModeService extends BaseGameModeService {
 
       await this.context.notifier.sendPrivateMessage(
         player.telegramUserId,
-        this.context.texts.otherPlayersWordsList(visibleWords),
+        this.context.textsForPlayer(game, player.id).otherPlayersWordsList(visibleWords),
       );
     }
   }
 
   async sendFinalSummary(game: GameState): Promise<void | NotificationError> {
+    const texts = this.context.textsForGame(game);
     if (!game.result) {
       const sent = await this.context.notifier.sendGroupMessage(
         game.chatId,
-        this.context.texts.gameFinished(),
+        texts.gameFinished(),
       );
       return sent instanceof Error ? sent : undefined;
     }
@@ -78,7 +80,7 @@ export class NormalModeService extends BaseGameModeService {
 
     const sent = await this.context.notifier.sendGroupMessage(
       game.chatId,
-      this.context.texts.normalSummary(lines),
+      texts.normalSummary(lines),
     );
     return sent instanceof Error ? sent : undefined;
   }

@@ -109,7 +109,7 @@ export abstract class BaseGameModeService implements GameModeService {
     if (game.stage !== "IN_PROGRESS") {
       const sentMessage = await this.context.notifier.sendGroupMessage(
         chatId,
-        this.context.texts.giveUpOnlyDuringGame(),
+        this.context.textsForGame(game).giveUpOnlyDuringGame(),
       );
       if (sentMessage instanceof Error) return sentMessage;
       return;
@@ -150,4 +150,3 @@ export abstract class BaseGameModeService implements GameModeService {
     questionText?: string,
   ): Promise<void | StartQuestionError>;
 }
-

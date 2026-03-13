@@ -15,3 +15,15 @@
 - All project tasks should be run through `pnpm` commands when possible, for example `pnpm test`, `pnpm vitest`, `pnpm tsc`.
 - If a direct fallback is absolutely required for diagnosis, document that it was only a temporary workaround and re-check the result later under the proper `pnpm` + Node `24.13.0` environment.
 - This environment has also shown tool instability around file patching, so if an automated patch command fails unexpectedly, verify the file contents immediately and use a minimal file rewrite only as a fallback.
+
+## Repository-Specific Notes
+
+- For this repo inside Codex desktop, a reliable Node fallback is `C:\nvm4w\nodejs\node.exe`. Use it only when `node` is missing from `PATH`, and prefer requesting approval once instead of losing time searching unrelated locations.
+- `pnpm` may also be absent from `PATH` in this shell. If the normal command is unavailable, first confirm the correct Node runtime, then use approved direct invocations only as a temporary execution path.
+- `@grammyjs/i18n` in this repo is wired through `src/application/app-i18n.ts` and `src/adapters/telegram/telegram-i18n.ts`. Set `localeNegotiator` in the `new I18n(...)` config, not by mutating the instance afterward.
+- Keep `fluentBundleOptions.useIsolating = false` in the base i18n config. Otherwise Fluent inserts Unicode isolation marks and string-based tests will fail unexpectedly.
+- Locale source of truth is not grammY session. It lives in player profile persistence plus `GameState.groupLocale`, because status subscribers render outside `ctx`.
+- Do not remove `TextService` for localization work in this codebase. Treat it as the stable application facade over the i18n backend and preserve its current method-based API unless the user explicitly asks for a bigger refactor.
+- Group messages should use `textsForGame(game)`. Private panels and DM responses should use player-specific locale helpers such as `textsForPlayer(game, playerId)` or `texts.forLocale(locale)`.
+- `ChatCommandResolver` is intentionally locale-agnostic now. It returns command IDs only; localized command descriptions are materialized later in `TelegramCommandSync`.
+- When command sync or translation work changes, rerun both `tsc --noEmit -p tsconfig.json` and `vitest run`. The text-service tests are a fast signal for Fluent formatting regressions.

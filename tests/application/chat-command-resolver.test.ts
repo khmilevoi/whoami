@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { ChatCommandResolver } from "../../src/application/chat-command-resolver.js";
 import { GameStatusSnapshot } from "../../src/application/game-status-service.js";
-import { TextService } from "../../src/application/text-service.js";
 import { GameStage } from "../../src/domain/types.js";
 
-const resolver = new ChatCommandResolver(new TextService("ru"));
+const resolver = new ChatCommandResolver();
 
 const createSnapshot = (stage: GameStage): GameStatusSnapshot => ({
   gameId: "g1",
@@ -12,6 +11,7 @@ const createSnapshot = (stage: GameStage): GameStatusSnapshot => ({
   stage,
   mode: "NORMAL",
   playMode: "ONLINE",
+  groupLocale: "ru",
   updatedAt: "2026-01-01T00:00:00.000Z",
   creatorPlayerId: "p1",
   creatorTelegramUserId: "101",
@@ -30,9 +30,7 @@ describe("chat command resolver", () => {
   it("returns start command when no active game", () => {
     const resolution = resolver.resolve(null);
 
-    expect(resolution.chatCommands.map((command) => command.command)).toEqual([
-      "whoami_start",
-    ]);
+    expect(resolution.chatCommands).toEqual(["START_GAME"]);
     expect(resolution.memberOverrides).toEqual([]);
   });
 
@@ -43,7 +41,7 @@ describe("chat command resolver", () => {
     expect(resolution.memberOverrides).toEqual([
       {
         telegramUserId: "101",
-        commands: [expect.objectContaining({ command: "whoami_cancel" })],
+        commands: ["CANCEL"],
       },
     ]);
   });
@@ -62,7 +60,7 @@ describe("chat command resolver", () => {
       expect(resolution.memberOverrides).toEqual([
         {
           telegramUserId: "101",
-          commands: [expect.objectContaining({ command: "whoami_cancel" })],
+          commands: ["CANCEL"],
         },
       ]);
     }
@@ -71,9 +69,7 @@ describe("chat command resolver", () => {
   it("returns only giveup during in-progress", () => {
     const resolution = resolver.resolve(createSnapshot("IN_PROGRESS"));
 
-    expect(resolution.chatCommands.map((command) => command.command)).toEqual([
-      "giveup",
-    ]);
+    expect(resolution.chatCommands).toEqual(["GIVEUP"]);
     expect(resolution.memberOverrides).toEqual([]);
   });
 
@@ -81,11 +77,7 @@ describe("chat command resolver", () => {
     const finished = resolver.resolve(createSnapshot("FINISHED"));
     const canceled = resolver.resolve(createSnapshot("CANCELED"));
 
-    expect(finished.chatCommands.map((command) => command.command)).toEqual([
-      "whoami_start",
-    ]);
-    expect(canceled.chatCommands.map((command) => command.command)).toEqual([
-      "whoami_start",
-    ]);
+    expect(finished.chatCommands).toEqual(["START_GAME"]);
+    expect(canceled.chatCommands).toEqual(["START_GAME"]);
   });
 });

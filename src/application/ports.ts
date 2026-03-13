@@ -1,12 +1,24 @@
 import type { NotificationError } from "../domain/errors.js";
 import {
   GameState,
+  LocaleSource,
   PlayerIdentity,
+  SupportedLocale,
   UiButton,
 } from "../domain/types.js";
 
 export interface NotificationReceipt {
   messageId: number;
+}
+
+export interface StoredPlayerProfile {
+  id: string;
+  telegramUserId: string;
+  username?: string;
+  displayName: string;
+  locale: SupportedLocale;
+  localeSource: LocaleSource;
+  createdAt: string;
 }
 
 export interface GameRepository {
@@ -17,6 +29,8 @@ export interface GameRepository {
   listActiveGames(): GameState[];
   listKnownChatIds(): string[];
   listKnownTelegramUserIdsByChatId(chatId: string): string[];
+  findPlayerProfileByTelegramUserId(telegramUserId: string): StoredPlayerProfile | null;
+  upsertPlayerProfile(profile: StoredPlayerProfile): void;
 }
 
 export interface TransactionRunner {
@@ -37,6 +51,9 @@ export interface IdentityPort {
     username?: string;
     firstName?: string;
     lastName?: string;
+    languageCode?: string;
+    locale?: SupportedLocale;
+    localeSource?: LocaleSource;
   }): PlayerIdentity;
 }
 

@@ -8,6 +8,7 @@ import {
   Lifetime,
 } from "awilix";
 import { Bot } from "grammy";
+import { I18n } from "@grammyjs/i18n";
 import { AppConfig, loadConfig } from "./config.js";
 import { ChatCommandResolver } from "./application/chat-command-resolver.js";
 import { GameFlowStatusSubscriber } from "./application/game-flow-status-subscriber.js";
@@ -33,6 +34,8 @@ import { ConfigDraftStore } from "./application/stores/config-draft-store.js";
 import { PrivateExpectationStore } from "./application/stores/private-expectation-store.js";
 import { PregameUiStateStore } from "./application/stores/pregame-ui-state-store.js";
 import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync.js";
+import { createTelegramI18n } from "./adapters/telegram/telegram-i18n.js";
+import { BotContext } from "./adapters/telegram/bot-context.js";
 import { TelegramNotifier } from "./adapters/telegram/telegram-notifier.js";
 import { GameEngine } from "./domain/game-engine.js";
 import { GameLobbyService } from "./domain/game-lobby/index.js";
@@ -41,6 +44,7 @@ import { GameStateAccessService } from "./domain/game-state-access/index.js";
 import { NormalRoundService } from "./domain/normal-round/index.js";
 import { ReverseRoundService } from "./domain/reverse-round/index.js";
 import { WordPreparationService } from "./domain/word-preparation/index.js";
+import { LEGACY_LOCALE } from "./domain/locale.js";
 import { SystemClock } from "./infrastructure/clock.js";
 import { NanoIdPort } from "./infrastructure/id-port.js";
 import { TelegramIdentityPort } from "./infrastructure/identity.js";
@@ -51,9 +55,10 @@ import { SqliteTransactionRunner } from "./infrastructure/sqlite/transaction-run
 
 interface BaseCradle {
   config: AppConfig;
-  bot: Bot;
+  bot: Bot<BotContext>;
   db: Database.Database;
   texts: TextService;
+  repository: GameRepository;
 }
 
 interface DomainCradle {
@@ -67,7 +72,6 @@ interface DomainCradle {
 
 interface ServiceCradle extends BaseCradle, DomainCradle {
   engine: GameEngine;
-  repository: GameRepository;
   transactionRunner: TransactionRunner;
   notifier: NotifierPort;
   identity: IdentityPort;
@@ -89,7 +93,7 @@ interface InternalCradle extends ServiceCradle {
 export const buildContainer = (externalConfig?: AppConfig) => {
   const config = externalConfig ?? loadConfig();
   const db = createDatabase(config.dbPath);
-  const bot = new Bot(config.botToken);
+  const bot = new Bot<BotContext>(config.botToken);
 
   const container = createContainer({
     injectionMode: InjectionMode.PROXY,
@@ -99,8 +103,22 @@ export const buildContainer = (externalConfig?: AppConfig) => {
     config: asValue(config),
     db: asValue(db),
     bot: asValue(bot),
-    texts: asValue(new TextService("ru")),
     logger: asClass(ConsoleLogger, { lifetime: Lifetime.SINGLETON }),
+    repository: asFunction(
+      ({ db }: { db: Database.Database }) => new SqliteGameRepository(db),
+      {
+        lifetime: Lifetime.SINGLETON,
+      },
+    ),
+    i18n: asFunction(
+      ({ repository }: { repository: GameRepository }) => createTelegramI18n(repository),
+      { lifetime: Lifetime.SINGLETON },
+    ),
+    texts: asFunction(
+      ({ i18n }: { i18n: I18n<BotContext> }) =>
+        new TextService({ i18n, locale: LEGACY_LOCALE }),
+      { lifetime: Lifetime.SINGLETON },
+    ),
     gameStateAccess: asClass(GameStateAccessService, {
       lifetime: Lifetime.SINGLETON,
     }),
@@ -143,14 +161,8 @@ export const buildContainer = (externalConfig?: AppConfig) => {
         }),
       { lifetime: Lifetime.SINGLETON },
     ),
-    repository: asFunction(
-      ({ db }: BaseCradle) => new SqliteGameRepository(db),
-      {
-        lifetime: Lifetime.SINGLETON,
-      },
-    ),
     transactionRunner: asFunction(
-      ({ db }: BaseCradle) => new SqliteTransactionRunner(db),
+      ({ db }: { db: Database.Database }) => new SqliteTransactionRunner(db),
       {
         lifetime: Lifetime.SINGLETON,
       },
@@ -246,15 +258,12 @@ export const buildContainer = (externalConfig?: AppConfig) => {
         ]),
       { lifetime: Lifetime.SINGLETON },
     ),
-    commandResolver: asFunction(
-      ({ texts }: BaseCradle) => new ChatCommandResolver(texts),
-      {
-        lifetime: Lifetime.SINGLETON,
-      },
-    ),
+    commandResolver: asFunction(() => new ChatCommandResolver(), {
+      lifetime: Lifetime.SINGLETON,
+    }),
     commandSync: asFunction(
       ({ bot, repository, statusService, commandResolver, logger, texts }: {
-        bot: Bot;
+        bot: Bot<BotContext>;
         repository: GameRepository;
         statusService: GameStatusService;
         commandResolver: ChatCommandResolver;
@@ -311,4 +320,3 @@ export const buildContainer = (externalConfig?: AppConfig) => {
 
   return container;
 };
-

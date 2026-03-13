@@ -1,22 +1,18 @@
-import { createBotCommands, ChatCommandResolution } from "./bot-commands.js";
+import { BotCommandId, ChatCommandResolution } from "./bot-commands.js";
 import { GameStatusSnapshot } from "./game-status-service.js";
-import { TextService } from "./text-service.js";
 
 export class ChatCommandResolver {
-  private readonly commands;
-
-  constructor(texts: TextService) {
-    this.commands = createBotCommands(texts);
-  }
-
   resolve(snapshot: GameStatusSnapshot | null): ChatCommandResolution {
     if (!snapshot || !snapshot.hasActiveGame) {
-      return this.commands.noGameResolution();
+      return {
+        chatCommands: ["START_GAME"],
+        memberOverrides: [],
+      };
     }
 
     if (snapshot.stage === "IN_PROGRESS") {
       return {
-        chatCommands: [this.commands.BOT_COMMANDS.GIVEUP],
+        chatCommands: ["GIVEUP"],
         memberOverrides: [],
       };
     }
@@ -26,9 +22,10 @@ export class ChatCommandResolver {
       memberOverrides: [
         {
           telegramUserId: snapshot.creatorTelegramUserId,
-          commands: [this.commands.BOT_COMMANDS.CANCEL],
+          commands: ["CANCEL"],
         },
       ],
     };
   }
 }
+
