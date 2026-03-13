@@ -359,6 +359,20 @@ export const registerTelegramHandlers = (
 
       if (parts[0] === "ui") {
         const [, action, gameId] = parts;
+        if (action === "join") {
+          const result = await gameService.joinGameById(gameId, asActor(ctx));
+          if (result instanceof Error) return result;
+          await ctx.answerCallbackQuery();
+          return;
+        }
+
+        if (action === "close-lobby") {
+          const result = await gameService.beginConfigurationByGameId(gameId, asActor(ctx));
+          if (result instanceof Error) return result;
+          await ctx.answerCallbackQuery();
+          return;
+        }
+
         if (action === "config") {
           const result = await gameService.beginConfigurationByGameId(gameId, asActor(ctx));
           if (result instanceof Error) return result;
@@ -431,3 +445,4 @@ export const registerTelegramHandlers = (
     });
   });
 };
+

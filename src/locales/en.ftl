@@ -87,7 +87,8 @@ group-lobby-status-open-title = 👥 Player lobby is open
 group-lobby-status-open-count = Players: { $joined }/{ $maxPlayers }
 group-lobby-status-open-ready = The creator can move to configuration in private chat.
 group-lobby-status-open-min-players = At least { $minPlayers } players are required to start.
-group-configuring-status-title = ⚙️ Creator is configuring the game
+group-configuring-status-title = ⚙️ Player lobby is closed
+group-configuring-status-private-chat = Open the bot private chat using the button below to continue.
 group-configuring-status-mode = Mode: { $mode }
 group-configuring-status-play-mode = Format: { $playMode }
 group-configuring-status-pairing-mode = Pairs: { $pairingMode }
@@ -172,3 +173,4 @@ error-selected-target-is-already-taken = The selected player is already taken
 config-saved-pairing-mode = pairs: { $pairingMode }
 other-players-words-list-empty = (no data)
 word-summary-clue-empty = (none)
+

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   OnlyGameCreatorCanCancelError,
+  OnlyGameCreatorCanCloseLobbyError,
   PlayerNotAllowedToVoteError,
 } from "../../src/domain/errors.js";
 import { PairingMode, PlayMode, VoteDecision } from "../../src/domain/types.js";
 import { createGameServiceHarness } from "./game-service.harness.js";
+import type { SentNotification } from "../mocks/fake-notifier.js";
 import { parseManualPairPayload } from "../../src/adapters/telegram/manual-pair-payload.js";
 import { mustBeDefined } from "../support/strict-helpers.js";
 
@@ -12,6 +14,29 @@ const flushReactiveEffects = async (): Promise<void> => {
   await Promise.resolve();
   await Promise.resolve();
 };
+
+const privateNotifications = (
+  harness: ReturnType<typeof createGameServiceHarness>,
+): SentNotification[] =>
+  harness.notifier.sent.filter(
+    (notification) =>
+      notification.kind === "private-message" ||
+      notification.kind === "private-keyboard" ||
+      notification.kind === "private-edit",
+  );
+
+const latestGroupNotification = (
+  harness: ReturnType<typeof createGameServiceHarness>,
+): SentNotification =>
+  mustBeDefined(
+    [...harness.notifier.sent]
+      .reverse()
+      .find(
+        (notification) =>
+          notification.kind === "group-message" || notification.kind === "group-edit",
+      ),
+    "Expected group notification",
+  );
 
 const askCurrentQuestion = async ({
   harness,
@@ -274,27 +299,117 @@ describe("game service", () => {
     await finishReverseScenario({ playMode: "OFFLINE" });
   });
 
-  it("marks creator as BLOCKED_DM when configuration DM cannot be delivered", async () => {
+
+
+  it("renders lobby group actions without sending private panels", async () => {
     const harness = createGameServiceHarness();
     const actors = harness.createActors(3);
-    const chatId = "chat-blocked-config";
-
-    harness.notifier.setPrivateKeyboardFailure(actors[0]!.telegramUserId);
+    const chatId = "chat-lobby-actions";
 
     await harness.service.startGame(chatId, actors[0]!);
     await harness.service.joinGame(chatId, actors[1]!);
     await harness.service.joinGame(chatId, actors[2]!);
-    await harness.service.beginConfiguration(chatId, actors[0]!.telegramUserId);
     await flushReactiveEffects();
 
     const game = harness.getGameByChat(chatId);
-    expect(game.stage).toBe("CONFIGURING");
-    expect(
-      game.players.find((player) => player.id === game.creatorPlayerId)?.stage,
-    ).toBe("BLOCKED_DM");
+    const groupNotification = latestGroupNotification(harness);
+
+    expect(privateNotifications(harness)).toEqual([]);
+    expect(groupNotification.buttons).toEqual([
+      [
+        expect.objectContaining({
+          kind: "callback",
+          data: `ui:join:${game.id}`,
+        }),
+        expect.objectContaining({
+          kind: "callback",
+          data: `ui:close-lobby:${game.id}`,
+        }),
+      ],
+    ]);
   });
 
-  it("marks player as BLOCKED_DM when word collection DM cannot be delivered", async () => {
+  it("keeps configuration in the group chat until players open private chat", async () => {
+    const harness = createGameServiceHarness();
+    const actors = harness.createActors(3);
+    const chatId = "chat-config-open-link";
+
+    await harness.service.startGame(chatId, actors[0]!);
+    await harness.service.joinGame(chatId, actors[1]!);
+    await harness.service.joinGame(chatId, actors[2]!);
+    await harness.service.beginConfiguration(chatId, actors[0]!);
+    await flushReactiveEffects();
+
+    const game = harness.getGameByChat(chatId);
+    const groupNotification = latestGroupNotification(harness);
+
+    expect(game.stage).toBe("CONFIGURING");
+    expect(privateNotifications(harness)).toEqual([]);
+    expect(groupNotification.buttons).toEqual([
+      [
+        expect.objectContaining({
+          kind: "url",
+          url: `https://t.me/test_bot?start=open-${game.id}`,
+        }),
+      ],
+    ]);
+  });
+
+  it("opens the creator configuration panel only after private start", async () => {
+    const harness = createGameServiceHarness();
+    const actors = harness.createActors(3);
+    const chatId = "chat-open-config-from-private";
+
+    await harness.service.startGame(chatId, actors[0]!);
+    await harness.service.joinGame(chatId, actors[1]!);
+    await harness.service.joinGame(chatId, actors[2]!);
+    await harness.service.beginConfiguration(chatId, actors[0]!);
+    await flushReactiveEffects();
+
+    const game = harness.getGameByChat(chatId);
+    await harness.service.handlePrivateStart(actors[0]!, {
+      action: "open",
+      gameId: game.id,
+    });
+    await flushReactiveEffects();
+
+    const creatorPanel = mustBeDefined(
+      [...privateNotifications(harness)]
+        .reverse()
+        .find(
+          (notification) =>
+            notification.kind === "private-keyboard" &&
+            notification.userId === actors[0]!.telegramUserId,
+        ),
+      "Expected creator private panel",
+    );
+
+    expect(creatorPanel.buttons).toEqual([
+      [
+        expect.objectContaining({
+          kind: "callback",
+          data: `ui:open-config:${game.id}`,
+        }),
+      ],
+    ]);
+  });
+
+  it("allows only the creator to close the lobby", async () => {
+    const harness = createGameServiceHarness();
+    const actors = harness.createActors(3);
+    const chatId = "chat-close-lobby-access";
+
+    await harness.service.startGame(chatId, actors[0]!);
+    await harness.service.joinGame(chatId, actors[1]!);
+    await harness.service.joinGame(chatId, actors[2]!);
+
+    await expect(
+      harness.service.beginConfiguration(chatId, actors[1]!),
+    ).resolves.toBeInstanceOf(OnlyGameCreatorCanCloseLobbyError);
+    expect(harness.getGameByChat(chatId).stage).toBe("LOBBY_OPEN");
+  });
+
+  it("marks player as BLOCKED_DM only after they open private chat and delivery fails", async () => {
     const harness = createGameServiceHarness();
     const actors = harness.createActors(3);
     const chatId = "chat-blocked-word";
@@ -302,10 +417,20 @@ describe("game service", () => {
     await harness.service.startGame(chatId, actors[0]!);
     await harness.service.joinGame(chatId, actors[1]!);
     await harness.service.joinGame(chatId, actors[2]!);
-    await harness.service.beginConfiguration(chatId, actors[0]!.telegramUserId);
+    await harness.service.beginConfiguration(chatId, actors[0]!);
     await flushReactiveEffects();
 
     const game = harness.getGameByChat(chatId);
+    await harness.service.handlePrivateStart(actors[0]!, {
+      action: "open",
+      gameId: game.id,
+    });
+    await harness.service.handlePrivateStart(actors[2]!, {
+      action: "open",
+      gameId: game.id,
+    });
+    await flushReactiveEffects();
+
     harness.notifier.setPrivateMessageFailure(actors[1]!.telegramUserId);
 
     await harness.configureGame(
@@ -317,8 +442,21 @@ describe("game service", () => {
     );
     await flushReactiveEffects();
 
-    const updated = harness.getGameById(game.id);
+    let updated = harness.getGameById(game.id);
     expect(updated.stage).toBe("PREPARE_WORDS");
+    expect(
+      updated.players.find(
+        (player) => player.telegramUserId === actors[1]!.telegramUserId,
+      )?.stage,
+    ).toBe("JOINED");
+
+    await harness.service.handlePrivateStart(actors[1]!, {
+      action: "open",
+      gameId: game.id,
+    });
+    await flushReactiveEffects();
+
+    updated = harness.getGameById(game.id);
     expect(
       updated.players.find(
         (player) => player.telegramUserId === actors[1]!.telegramUserId,
@@ -326,6 +464,29 @@ describe("game service", () => {
     ).toBe("BLOCKED_DM");
   });
 
+  it("still allows joining through the legacy start payload", async () => {
+    const harness = createGameServiceHarness();
+    const actors = harness.createActors(2);
+    const chatId = "chat-legacy-start-join";
+
+    await harness.service.startGame(chatId, actors[0]!);
+    const game = harness.getGameByChat(chatId);
+
+    await harness.service.handlePrivateStart(actors[1]!, {
+      action: "join",
+      gameId: game.id,
+    });
+    await flushReactiveEffects();
+
+    expect(
+      harness.getPlayerByTelegram(game.id, actors[1]!.telegramUserId).dmOpened,
+    ).toBe(true);
+    expect(harness.getGameById(game.id).players).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ telegramUserId: actors[1]!.telegramUserId }),
+      ]),
+    );
+  });
   it("keeps reverse pending vote unchanged when a non-target player tries to vote", async () => {
     const harness = createGameServiceHarness();
     const actors = harness.createActors(3);
@@ -534,6 +695,4 @@ describe("game service", () => {
     );
   });
 });
-
-
 

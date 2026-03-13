@@ -475,6 +475,7 @@ export class TextService {
   }): string {
     return [
       this.t("group-configuring-status-title"),
+      this.t("group-configuring-status-private-chat"),
       this.t("group-configuring-status-mode", {
         mode: input.mode ? this.gameMode(input.mode) : "-",
       }),
@@ -606,3 +607,4 @@ export class TextService {
     return this.i18n.t(this.locale, key, variables);
   }
 }
+

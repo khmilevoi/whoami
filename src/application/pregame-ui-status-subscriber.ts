@@ -84,10 +84,15 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
         buttons: [
           [
             {
-              kind: "url",
+              kind: "callback",
               text: texts.joinGameButton(),
-              url: this.context.notifier.buildBotDeepLink(`join-${game.id}`),
+              data: `ui:join:${game.id}`,
               style: "primary",
+            },
+            {
+              kind: "callback",
+              text: texts.configureGameButton(),
+              data: `ui:close-lobby:${game.id}`,
             },
           ],
         ],
@@ -102,6 +107,16 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
           playMode: draft.playMode,
           pairingMode: draft.pairingMode,
         }),
+        buttons: [
+          [
+            {
+              kind: "url",
+              text: texts.openPrivateChatButton(),
+              url: this.context.notifier.buildBotDeepLink(`open-${game.id}`),
+              style: "primary",
+            },
+          ],
+        ],
       };
     }
 
@@ -364,8 +379,12 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
   ): Promise<
     void | appErrors.MarkDmError | appErrors.GameNotFoundError | NotificationError
   > {
+    if (game.stage === "LOBBY_OPEN") {
+      return;
+    }
+
     const player = game.players.find((candidate) => candidate.id === playerId);
-    if (player?.stage === "BLOCKED_DM" && !player.dmOpened) {
+    if (!player?.dmOpened || player.stage === "BLOCKED_DM") {
       return;
     }
 
@@ -429,3 +448,4 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
     return this.context.publishGameStatus(updated);
   }
 }
+

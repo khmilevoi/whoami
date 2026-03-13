@@ -62,10 +62,15 @@ export class PregameUiSyncService {
         buttons: [
           [
             {
-              kind: "url",
+              kind: "callback",
               text: this.context.texts.joinGameButton(),
-              url: this.context.notifier.buildBotDeepLink(`join-${game.id}`),
+              data: `ui:join:${game.id}`,
               style: "primary",
+            },
+            {
+              kind: "callback",
+              text: this.context.texts.configureGameButton(),
+              data: `ui:close-lobby:${game.id}`,
             },
           ],
         ],
@@ -80,6 +85,16 @@ export class PregameUiSyncService {
           playMode: draft.playMode,
           pairingMode: draft.pairingMode,
         }),
+        buttons: [
+          [
+            {
+              kind: "url",
+              text: this.context.texts.openPrivateChatButton(),
+              url: this.context.notifier.buildBotDeepLink(`open-${game.id}`),
+              style: "primary",
+            },
+          ],
+        ],
       };
     }
 
@@ -357,6 +372,15 @@ export class PregameUiSyncService {
     telegramUserId: string,
     view: RenderedView,
   ): Promise<void | appErrors.MarkDmError | NotificationError> {
+    if (game.stage === "LOBBY_OPEN") {
+      return;
+    }
+
+    const player = game.players.find((candidate) => candidate.id === playerId);
+    if (!player?.dmOpened || player.stage === "BLOCKED_DM") {
+      return;
+    }
+
     game.ui ??= { privatePanels: {} };
     const existing = game.ui.privatePanels[playerId];
     if (existing) {
@@ -401,3 +425,4 @@ export class PregameUiSyncService {
     return;
   }
 }
+

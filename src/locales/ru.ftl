@@ -87,7 +87,8 @@ group-lobby-status-open-title = 👥 Набор игроков открыт
 group-lobby-status-open-count = Игроков: { $joined }/{ $maxPlayers }
 group-lobby-status-open-ready = Создатель может переходить к настройке в ЛС.
 group-lobby-status-open-min-players = Для старта нужно минимум { $minPlayers } игрока(ов).
-group-configuring-status-title = ⚙️ Создатель настраивает игру
+group-configuring-status-title = ⚙️ Набор игроков закрыт
+group-configuring-status-private-chat = Откройте ЛС бота по кнопке ниже, чтобы продолжить.
 group-configuring-status-mode = Режим: { $mode }
 group-configuring-status-play-mode = Формат: { $playMode }
 group-configuring-status-pairing-mode = Пары: { $pairingMode }
@@ -172,3 +173,4 @@ error-selected-target-is-already-taken = Выбранный игрок уже з
 config-saved-pairing-mode = пары: { $pairingMode }
 other-players-words-list-empty = (нет данных)
 word-summary-clue-empty = (нет)
+
