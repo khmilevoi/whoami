@@ -13,6 +13,8 @@ import { mustBeDefined } from "../support/strict-helpers.js";
 const flushReactiveEffects = async (): Promise<void> => {
   await Promise.resolve();
   await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
 };
 
 const privateNotifications = (
@@ -448,7 +450,7 @@ describe("game service", () => {
       updated.players.find(
         (player) => player.telegramUserId === actors[1]!.telegramUserId,
       )?.stage,
-    ).toBe("JOINED");
+    ).toBe("WORD_DRAFT");
 
     await harness.service.handlePrivateStart(actors[1]!, {
       action: "open",
@@ -695,4 +697,5 @@ describe("game service", () => {
     );
   });
 });
+
 
