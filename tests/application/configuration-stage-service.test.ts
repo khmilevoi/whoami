@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createGameServiceComponentHarness } from "./game-service-components.harness.js";
 
+const emptyDraft = {
+  step: "MODE",
+  awaitingConfirmation: false,
+};
+
 const setupLobby = async () => {
   const components = createGameServiceComponentHarness();
   const actors = components.game.createActors(3);
@@ -22,7 +27,7 @@ const setupLobby = async () => {
 };
 
 describe("configuration stage service", () => {
-  it("stores NORMAL draft choices until the final pairing step and then configures random pairings", async () => {
+  it("stores NORMAL draft choices until explicit confirmation and then configures random pairings", async () => {
     const { components, actors, game } = await setupLobby();
     const creator = actors[0]!;
 
@@ -33,7 +38,13 @@ describe("configuration stage service", () => {
       "NORMAL",
     );
 
-    expect(components.configDraftStore.get(game.id)).toEqual({ mode: "NORMAL" });
+    expect(components.configDraftStore.get(game.id)).toEqual({
+      step: "PLAY_MODE",
+      mode: "NORMAL",
+      playMode: undefined,
+      pairingMode: undefined,
+      awaitingConfirmation: false,
+    });
     expect(components.game.getGameById(game.id).config).toBeUndefined();
 
     await components.configurationStage.applyConfigStep(
@@ -44,8 +55,11 @@ describe("configuration stage service", () => {
     );
 
     expect(components.configDraftStore.get(game.id)).toEqual({
+      step: "PAIRING_MODE",
       mode: "NORMAL",
       playMode: "ONLINE",
+      pairingMode: undefined,
+      awaitingConfirmation: false,
     });
     expect(components.game.getGameById(game.id).config).toBeUndefined();
 
@@ -56,8 +70,22 @@ describe("configuration stage service", () => {
       "RANDOM",
     );
 
+    expect(components.configDraftStore.get(game.id)).toEqual({
+      step: "CONFIRM",
+      mode: "NORMAL",
+      playMode: "ONLINE",
+      pairingMode: "RANDOM",
+      awaitingConfirmation: true,
+    });
+    expect(components.game.getGameById(game.id).config).toBeUndefined();
+
+    await components.configurationStage.confirmConfigDraft(
+      game.id,
+      creator.telegramUserId,
+    );
+
     const configured = components.game.getGameById(game.id);
-    expect(components.configDraftStore.get(game.id)).toEqual({});
+    expect(components.configDraftStore.get(game.id)).toEqual(emptyDraft);
     expect(configured.config).toEqual({
       mode: "NORMAL",
       playMode: "ONLINE",
@@ -68,7 +96,7 @@ describe("configuration stage service", () => {
     expect(Object.keys(configured.words)).toHaveLength(configured.players.length);
   });
 
-  it("configures REVERSE mode immediately after the play-mode step without manual pairing state", async () => {
+  it("stores REVERSE mode draft until confirmation without manual pairing state", async () => {
     const { components, actors, game } = await setupLobby();
     const creator = actors[0]!;
 
@@ -85,8 +113,22 @@ describe("configuration stage service", () => {
       "OFFLINE",
     );
 
+    expect(components.configDraftStore.get(game.id)).toEqual({
+      step: "CONFIRM",
+      mode: "REVERSE",
+      playMode: "OFFLINE",
+      pairingMode: undefined,
+      awaitingConfirmation: true,
+    });
+    expect(components.game.getGameById(game.id).config).toBeUndefined();
+
+    await components.configurationStage.confirmConfigDraft(
+      game.id,
+      creator.telegramUserId,
+    );
+
     const configured = components.game.getGameById(game.id);
-    expect(components.configDraftStore.get(game.id)).toEqual({});
+    expect(components.configDraftStore.get(game.id)).toEqual(emptyDraft);
     expect(configured.config).toEqual({
       mode: "REVERSE",
       playMode: "OFFLINE",
@@ -103,52 +145,82 @@ describe("configuration stage service", () => {
       });
     }
   });
-});
 
-it("rejects non-creator config changes without mutating the draft or game", async () => {
-  const { components, actors, game } = await setupLobby();
+  it("rejects non-creator config changes without mutating the draft or game", async () => {
+    const { components, actors, game } = await setupLobby();
 
-  const result = await components.configurationStage.applyConfigStep(
-    game.id,
-    actors[1]!.telegramUserId,
-    "mode",
-    "REVERSE",
-  );
+    const result = await components.configurationStage.applyConfigStep(
+      game.id,
+      actors[1]!.telegramUserId,
+      "mode",
+      "REVERSE",
+    );
 
-  expect(result).toBeInstanceOf(Error);
-  expect(components.configDraftStore.get(game.id)).toEqual({});
-  expect(components.game.getGameById(game.id).config).toBeUndefined();
-});
+    expect(result).toBeInstanceOf(Error);
+    expect(components.configDraftStore.get(game.id)).toEqual(emptyDraft);
+    expect(components.game.getGameById(game.id).config).toBeUndefined();
+  });
 
-it("publishes chooser state for manual pairing without priming word expectations", async () => {
-  const { components, actors, game } = await setupLobby();
-  const creator = actors[0]!;
+  it("publishes chooser state for manual pairing only after confirmation without priming word expectations", async () => {
+    const { components, actors, game } = await setupLobby();
+    const creator = actors[0]!;
 
-  await components.configurationStage.applyConfigStep(
-    game.id,
-    creator.telegramUserId,
-    "mode",
-    "NORMAL",
-  );
-  await components.configurationStage.applyConfigStep(
-    game.id,
-    creator.telegramUserId,
-    "play",
-    "ONLINE",
-  );
-  await components.configurationStage.applyConfigStep(
-    game.id,
-    creator.telegramUserId,
-    "pair",
-    "MANUAL",
-  );
+    await components.configurationStage.applyConfigStep(
+      game.id,
+      creator.telegramUserId,
+      "mode",
+      "NORMAL",
+    );
+    await components.configurationStage.applyConfigStep(
+      game.id,
+      creator.telegramUserId,
+      "play",
+      "ONLINE",
+    );
+    await components.configurationStage.applyConfigStep(
+      game.id,
+      creator.telegramUserId,
+      "pair",
+      "MANUAL",
+    );
+    await components.configurationStage.confirmConfigDraft(
+      game.id,
+      creator.telegramUserId,
+    );
 
-  const configured = components.game.getGameById(game.id);
-  const snapshot = components.context.statusService.getByGameId(game.id);
+    const configured = components.game.getGameById(game.id);
+    const snapshot = components.context.statusService.getByGameId(game.id);
 
-  expect(configured.stage).toBe("PREPARE_WORDS");
-  expect(configured.words).toEqual({});
-  expect(snapshot?.manualPairingPending).toBe(true);
-  expect(snapshot?.manualPairingChooserPlayerId).toBe(configured.players[0]!.id);
-  expect(components.expectationStore.get(game.id, configured.players[0]!.id)).toBeUndefined();
+    expect(configured.stage).toBe("PREPARE_WORDS");
+    expect(configured.words).toEqual({});
+    expect(snapshot?.manualPairingPending).toBe(true);
+    expect(snapshot?.manualPairingChooserPlayerId).toBe(configured.players[0]!.id);
+    expect(components.expectationStore.get(game.id, configured.players[0]!.id)).toBeUndefined();
+  });
+
+  it("restarts the draft back to the first step", async () => {
+    const { components, actors, game } = await setupLobby();
+    const creator = actors[0]!;
+
+    await components.configurationStage.applyConfigStep(
+      game.id,
+      creator.telegramUserId,
+      "mode",
+      "NORMAL",
+    );
+    await components.configurationStage.applyConfigStep(
+      game.id,
+      creator.telegramUserId,
+      "play",
+      "ONLINE",
+    );
+
+    await components.configurationStage.restartConfigDraft(
+      game.id,
+      creator.telegramUserId,
+    );
+
+    expect(components.configDraftStore.get(game.id)).toEqual(emptyDraft);
+    expect(components.game.getGameById(game.id).config).toBeUndefined();
+  });
 });

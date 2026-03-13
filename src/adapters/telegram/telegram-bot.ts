@@ -7,12 +7,10 @@ import type { TelegramHandlerError } from "../../application/errors.js";
 import { LoggerPort } from "../../application/ports.js";
 import { TextService } from "../../application/text-service.js";
 import { TelegramCommandSync } from "./telegram-command-sync.js";
-import { createCreatorConfigMenu } from "./creator-config-menu.js";
+
 import { parseManualPairPayload } from "./manual-pair-payload.js";
 import { parseStartPayload } from "./start-payload.js";
 import { BotContext } from "./bot-context.js";
-
-type GroupMessageReadStatus = "enabled" | "disabled" | "unknown";
 
 const asActor = (ctx: BotContext) => ({
   telegramUserId: String(ctx.from?.id ?? ""),
@@ -62,6 +60,27 @@ const buildLanguageKeyboard = (texts: TextService, currentLocale: SupportedLocal
 
 const buildPrivateLink = (botUsername?: string): string =>
   botUsername ? `https://t.me/${botUsername}` : "https://t.me";
+
+const maybeEnterPregameConfigConversation = async (
+  ctx: BotContext,
+  gameService: GameService,
+  gameId?: string,
+): Promise<void> => {
+  if (!isPrivate(ctx)) {
+    return;
+  }
+
+  const snapshot = gameService.findConfiguringGameByCreator(String(ctx.from?.id ?? ""));
+  if (!snapshot) {
+    return;
+  }
+
+  if (gameId && snapshot.gameId !== gameId) {
+    return;
+  }
+
+  await ctx.conversation.enter("pregame-config", snapshot.gameId).catch(() => undefined);
+};
 
 const replyForReturnedError = async (
   ctx: BotContext,
@@ -169,56 +188,6 @@ const executeWithToast = async (
   }
 };
 
-const createGroupMessageReadStatusResolver = (
-  bot: Bot<BotContext>,
-  logger: LoggerPort,
-): (() => Promise<GroupMessageReadStatus>) => {
-  let cached: GroupMessageReadStatus | null = null;
-  let inFlight: Promise<GroupMessageReadStatus> | null = null;
-
-  return async () => {
-    if (cached) {
-      return cached;
-    }
-
-    if (inFlight) {
-      return inFlight;
-    }
-
-    inFlight = bot.api
-      .getMe()
-      .then((me) => {
-        if (me.can_read_all_group_messages === true) {
-          cached = "enabled";
-          return cached;
-        }
-
-        if (me.can_read_all_group_messages === false) {
-          cached = "disabled";
-          return cached;
-        }
-
-        logger.warn("telegram_group_read_capability_unknown", {
-          reason: "missing_can_read_all_group_messages_flag",
-        });
-        cached = "unknown";
-        return cached;
-      })
-      .catch((error) => {
-        logger.error("telegram_group_read_capability_check_failed", {
-          reason: error instanceof Error ? error.message : String(error),
-        });
-        cached = "unknown";
-        return cached;
-      })
-      .finally(() => {
-        inFlight = null;
-      });
-
-    return inFlight;
-  };
-};
-
 export const registerTelegramHandlers = (
   bot: Bot<BotContext>,
   gameService: GameService,
@@ -227,12 +196,6 @@ export const registerTelegramHandlers = (
   botUsername?: string,
   _commandSync?: TelegramCommandSync,
 ): void => {
-  const resolveGroupMessageReadStatus = createGroupMessageReadStatusResolver(
-    bot,
-    logger,
-  );
-  const creatorConfigMenu = createCreatorConfigMenu(gameService, texts);
-  bot.use(creatorConfigMenu);
 
   bot.command("start", async (ctx) => {
     await executeWithReply(ctx, logger, texts, async () => {
@@ -245,7 +208,16 @@ export const registerTelegramHandlers = (
         return payload;
       }
 
-      return gameService.handlePrivateStart(asActor(ctx), payload);
+      const result = await gameService.handlePrivateStart(asActor(ctx), payload);
+      if (result instanceof Error) {
+        return result;
+      }
+
+      if (payload?.action !== "join") {
+        await maybeEnterPregameConfigConversation(ctx, gameService, payload?.gameId ?? undefined);
+      }
+
+      return;
     });
   });
 
@@ -331,28 +303,7 @@ export const registerTelegramHandlers = (
         return;
       }
 
-      if (parts[0] === "cfg") {
-        const [, key, value, gameId] = parts;
-        if (key === "play" && value === "ONLINE") {
-          const status = await resolveGroupMessageReadStatus();
-          if (status !== "enabled") {
-            await safeToast(
-              ctx,
-              status === "disabled"
-                ? localizedTexts(texts, ctx).onlineModeDisabledAlert()
-                : localizedTexts(texts, ctx).onlineModeUnknownAlert(),
-            );
-            return;
-          }
-        }
-
-        const result = await gameService.applyConfigStep(
-          gameId,
-          asActor(ctx),
-          key as "mode" | "play" | "pair",
-          value,
-        );
-        if (result instanceof Error) return result;
+      if (parts[0] === "cfgw") {
         await ctx.answerCallbackQuery();
         return;
       }
@@ -377,17 +328,13 @@ export const registerTelegramHandlers = (
           const result = await gameService.beginConfigurationByGameId(gameId, asActor(ctx));
           if (result instanceof Error) return result;
           await ctx.answerCallbackQuery();
-          await ctx.reply(localizedTexts(texts, ctx).chooseGameModePrompt(), {
-            reply_markup: creatorConfigMenu,
-          });
+          await maybeEnterPregameConfigConversation(ctx, gameService, gameId);
           return;
         }
 
         if (action === "open-config") {
           await ctx.answerCallbackQuery();
-          await ctx.reply(localizedTexts(texts, ctx).chooseGameModePrompt(), {
-            reply_markup: creatorConfigMenu,
-          });
+          await maybeEnterPregameConfigConversation(ctx, gameService, gameId);
           return;
         }
       }
@@ -445,4 +392,9 @@ export const registerTelegramHandlers = (
     });
   });
 };
+
+
+
+
+
 

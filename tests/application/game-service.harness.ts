@@ -298,6 +298,8 @@ export const createGameServiceHarness = (
         pairingMode ?? "RANDOM",
       );
     }
+
+    await service.confirmConfigDraft(gameId, actorTelegramUserId);
   };
 
   const setupConfiguredGame = async ({
@@ -532,6 +534,7 @@ export const createGameServiceHarness = (
     setupReverseOfflineInProgress,
   };
 };
+
 
 
 

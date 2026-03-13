@@ -1,11 +1,12 @@
 import * as appErrors from "../domain/errors.js";
-import { GameState, UiButton } from "../domain/types.js";
+import { GameState } from "../domain/types.js";
 import type { NotificationError } from "../domain/errors.js";
 import {
   GameStatusSubscriber,
   GameStatusTransition,
 } from "./game-status-service.js";
 import { GameServiceContext } from "./game-service-context.js";
+import { PregameUiRenderer } from "./pregame-ui-renderer.js";
 import { ConfigDraftStore } from "./stores/config-draft-store.js";
 import { PrivateExpectationStore } from "./stores/private-expectation-store.js";
 import {
@@ -13,18 +14,21 @@ import {
   PregameUiStateStore,
 } from "./stores/pregame-ui-state-store.js";
 
-interface RenderedView {
-  text: string;
-  buttons?: UiButton[][];
-}
-
 export class PregameUiStatusSubscriber implements GameStatusSubscriber {
+  private readonly renderer: PregameUiRenderer;
+
   constructor(
     private readonly context: GameServiceContext,
     private readonly configDraftStore: ConfigDraftStore,
     private readonly expectationStore: PrivateExpectationStore,
     private readonly uiStateStore: PregameUiStateStore,
-  ) {}
+  ) {
+    this.renderer = new PregameUiRenderer(
+      context,
+      configDraftStore,
+      expectationStore,
+    );
+  }
 
   async onGameStatusChanged(
     transition: GameStatusTransition,
@@ -53,12 +57,16 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
     const state = structuredClone(this.uiStateStore.get(game.id)) as PregameUiGameState;
     state.privatePanels ??= {};
 
-    const groupView = this.renderGroupView(game);
+    const groupView = this.renderer.renderGroupView(game);
     const groupReceipt = await this.upsertGroupView(game, state, groupView);
     if (groupReceipt instanceof Error) return groupReceipt;
 
     for (const player of game.players) {
-      const privateView = this.renderPrivateView(game, state, player.id);
+      const privateView = this.renderer.renderPrivateView(
+        game,
+        state.groupStatusMessageId,
+        player.id,
+      );
       const privateReceipt = await this.upsertPrivateView(
         game,
         state,
@@ -72,275 +80,10 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
     this.uiStateStore.set(game.id, state);
   }
 
-  private renderGroupView(game: GameState): RenderedView {
-    const texts = this.context.textsForGame(game);
-    if (game.stage === "LOBBY_OPEN") {
-      return {
-        text: texts.groupLobbyStatusOpen(
-          game.players.length,
-          this.context.limits.maxPlayers,
-          this.context.limits.minPlayers,
-        ),
-        buttons: [
-          [
-            {
-              kind: "callback",
-              text: texts.joinGameButton(),
-              data: `ui:join:${game.id}`,
-              style: "primary",
-            },
-            {
-              kind: "callback",
-              text: texts.configureGameButton(),
-              data: `ui:close-lobby:${game.id}`,
-            },
-          ],
-        ],
-      };
-    }
-
-    if (game.stage === "CONFIGURING") {
-      const draft = this.configDraftStore.get(game.id);
-      return {
-        text: texts.groupConfiguringStatus({
-          mode: draft.mode,
-          playMode: draft.playMode,
-          pairingMode: draft.pairingMode,
-        }),
-        buttons: [
-          [
-            {
-              kind: "url",
-              text: texts.openPrivateChatButton(),
-              url: this.context.notifier.buildBotDeepLink(`open-${game.id}`),
-              style: "primary",
-            },
-          ],
-        ],
-      };
-    }
-
-    if (game.stage === "PREPARE_WORDS" || game.stage === "READY_WAIT") {
-      const readyCount = Object.values(game.words).filter(
-        (entry) => entry.finalConfirmed,
-      ).length;
-      return {
-        text: texts.groupWordCollectionStatus(readyCount, game.players.length),
-      };
-    }
-
-    if (game.stage === "IN_PROGRESS") {
-      return {
-        text: texts.groupInitializationFinished(),
-      };
-    }
-
-    return {
-      text: game.stage === "CANCELED" ? texts.groupCanceledStatus() : texts.groupFinishedStatus(),
-    };
-  }
-
-  private renderPrivateView(
-    game: GameState,
-    state: PregameUiGameState,
-    playerId: string,
-  ): RenderedView {
-    const texts = this.context.textsForPlayer(game, playerId);
-    const player = game.players.find((candidate) => candidate.id === playerId);
-    if (!player) {
-      return { text: texts.privatePanelPlayerNotFound() };
-    }
-
-    const gameLink = state.groupStatusMessageId
-      ? this.context.notifier.buildGroupMessageLink(
-          game.chatId,
-          state.groupStatusMessageId,
-        )
-      : null;
-    const gameLinkRow = gameLink
-      ? [
-          {
-            kind: "url" as const,
-            text: texts.openMainChatButton(),
-            url: gameLink,
-            style: "primary" as const,
-          },
-        ]
-      : null;
-
-    if (game.stage === "LOBBY_OPEN") {
-      const buttons: UiButton[][] = [];
-      if (
-        player.id === game.creatorPlayerId &&
-        game.players.length >= this.context.limits.minPlayers
-      ) {
-        buttons.push([
-          {
-            kind: "callback",
-            text: texts.configureGameButton(),
-            data: `ui:config:${game.id}`,
-            style: "primary",
-          },
-        ]);
-      }
-      if (gameLinkRow) {
-        buttons.push(gameLinkRow);
-      }
-
-      return {
-        text: texts.privateLobbyStatus(
-          game.players.length,
-          player.id === game.creatorPlayerId,
-        ),
-        buttons: buttons.length > 0 ? buttons : undefined,
-      };
-    }
-
-    if (game.stage === "CONFIGURING") {
-      const buttons: UiButton[][] = [];
-      if (player.id === game.creatorPlayerId) {
-        buttons.push([
-          {
-            kind: "callback",
-            text: texts.openConfigMenuButton(),
-            data: `ui:open-config:${game.id}`,
-            style: "primary",
-          },
-        ]);
-      }
-      if (gameLinkRow) {
-        buttons.push(gameLinkRow);
-      }
-      return {
-        text:
-          player.id === game.creatorPlayerId
-            ? texts.privateCreatorConfigStatus()
-            : texts.privatePlayerConfigStatus(),
-        buttons: buttons.length > 0 ? buttons : undefined,
-      };
-    }
-
-    if (game.stage === "PREPARE_WORDS" || game.stage === "READY_WAIT") {
-      const readyCount = Object.values(game.words).filter(
-        (entry) => entry.finalConfirmed,
-      ).length;
-      const entry = game.words[player.id];
-      const expectation = this.expectationStore.get(game.id, player.id) ?? "WORD";
-      const buttons: UiButton[][] = [];
-      if (entry) {
-        if (!entry.word) {
-          if (gameLinkRow) {
-            buttons.push(gameLinkRow);
-          }
-          return {
-            text:
-              expectation === "CLUE"
-                ? texts.privateEnterClueStatus(readyCount, game.players.length)
-                : texts.privateEnterWordStatus(readyCount, game.players.length),
-            buttons: buttons.length > 0 ? buttons : undefined,
-          };
-        }
-
-        if (!entry.wordConfirmed) {
-          if (gameLinkRow) {
-            buttons.push(gameLinkRow);
-          }
-          buttons.unshift([
-            {
-              kind: "callback",
-              text: `✅ ${texts.yesButton()}`,
-              data: `word:confirm:YES:${game.id}`,
-              style: "success",
-            },
-            {
-              kind: "callback",
-              text: `✏️ ${texts.noButton()}`,
-              data: `word:confirm:NO:${game.id}`,
-              style: "danger",
-            },
-          ]);
-          return {
-            text: texts.confirmWordPrompt(entry.word),
-            buttons,
-          };
-        }
-
-        if (!entry.finalConfirmed) {
-          const needsClueDecision = entry.clue === undefined && expectation !== "CLUE";
-          if (needsClueDecision) {
-            if (gameLinkRow) {
-              buttons.push(gameLinkRow);
-            }
-            buttons.unshift([
-              {
-                kind: "callback",
-                text: `💡 ${texts.yesButton()}`,
-                data: `word:clue:YES:${game.id}`,
-                style: "primary",
-              },
-              {
-                kind: "callback",
-                text: `➡️ ${texts.noButton()}`,
-                data: `word:clue:NO:${game.id}`,
-              },
-            ]);
-            return {
-              text: texts.privateClueDecisionStatus(readyCount, game.players.length),
-              buttons,
-            };
-          }
-
-          if (gameLinkRow) {
-            buttons.push(gameLinkRow);
-          }
-          buttons.unshift([
-            {
-              kind: "callback",
-              text: `✅ ${texts.confirmButton()}`,
-              data: `word:final:YES:${game.id}`,
-              style: "success",
-            },
-            {
-              kind: "callback",
-              text: `✏️ ${texts.editButton()}`,
-              data: `word:final:NO:${game.id}`,
-              style: "danger",
-            },
-          ]);
-          return {
-            text: texts.wordSummary(entry.word, entry.clue),
-            buttons,
-          };
-        }
-      }
-
-      if (gameLinkRow) {
-        buttons.push(gameLinkRow);
-      }
-      return {
-        text: texts.privateReadyWaitingStatus(readyCount, game.players.length),
-        buttons: buttons.length > 0 ? buttons : undefined,
-      };
-    }
-
-    if (game.stage === "IN_PROGRESS") {
-      const buttons = gameLinkRow ? [gameLinkRow] : undefined;
-      return {
-        text: texts.privateGameStartedStatus(),
-        buttons,
-      };
-    }
-
-    return {
-      text: game.stage === "CANCELED" ? texts.privateCanceledStatus() : texts.privateFinishedStatus(),
-      buttons: gameLinkRow ? [gameLinkRow] : undefined,
-    };
-  }
-
   private async upsertGroupView(
     game: GameState,
     state: PregameUiGameState,
-    view: RenderedView,
+    view: { text: string; buttons?: import("../domain/types.js").UiButton[][] },
   ): Promise<void | NotificationError> {
     const messageId = state.groupStatusMessageId;
     if (messageId) {
@@ -375,7 +118,7 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
     state: PregameUiGameState,
     playerId: string,
     telegramUserId: string,
-    view: RenderedView,
+    view: { text: string; buttons?: import("../domain/types.js").UiButton[][] },
   ): Promise<
     void | appErrors.MarkDmError | appErrors.GameNotFoundError | NotificationError
   > {
@@ -448,4 +191,3 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
     return this.context.publishGameStatus(updated);
   }
 }
-

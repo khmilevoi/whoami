@@ -57,8 +57,8 @@ export class GameService {
     private readonly texts: TextService,
     private readonly limits: { minPlayers: number; maxPlayers: number },
     private readonly statusService: GameStatusService,
-    configDraftStore = new ConfigDraftStore(),
-    expectationStore = new PrivateExpectationStore(),
+    private readonly configDraftStore = new ConfigDraftStore(),
+    private readonly expectationStore = new PrivateExpectationStore(),
   ) {
     this.context = new GameServiceContext({
       engine,
@@ -206,6 +206,10 @@ export class GameService {
     });
     if (game instanceof Error) return game;
 
+    this.configDraftStore.set(game.id, {
+      step: "MODE",
+      awaitingConfirmation: false,
+    });
     return this.statusService.publish(game);
   }
 
@@ -225,15 +229,52 @@ export class GameService {
     key: "mode" | "play" | "pair",
     value: string,
   ): Promise<void | GameServiceError> {
+    return this.saveConfigDraftStep(gameId, actor, key, value);
+  }
+
+  async saveConfigDraftStep(
+    gameId: string,
+    actor: ActorLike,
+    key: "mode" | "play" | "pair",
+    value: string,
+  ): Promise<void | GameServiceError> {
     const actorInput = this.toActorInput(actor);
     const actorIdentity = this.persistActorProfile(actorInput);
     const refreshResult = this.refreshActorInGame(gameId, actorIdentity);
     if (refreshResult instanceof Error) return refreshResult;
-    return this.configurationStage.applyConfigStep(
+    return this.configurationStage.saveConfigDraftStep(
       gameId,
       actorIdentity.telegramUserId,
       key,
       value,
+    );
+  }
+
+  async confirmConfigDraft(
+    gameId: string,
+    actor: ActorLike,
+  ): Promise<void | GameServiceError> {
+    const actorInput = this.toActorInput(actor);
+    const actorIdentity = this.persistActorProfile(actorInput);
+    const refreshResult = this.refreshActorInGame(gameId, actorIdentity);
+    if (refreshResult instanceof Error) return refreshResult;
+    return this.configurationStage.confirmConfigDraft(
+      gameId,
+      actorIdentity.telegramUserId,
+    );
+  }
+
+  async restartConfigDraft(
+    gameId: string,
+    actor: ActorLike,
+  ): Promise<void | GameServiceError> {
+    const actorInput = this.toActorInput(actor);
+    const actorIdentity = this.persistActorProfile(actorInput);
+    const refreshResult = this.refreshActorInGame(gameId, actorIdentity);
+    if (refreshResult instanceof Error) return refreshResult;
+    return this.configurationStage.restartConfigDraft(
+      gameId,
+      actorIdentity.telegramUserId,
     );
   }
 
@@ -651,3 +692,4 @@ export class GameService {
     return actor;
   }
 }
+

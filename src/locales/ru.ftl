@@ -174,3 +174,12 @@ config-saved-pairing-mode = пары: { $pairingMode }
 other-players-words-list-empty = (нет данных)
 word-summary-clue-empty = (нет)
 
+config-progress-line = Шаг { $currentStep }/{ $totalSteps }. Осталось шагов: { $remainingSteps }.
+config-responsible-line = Сейчас действует: { $playerLabel }
+wizard-confirm-config-title = Проверьте настройки игры:
+restart-config-button = Начать заново
+manual-pairing-status-title = 🧩 Игроки выбирают пары
+manual-pairing-current-chooser = Сейчас выбирает: { $playerLabel }
+manual-pairing-queue-position = Вы в очереди: { $queuePosition }
+manual-pairing-remaining = Осталось выборов: { $remainingSteps }
+manual-pairing-already-selected = Вы уже выбрали пару.

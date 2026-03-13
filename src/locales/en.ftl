@@ -174,3 +174,12 @@ config-saved-pairing-mode = pairs: { $pairingMode }
 other-players-words-list-empty = (no data)
 word-summary-clue-empty = (none)
 
+config-progress-line = Step { $currentStep }/{ $totalSteps }. Remaining steps: { $remainingSteps }.
+config-responsible-line = Current actor: { $playerLabel }
+wizard-confirm-config-title = Review game settings:
+restart-config-button = Start over
+manual-pairing-status-title = 🧩 Players are choosing pairs
+manual-pairing-current-chooser = Choosing now: { $playerLabel }
+manual-pairing-queue-position = Your queue position: { $queuePosition }
+manual-pairing-remaining = Choices left: { $remainingSteps }
+manual-pairing-already-selected = You have already chosen a pair.

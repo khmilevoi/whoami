@@ -1,21 +1,25 @@
 import * as appErrors from "../domain/errors.js";
-import { GameState, UiButton } from "../domain/types.js";
+import { GameState } from "../domain/types.js";
 import type { NotificationError } from "../domain/errors.js";
 import { GameServiceContext } from "./game-service-context.js";
+import { PregameUiRenderer } from "./pregame-ui-renderer.js";
 import { ConfigDraftStore } from "./stores/config-draft-store.js";
 import { PrivateExpectationStore } from "./stores/private-expectation-store.js";
 
-interface RenderedView {
-  text: string;
-  buttons?: UiButton[][];
-}
-
 export class PregameUiSyncService {
+  private readonly renderer: PregameUiRenderer;
+
   constructor(
     private readonly context: GameServiceContext,
     private readonly configDraftStore: ConfigDraftStore,
     private readonly expectationStore: PrivateExpectationStore,
-  ) {}
+  ) {
+    this.renderer = new PregameUiRenderer(
+      context,
+      configDraftStore,
+      expectationStore,
+    );
+  }
 
   async syncGame(
     gameId: string,
@@ -28,12 +32,16 @@ export class PregameUiSyncService {
     const next = structuredClone(game) as GameState;
     next.ui ??= { privatePanels: {} };
 
-    const groupView = this.renderGroupView(next);
+    const groupView = this.renderer.renderGroupView(next);
     const groupReceipt = await this.upsertGroupView(next, groupView);
     if (groupReceipt instanceof Error) return groupReceipt;
 
     for (const player of next.players) {
-      const privateView = this.renderPrivateView(next, player.id);
+      const privateView = this.renderer.renderPrivateView(
+        next,
+        next.ui.groupStatusMessageId,
+        player.id,
+      );
       const privateReceipt = await this.upsertPrivateView(
         next,
         player.id,
@@ -51,289 +59,9 @@ export class PregameUiSyncService {
     return;
   }
 
-  private renderGroupView(game: GameState): RenderedView {
-    if (game.stage === "LOBBY_OPEN") {
-      return {
-        text: this.context.texts.groupLobbyStatusOpen(
-          game.players.length,
-          this.context.limits.maxPlayers,
-          this.context.limits.minPlayers,
-        ),
-        buttons: [
-          [
-            {
-              kind: "callback",
-              text: this.context.texts.joinGameButton(),
-              data: `ui:join:${game.id}`,
-              style: "primary",
-            },
-            {
-              kind: "callback",
-              text: this.context.texts.configureGameButton(),
-              data: `ui:close-lobby:${game.id}`,
-            },
-          ],
-        ],
-      };
-    }
-
-    if (game.stage === "CONFIGURING") {
-      const draft = this.configDraftStore.get(game.id);
-      return {
-        text: this.context.texts.groupConfiguringStatus({
-          mode: draft.mode,
-          playMode: draft.playMode,
-          pairingMode: draft.pairingMode,
-        }),
-        buttons: [
-          [
-            {
-              kind: "url",
-              text: this.context.texts.openPrivateChatButton(),
-              url: this.context.notifier.buildBotDeepLink(`open-${game.id}`),
-              style: "primary",
-            },
-          ],
-        ],
-      };
-    }
-
-    if (game.stage === "PREPARE_WORDS" || game.stage === "READY_WAIT") {
-      const readyCount = Object.values(game.words).filter(
-        (entry) => entry.finalConfirmed,
-      ).length;
-      return {
-        text: this.context.texts.groupWordCollectionStatus(
-          readyCount,
-          game.players.length,
-        ),
-      };
-    }
-
-    if (game.stage === "IN_PROGRESS") {
-      return {
-        text: this.context.texts.groupInitializationFinished(),
-      };
-    }
-
-    return {
-      text:
-        game.stage === "CANCELED"
-          ? this.context.texts.groupCanceledStatus()
-          : this.context.texts.groupFinishedStatus(),
-    };
-  }
-
-  private renderPrivateView(game: GameState, playerId: string): RenderedView {
-    const player = game.players.find((candidate) => candidate.id === playerId);
-    if (!player) {
-      return { text: this.context.texts.privatePanelPlayerNotFound() };
-    }
-
-    const gameLink = game.ui?.groupStatusMessageId
-      ? this.context.notifier.buildGroupMessageLink(
-          game.chatId,
-          game.ui.groupStatusMessageId,
-        )
-      : null;
-    const gameLinkRow = gameLink
-      ? [
-          {
-            kind: "url" as const,
-            text: this.context.texts.openMainChatButton(),
-            url: gameLink,
-            style: "primary" as const,
-          },
-        ]
-      : null;
-
-    if (game.stage === "LOBBY_OPEN") {
-      const buttons: UiButton[][] = [];
-      if (
-        player.id === game.creatorPlayerId &&
-        game.players.length >= this.context.limits.minPlayers
-      ) {
-        buttons.push([
-          {
-            kind: "callback",
-            text: this.context.texts.configureGameButton(),
-            data: `ui:config:${game.id}`,
-            style: "primary",
-          },
-        ]);
-      }
-      if (gameLinkRow) {
-        buttons.push(gameLinkRow);
-      }
-
-      return {
-        text: this.context.texts.privateLobbyStatus(
-          game.players.length,
-          player.id === game.creatorPlayerId,
-        ),
-        buttons: buttons.length > 0 ? buttons : undefined,
-      };
-    }
-
-    if (game.stage === "CONFIGURING") {
-      const buttons: UiButton[][] = [];
-      if (player.id === game.creatorPlayerId) {
-        buttons.push([
-          {
-            kind: "callback",
-            text: this.context.texts.openConfigMenuButton(),
-            data: `ui:open-config:${game.id}`,
-            style: "primary",
-          },
-        ]);
-      }
-      if (gameLinkRow) {
-        buttons.push(gameLinkRow);
-      }
-      return {
-        text:
-          player.id === game.creatorPlayerId
-            ? this.context.texts.privateCreatorConfigStatus()
-            : this.context.texts.privatePlayerConfigStatus(),
-        buttons: buttons.length > 0 ? buttons : undefined,
-      };
-    }
-
-    if (game.stage === "PREPARE_WORDS" || game.stage === "READY_WAIT") {
-      const readyCount = Object.values(game.words).filter(
-        (entry) => entry.finalConfirmed,
-      ).length;
-      const entry = game.words[player.id];
-      const expectation = this.expectationStore.get(game.id, player.id) ?? "WORD";
-      const buttons: UiButton[][] = [];
-      if (entry) {
-        if (!entry.word) {
-          if (gameLinkRow) {
-            buttons.push(gameLinkRow);
-          }
-          return {
-            text:
-              expectation === "CLUE"
-                ? this.context.texts.privateEnterClueStatus(
-                    readyCount,
-                    game.players.length,
-                  )
-                : this.context.texts.privateEnterWordStatus(
-                    readyCount,
-                    game.players.length,
-                  ),
-            buttons: buttons.length > 0 ? buttons : undefined,
-          };
-        }
-
-        if (!entry.wordConfirmed) {
-          if (gameLinkRow) {
-            buttons.push(gameLinkRow);
-          }
-          buttons.unshift([
-            {
-              kind: "callback",
-              text: `✅ ${this.context.texts.yesButton()}`,
-              data: `word:confirm:YES:${game.id}`,
-              style: "success",
-            },
-            {
-              kind: "callback",
-              text: `✏️ ${this.context.texts.noButton()}`,
-              data: `word:confirm:NO:${game.id}`,
-              style: "danger",
-            },
-          ]);
-          return {
-            text: this.context.texts.confirmWordPrompt(entry.word),
-            buttons,
-          };
-        }
-
-        if (!entry.finalConfirmed) {
-          const needsClueDecision = entry.clue === undefined && expectation !== "CLUE";
-          if (needsClueDecision) {
-            if (gameLinkRow) {
-              buttons.push(gameLinkRow);
-            }
-            buttons.unshift([
-              {
-                kind: "callback",
-                text: `💡 ${this.context.texts.yesButton()}`,
-                data: `word:clue:YES:${game.id}`,
-                style: "primary",
-              },
-              {
-                kind: "callback",
-                text: `➡️ ${this.context.texts.noButton()}`,
-                data: `word:clue:NO:${game.id}`,
-              },
-            ]);
-            return {
-              text: this.context.texts.privateClueDecisionStatus(
-                readyCount,
-                game.players.length,
-              ),
-              buttons,
-            };
-          }
-
-          if (gameLinkRow) {
-            buttons.push(gameLinkRow);
-          }
-          buttons.unshift([
-            {
-              kind: "callback",
-              text: `✅ ${this.context.texts.confirmButton()}`,
-              data: `word:final:YES:${game.id}`,
-              style: "success",
-            },
-            {
-              kind: "callback",
-              text: `✏️ ${this.context.texts.editButton()}`,
-              data: `word:final:NO:${game.id}`,
-              style: "danger",
-            },
-          ]);
-          return {
-            text: this.context.texts.wordSummary(entry.word, entry.clue),
-            buttons,
-          };
-        }
-      }
-
-      if (gameLinkRow) {
-        buttons.push(gameLinkRow);
-      }
-      return {
-        text: this.context.texts.privateReadyWaitingStatus(
-          readyCount,
-          game.players.length,
-        ),
-        buttons: buttons.length > 0 ? buttons : undefined,
-      };
-    }
-
-    if (game.stage === "IN_PROGRESS") {
-      const buttons = gameLinkRow ? [gameLinkRow] : undefined;
-      return {
-        text: this.context.texts.privateGameStartedStatus(),
-        buttons,
-      };
-    }
-
-    return {
-      text:
-        game.stage === "CANCELED"
-          ? this.context.texts.privateCanceledStatus()
-          : this.context.texts.privateFinishedStatus(),
-      buttons: gameLinkRow ? [gameLinkRow] : undefined,
-    };
-  }
-
   private async upsertGroupView(
     game: GameState,
-    view: RenderedView,
+    view: { text: string; buttons?: import("../domain/types.js").UiButton[][] },
   ): Promise<void | NotificationError> {
     const messageId = game.ui?.groupStatusMessageId;
     if (messageId) {
@@ -363,15 +91,16 @@ export class PregameUiSyncService {
 
     game.ui ??= { privatePanels: {} };
     game.ui.groupStatusMessageId = created.messageId;
-    return;
   }
 
   private async upsertPrivateView(
     game: GameState,
     playerId: string,
     telegramUserId: string,
-    view: RenderedView,
-  ): Promise<void | appErrors.MarkDmError | NotificationError> {
+    view: { text: string; buttons?: import("../domain/types.js").UiButton[][] },
+  ): Promise<
+    void | appErrors.MarkDmError | appErrors.GameNotFoundError | NotificationError
+  > {
     if (game.stage === "LOBBY_OPEN") {
       return;
     }
@@ -407,22 +136,38 @@ export class PregameUiSyncService {
         )
       : await this.context.notifier.sendPrivateMessage(telegramUserId, view.text);
     if (created === false) {
-      const blocked = this.context.engine.markDmBlocked(
-        game,
-        playerId,
-        this.context.clock.nowIso(),
-      );
-      if (blocked instanceof Error) {
-        return blocked;
-      }
-      return;
+      return this.markDmBlocked(game.id, playerId);
     }
 
     game.ui.privatePanels[playerId] = {
       chatId: telegramUserId,
       messageId: created.messageId,
     };
-    return;
+  }
+
+  private markDmBlocked(
+    gameId: string,
+    playerId: string,
+  ): void |
+    appErrors.MarkDmError |
+    appErrors.GameNotFoundError |
+    appErrors.PlayerNotFoundError {
+    const updated = this.context.transactionRunner.runInTransaction(() => {
+      const current = this.context.getGameByIdOrError(gameId);
+      if (current instanceof Error) return current;
+
+      const next = this.context.engine.markDmBlocked(
+        current,
+        playerId,
+        this.context.clock.nowIso(),
+      );
+      if (next instanceof Error) return next;
+
+      this.context.repository.update(next);
+      return next;
+    });
+    if (updated instanceof Error) return updated;
+
+    return this.context.publishGameStatus(updated);
   }
 }
-

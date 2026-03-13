@@ -6,11 +6,26 @@ import { Context } from "grammy";
 import { DEFAULT_LOCALE } from "../domain/locale.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
-const localesDirectory = path.resolve(currentDir, "../locales");
+const resolveLocalesDirectory = (): string => {
+  const checkedDirectories = [
+    path.resolve(currentDir, "./locales"),
+    path.resolve(currentDir, "../locales"),
+    path.resolve(process.cwd(), "src/locales"),
+  ];
 
-if (!fs.existsSync(localesDirectory)) {
-  throw new Error(`Locales directory not found: ${localesDirectory}`);
-}
+  const existingDirectory = checkedDirectories.find(
+    (candidate) => fs.existsSync(candidate) && fs.statSync(candidate).isDirectory(),
+  );
+  if (existingDirectory) {
+    return existingDirectory;
+  }
+
+  throw new Error(
+    `Locales directory not found. Checked: ${checkedDirectories.join(", ")}`,
+  );
+};
+
+const localesDirectory = resolveLocalesDirectory();
 
 export interface TranslationBackend {
   t(locale: string, key: string, variables?: Record<string, unknown>): string;

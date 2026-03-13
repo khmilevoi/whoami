@@ -1,10 +1,12 @@
 import { autoRetry } from "@grammyjs/auto-retry";
+import { createConversation, conversations } from "@grammyjs/conversations";
 import { hydrate } from "@grammyjs/hydrate";
 import { I18n } from "@grammyjs/i18n";
 import * as appErrors from "./domain/errors.js";
 import { AwilixContainer } from "awilix";
 import { Bot } from "grammy";
 import { buildHttpServer } from "./adapters/http/server.js";
+import { runPregameConfigConversation } from "./adapters/telegram/pregame-config-conversation.js";
 import { registerTelegramHandlers } from "./adapters/telegram/telegram-bot.js";
 import { TelegramCommandSync } from "./adapters/telegram/telegram-command-sync.js";
 import { bindResolvedLocale } from "./adapters/telegram/telegram-i18n.js";
@@ -15,6 +17,7 @@ import {
   GameStatusSubscriber,
 } from "./application/game-status-service.js";
 import { LoggerPort } from "./application/ports.js";
+import { ConfigDraftStore } from "./application/stores/config-draft-store.js";
 import { TextService } from "./application/text-service.js";
 import { loadConfig } from "./config.js";
 import { buildContainer } from "./container.js";
@@ -38,6 +41,7 @@ const start = (): void | appErrors.StartAppError => {
   const logger = container.resolve<LoggerPort>("logger");
   const texts = container.resolve<TextService>("texts");
   const gameService = container.resolve<GameService>("gameService");
+  const configDraftStore = container.resolve<ConfigDraftStore>("configDraftStore");
   const commandSync = container.resolve<TelegramCommandSync>("commandSync");
   const statusService = container.resolve<GameStatusService>("statusService");
   const pregameUiSubscriber = container.resolve<GameStatusSubscriber>(
@@ -45,6 +49,22 @@ const start = (): void | appErrors.StartAppError => {
   );
   const gameFlowSubscriber = container.resolve<GameStatusSubscriber>(
     "gameFlowSubscriber",
+  );
+
+  bot.use(conversations());
+  bot.use(
+    createConversation(
+      async (conversation, ctx, gameId: string) =>
+        runPregameConfigConversation(
+          conversation as never,
+          ctx as BotContext,
+          gameService,
+          configDraftStore,
+          texts,
+          gameId,
+        ),
+      "pregame-config",
+    ),
   );
 
   registerTelegramHandlers(
@@ -108,3 +128,5 @@ if (result instanceof Error) {
   console.error(result);
   process.exit(1);
 }
+
+

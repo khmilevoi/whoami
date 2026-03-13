@@ -34,6 +34,10 @@ const setupManualPairingGame = async () => {
     "pair",
     "MANUAL",
   );
+  await components.configurationStage.confirmConfigDraft(
+    game.id,
+    creator.telegramUserId,
+  );
 
   return {
     components,
@@ -103,66 +107,64 @@ describe("normal pairing stage service", () => {
     const afterRecovery = components.game.getGameById(gameId);
     expect(afterRecovery).toEqual(beforeRecovery);
   });
-});
 
-it("primes word expectations only after the final manual pair is chosen", async () => {
-  const { components, gameId, actors } = await setupManualPairingGame();
+  it("primes word expectations only after the final manual pair is chosen", async () => {
+    const { components, gameId, actors } = await setupManualPairingGame();
 
-  await components.normalPairingStage.applyManualPair(
-    gameId,
-    actors[0]!.telegramUserId,
-    "tg:2",
-  );
-  expect(components.expectationStore.get(gameId, "tg:1")).toBeUndefined();
-
-  await components.normalPairingStage.applyManualPair(
-    gameId,
-    actors[1]!.telegramUserId,
-    "tg:3",
-  );
-  await components.normalPairingStage.applyManualPair(
-    gameId,
-    actors[2]!.telegramUserId,
-    "tg:4",
-  );
-  await components.normalPairingStage.applyManualPair(
-    gameId,
-    actors[3]!.telegramUserId,
-    "tg:1",
-  );
-
-  for (const actor of actors) {
-    expect(components.expectationStore.get(gameId, `tg:${actor.telegramUserId}`)).toBe(
-      "WORD",
+    await components.normalPairingStage.applyManualPair(
+      gameId,
+      actors[0]!.telegramUserId,
+      "tg:2",
     );
-  }
-});
+    expect(components.expectationStore.get(gameId, "tg:1")).toBeUndefined();
 
-it("publishes only the games that are still awaiting a manual chooser during recovery", async () => {
-  const { components, gameId } = await setupManualPairingGame();
-  const reverse = await components.game.setupConfiguredGame({
-    chatId: "chat-pair-reverse",
-    actors: components.game.createActors(3, 10),
-    mode: "REVERSE",
-    playMode: "ONLINE",
+    await components.normalPairingStage.applyManualPair(
+      gameId,
+      actors[1]!.telegramUserId,
+      "tg:3",
+    );
+    await components.normalPairingStage.applyManualPair(
+      gameId,
+      actors[2]!.telegramUserId,
+      "tg:4",
+    );
+    await components.normalPairingStage.applyManualPair(
+      gameId,
+      actors[3]!.telegramUserId,
+      "tg:1",
+    );
+
+    for (const actor of actors) {
+      expect(components.expectationStore.get(gameId, `tg:${actor.telegramUserId}`)).toBe(
+        "WORD",
+      );
+    }
   });
-  const completed = components.game.getGameById(gameId);
-  completed.preparation.manualPairingCursor = completed.preparation.manualPairingQueue.length;
-  components.game.repository.update(completed);
-  components.context.statusService.clear("chat-pair");
-  components.context.statusService.clear("chat-pair-reverse");
 
-  await components.normalPairingStage.recoverPromptsOnStartup();
+  it("publishes only the games that are still awaiting a manual chooser during recovery", async () => {
+    const { components, gameId } = await setupManualPairingGame();
+    const reverse = await components.game.setupConfiguredGame({
+      chatId: "chat-pair-reverse",
+      actors: components.game.createActors(3, 10),
+      mode: "REVERSE",
+      playMode: "ONLINE",
+    });
+    const completed = components.game.getGameById(gameId);
+    completed.preparation.manualPairingCursor = completed.preparation.manualPairingQueue.length;
+    components.game.repository.update(completed);
+    components.context.statusService.clear("chat-pair");
+    components.context.statusService.clear("chat-pair-reverse");
 
-  expect(components.context.statusService.getByGameId(gameId)).toBeNull();
-  expect(components.context.statusService.getByGameId(reverse.id)).toBeNull();
+    await components.normalPairingStage.recoverPromptsOnStartup();
 
-  const pending = await setupManualPairingGame();
-  await pending.components.normalPairingStage.recoverPromptsOnStartup();
+    expect(components.context.statusService.getByGameId(gameId)).toBeNull();
+    expect(components.context.statusService.getByGameId(reverse.id)).toBeNull();
 
-  expect(pending.components.context.statusService.getByGameId(pending.gameId)?.manualPairingPending).toBe(
-    true,
-  );
+    const pending = await setupManualPairingGame();
+    await pending.components.normalPairingStage.recoverPromptsOnStartup();
+
+    expect(pending.components.context.statusService.getByGameId(pending.gameId)?.manualPairingPending).toBe(
+      true,
+    );
+  });
 });
-
-

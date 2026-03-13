@@ -7,9 +7,26 @@ import {
 } from "../../domain/types.js";
 import type { ConfigurationStageError } from "../errors.js";
 import { GameServiceContext } from "../game-service-context.js";
-import { ConfigDraftStore } from "../stores/config-draft-store.js";
+import { ConfigDraft, ConfigDraftStore } from "../stores/config-draft-store.js";
 import { NormalPairingStageService } from "./normal-pairing-stage-service.js";
 import { WordPreparationStageService } from "./word-preparation-stage-service.js";
+
+const initialDraft = (): ConfigDraft => ({
+  step: "MODE",
+  awaitingConfirmation: false,
+});
+
+const isDraftComplete = (draft: ConfigDraft): boolean => {
+  if (!draft.mode || !draft.playMode) {
+    return false;
+  }
+
+  if (draft.mode === "NORMAL") {
+    return draft.pairingMode !== undefined;
+  }
+
+  return true;
+};
 
 export class ConfigurationStageService {
   constructor(
@@ -20,6 +37,15 @@ export class ConfigurationStageService {
   ) {}
 
   async applyConfigStep(
+    gameId: string,
+    actorTelegramUserId: string,
+    key: "mode" | "play" | "pair",
+    value: string,
+  ): Promise<void | ConfigurationStageError> {
+    return this.saveConfigDraftStep(gameId, actorTelegramUserId, key, value);
+  }
+
+  async saveConfigDraftStep(
     gameId: string,
     actorTelegramUserId: string,
     key: "mode" | "play" | "pair",
@@ -38,21 +64,77 @@ export class ConfigurationStageService {
       return new appErrors.OnlyGameCreatorCanConfigureError();
     }
 
-    const draft = this.configDraftStore.get(gameId);
+    const currentDraft = this.configDraftStore.get(gameId);
+    const nextDraft: ConfigDraft = {
+      ...currentDraft,
+      awaitingConfirmation: false,
+    };
 
     if (key === "mode") {
-      draft.mode = value as GameMode;
-      draft.pairingMode = undefined;
+      nextDraft.step = "PLAY_MODE";
+      nextDraft.mode = value as GameMode;
+      nextDraft.playMode = undefined;
+      nextDraft.pairingMode = undefined;
     }
+
     if (key === "play") {
-      draft.playMode = value as PlayMode;
+      nextDraft.playMode = value as PlayMode;
+      nextDraft.step = nextDraft.mode === "NORMAL" ? "PAIRING_MODE" : "CONFIRM";
     }
+
     if (key === "pair") {
-      draft.pairingMode = value as PairingMode;
+      nextDraft.pairingMode = value as PairingMode;
+      nextDraft.step = "CONFIRM";
     }
 
-    this.configDraftStore.set(gameId, draft);
+    if (isDraftComplete(nextDraft)) {
+      nextDraft.awaitingConfirmation = true;
+      nextDraft.step = "CONFIRM";
+    }
 
+    this.configDraftStore.set(gameId, nextDraft);
+    return this.context.republishGameStatus(gameId);
+  }
+
+  async restartConfigDraft(
+    gameId: string,
+    actorTelegramUserId: string,
+  ): Promise<void | ConfigurationStageError> {
+    const game = this.context.getGameByIdOrError(gameId);
+    if (game instanceof Error) return game;
+
+    const actor = this.context.getPlayerByTelegramOrError(
+      game,
+      actorTelegramUserId,
+    );
+    if (actor instanceof Error) return actor;
+
+    if (actor.id !== game.creatorPlayerId) {
+      return new appErrors.OnlyGameCreatorCanConfigureError();
+    }
+
+    this.configDraftStore.set(gameId, initialDraft());
+    return this.context.republishGameStatus(gameId);
+  }
+
+  async confirmConfigDraft(
+    gameId: string,
+    actorTelegramUserId: string,
+  ): Promise<void | ConfigurationStageError> {
+    const game = this.context.getGameByIdOrError(gameId);
+    if (game instanceof Error) return game;
+
+    const actor = this.context.getPlayerByTelegramOrError(
+      game,
+      actorTelegramUserId,
+    );
+    if (actor instanceof Error) return actor;
+
+    if (actor.id !== game.creatorPlayerId) {
+      return new appErrors.OnlyGameCreatorCanConfigureError();
+    }
+
+    const draft = this.configDraftStore.get(gameId);
     if (!draft.mode || !draft.playMode) {
       return this.context.republishGameStatus(gameId);
     }
@@ -99,4 +181,3 @@ export class ConfigurationStageService {
     return this.wordPreparationStage.promptWordCollection(configured);
   }
 }
-

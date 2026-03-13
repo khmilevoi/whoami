@@ -563,6 +563,64 @@ export class TextService {
     return this.t("private-finished-status");
   }
 
+  configProgressLine(currentStep: number, totalSteps: number, remainingSteps: number): string {
+    return this.t("config-progress-line", {
+      currentStep,
+      totalSteps,
+      remainingSteps,
+    });
+  }
+
+  configResponsibleLine(playerLabel: string): string {
+    return this.t("config-responsible-line", { playerLabel });
+  }
+
+  configDraftSummary(input: {
+    mode?: GameMode;
+    playMode?: PlayMode;
+    pairingMode?: PairingMode;
+  }): string {
+    return [
+      this.t("group-configuring-status-mode", {
+        mode: input.mode ? this.gameMode(input.mode) : "-",
+      }),
+      this.t("group-configuring-status-play-mode", {
+        playMode: input.playMode ? this.playMode(input.playMode) : "-",
+      }),
+      this.t("group-configuring-status-pairing-mode", {
+        pairingMode: input.pairingMode ? this.pairingMode(input.pairingMode) : "-",
+      }),
+    ].join("\n");
+  }
+
+  wizardConfirmConfigTitle(): string {
+    return this.t("wizard-confirm-config-title");
+  }
+
+  restartConfigButton(): string {
+    return this.t("restart-config-button");
+  }
+
+  manualPairingStatusTitle(): string {
+    return this.t("manual-pairing-status-title");
+  }
+
+  manualPairingCurrentChooser(playerLabel: string): string {
+    return this.t("manual-pairing-current-chooser", { playerLabel });
+  }
+
+  manualPairingQueuePosition(queuePosition: number): string {
+    return this.t("manual-pairing-queue-position", { queuePosition });
+  }
+
+  manualPairingRemaining(remainingSteps: number): string {
+    return this.t("manual-pairing-remaining", { remainingSteps });
+  }
+
+  manualPairingAlreadySelected(): string {
+    return this.t("manual-pairing-already-selected");
+  }
+
   joinGameButton(): string {
     return this.t("join-game-button");
   }
@@ -607,4 +665,5 @@ export class TextService {
     return this.i18n.t(this.locale, key, variables);
   }
 }
+
 
