@@ -131,6 +131,9 @@ it("formats crownless summary rows and propagates send errors without mutating t
   expect(components.game.notifier.sent.at(-1)?.text).toContain(
     `${components.context.playerLabel(finished, finished.players[0]!.id)}: 2/3`,
   );
+  expect(components.game.notifier.sent.at(-1)?.text).toContain(
+    `${components.context.playerLabel(finished, finished.players[0]!.id)} -> ${components.context.playerLabel(finished, finished.words[finished.players[0]!.id]!.targetPlayerId ?? "-")}: ${finished.words[finished.players[0]!.id]!.word ?? "-"}`,
+  );
 
   components.game.notifier.sent.length = 0;
   components.game.notifier.setGroupMessageFailure(finished.chatId);
@@ -139,5 +142,6 @@ it("formats crownless summary rows and propagates send errors without mutating t
   expect(result).toBeInstanceOf(Error);
   expect(finished.result?.normal?.[0]?.crowns).toEqual([]);
 });
+
 
 

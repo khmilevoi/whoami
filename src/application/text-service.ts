@@ -321,6 +321,10 @@ export class TextService {
     return `${this.t("normal-summary-title")}\n${lines.join("\n")}`;
   }
 
+  finalWordAssignments(lines: string[]): string {
+    return `${this.t("final-word-assignments-title")}\n${lines.join("\n") || "-"}`;
+  }
+
   votePrompt(askerLabel: string): string {
     return this.t("vote-prompt", { askerLabel });
   }
@@ -665,5 +669,6 @@ export class TextService {
     return this.i18n.t(this.locale, key, variables);
   }
 }
+
 
 

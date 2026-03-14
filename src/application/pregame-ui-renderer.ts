@@ -296,6 +296,16 @@ export class PregameUiRenderer {
         }
 
         if (!entry.finalConfirmed) {
+          if (entry.clue === undefined && expectation === "CLUE") {
+            if (gameLinkRow) {
+              buttons.push(gameLinkRow);
+            }
+            return {
+              text: texts.privateEnterClueStatus(readyCount, game.players.length),
+              buttons: buttons.length > 0 ? buttons : undefined,
+            };
+          }
+
           const needsClueDecision = entry.clue === undefined && expectation !== "CLUE";
           if (needsClueDecision) {
             if (gameLinkRow) {

@@ -46,6 +46,7 @@ other-players-words-list = Other players' words:
   { $visibleWords }
 game-finished = Game finished.
 normal-summary-title = Summary (normal mode):
+final-word-assignments-title = Assigned words:
 vote-prompt = { $askerLabel } asked a question. Vote:
 reverse-target-turn = We are guessing { $targetLabel }'s word. { $askerLabel } asks the next question.
 reverse-summary-title = Summary (reverse mode):
@@ -183,3 +184,4 @@ manual-pairing-current-chooser = Choosing now: { $playerLabel }
 manual-pairing-queue-position = Your queue position: { $queuePosition }
 manual-pairing-remaining = Choices left: { $remainingSteps }
 manual-pairing-already-selected = You have already chosen a pair.
+

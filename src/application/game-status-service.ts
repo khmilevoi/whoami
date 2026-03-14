@@ -155,6 +155,7 @@ export class InMemoryGameStatusService implements GameStatusService {
   private readonly activeChatsByTelegramUser = new Map<string, Set<string>>();
   private readonly configuringByCreator = new Map<string, GameStatusSnapshot>();
   private readonly subscribers = new Set<GameStatusSubscriber>();
+  private notificationQueue: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly repository: GameRepository,
@@ -167,7 +168,7 @@ export class InMemoryGameStatusService implements GameStatusService {
     this.byChatId.set(game.chatId, current);
     this.byGameId.set(game.id, current);
     this.rebuildIndices();
-    this.notifySubscribers({
+    this.enqueueTransition({
       previous,
       current,
       changed: deriveChanged(previous, current),
@@ -183,7 +184,7 @@ export class InMemoryGameStatusService implements GameStatusService {
     this.byChatId.delete(chatId);
     this.byGameId.delete(previous.gameId);
     this.rebuildIndices();
-    this.notifySubscribers({
+    this.enqueueTransition({
       previous,
       current: null,
       changed: deriveChanged(previous, null),
@@ -243,27 +244,45 @@ export class InMemoryGameStatusService implements GameStatusService {
     }
   }
 
-  private notifySubscribers(transition: GameStatusTransition): void {
-    for (const subscriber of this.subscribers) {
-      Promise.resolve(subscriber.onGameStatusChanged(transition))
-        .then((result) => {
-          if (!result) {
-            return;
-          }
+  private enqueueTransition(transition: GameStatusTransition): void {
+    const queued = this.notificationQueue.then(() => this.dispatchTransition(transition));
+    this.notificationQueue = queued.catch((error) => {
+      this.logger.warn("game_status_dispatch_failed", {
+        reason: error instanceof Error ? error.message : String(error),
+        chatId: transition.current?.chatId ?? transition.previous?.chatId,
+      });
+    });
+  }
 
-          this.logger.warn("game_status_subscriber_failed", {
-            subscriber: subscriber.constructor.name,
-            reason: result.message,
-            chatId: transition.current?.chatId ?? transition.previous?.chatId,
-          });
-        })
-        .catch((error) => {
-          this.logger.warn("game_status_subscriber_failed", {
-            subscriber: subscriber.constructor.name,
-            reason: error instanceof Error ? error.message : String(error),
-            chatId: transition.current?.chatId ?? transition.previous?.chatId,
-          });
-        });
+  private async dispatchTransition(transition: GameStatusTransition): Promise<void> {
+    for (const subscriber of this.subscribers) {
+      const result = await Promise.resolve(subscriber.onGameStatusChanged(transition)).catch(
+        (error) => {
+          this.logSubscriberFailure(
+            subscriber,
+            transition,
+            error instanceof Error ? error.message : String(error),
+          );
+          return undefined;
+        },
+      );
+      if (!result) {
+        continue;
+      }
+
+      this.logSubscriberFailure(subscriber, transition, result.message);
     }
+  }
+
+  private logSubscriberFailure(
+    subscriber: GameStatusSubscriber,
+    transition: GameStatusTransition,
+    reason: string,
+  ): void {
+    this.logger.warn("game_status_subscriber_failed", {
+      subscriber: subscriber.constructor.name,
+      reason,
+      chatId: transition.current?.chatId ?? transition.previous?.chatId,
+    });
   }
 }

@@ -344,6 +344,13 @@ describe("game flow status subscriber", () => {
       const crown = row.crowns.length > 0 ? " 👑" : "";
       return `- ${finishHarness.context.playerLabel(finished, row.playerId)}: ${row.rounds}/${row.questions}${crown}`;
     });
+    const assignmentLines = finished.players.map((player) => {
+      const entry = finished.words[player.id];
+      const targetLabel = entry?.targetPlayerId
+        ? finishHarness.context.playerLabel(finished, entry.targetPlayerId)
+        : "-";
+      return `- ${finishHarness.context.playerLabel(finished, player.id)} -> ${targetLabel}: ${entry?.word ?? "-"}`;
+    });
 
     expect(finished.stage).toBe("FINISHED");
     expect(groupMessages(finishHarness).map((notification) => notification.text)).toEqual(
@@ -351,9 +358,13 @@ describe("game flow status subscriber", () => {
         finishHarness.context.textsForGame(finished).playerGaveUp(
           finishHarness.context.playerLabel(finished, finalAsker.id),
         ),
-        finishHarness.context.textsForGame(finished).normalSummary(lines),
+        [
+          finishHarness.context.textsForGame(finished).normalSummary(lines),
+          finishHarness.context.textsForGame(finished).finalWordAssignments(assignmentLines),
+        ].join("\n\n"),
       ]),
     );
   });
 });
+
 

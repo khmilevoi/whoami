@@ -77,10 +77,17 @@ export class NormalModeService extends BaseGameModeService {
       const crown = row.crowns.length > 0 ? " 👑" : "";
       return `- ${this.context.playerLabel(game, row.playerId)}: ${row.rounds}/${row.questions}${crown}`;
     });
+    const assignmentLines = game.players.map((player) => {
+      const entry = game.words[player.id];
+      const targetLabel = entry?.targetPlayerId
+        ? this.context.playerLabel(game, entry.targetPlayerId)
+        : "-";
+      return `- ${this.context.playerLabel(game, player.id)} -> ${targetLabel}: ${entry?.word ?? "-"}`;
+    });
 
     const sent = await this.context.notifier.sendGroupMessage(
       game.chatId,
-      texts.normalSummary(lines),
+      [texts.normalSummary(lines), texts.finalWordAssignments(assignmentLines)].join("\n\n"),
     );
     return sent instanceof Error ? sent : undefined;
   }
@@ -110,3 +117,4 @@ export class NormalModeService extends BaseGameModeService {
     return this.context.publishGameStatus(updated);
   }
 }
+

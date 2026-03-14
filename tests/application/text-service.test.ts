@@ -33,12 +33,18 @@ describe("text service", () => {
     );
     expect(texts.voteSummary("GUESSED")).toBe("Итог голосования: Угадал.");
     expect(texts.openMainChatButton()).toBe("🎮 Перейти в основной чат");
+    expect(texts.finalWordAssignments(["- Alice -> Bob: moon"])).toBe(
+      "Загаданные слова:\n- Alice -> Bob: moon",
+    );
   });
 
   it("renders english locale through the same facade", () => {
     expect(englishTexts.commandLanguageDescription()).toBe("Change language");
     expect(englishTexts.voteSummary("NO")).toBe("Vote result: No.");
     expect(englishTexts.openMainChatButton()).toBe("🎮 Open main chat");
+    expect(englishTexts.finalWordAssignments(["- Alice: moon"])).toBe(
+      "Assigned words:\n- Alice: moon",
+    );
   });
 
   it("renders every domain error class", () => {
@@ -50,3 +56,4 @@ describe("text service", () => {
     expect(rendered.every((message) => message.length > 0)).toBe(true);
   });
 });
+

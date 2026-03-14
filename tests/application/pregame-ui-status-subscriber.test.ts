@@ -40,6 +40,7 @@ const createSubscriberHarness = () => {
     subscriber,
     uiStateStore,
     configDraftStore,
+    expectationStore,
   };
 };
 
@@ -187,6 +188,64 @@ describe("pregame ui status subscriber", () => {
     expect(
       harness.game.getGameById(game.id).players.find((player) => player.id === creator.id)?.stage,
     ).not.toBe("BLOCKED_DM");
+  });
+
+  it("renders a clue-entry prompt before the final word summary", async () => {
+    const harness = createSubscriberHarness();
+    const actors = harness.game.createActors(3);
+    const configured = await harness.game.setupConfiguredGame({
+      chatId: "chat-ui-clue-prompt",
+      actors,
+      mode: "REVERSE",
+      playMode: "ONLINE",
+    });
+
+    await harness.game.service.handlePrivateText(actors[0]!.telegramUserId, "planet");
+    await harness.game.service.handleWordCallback(
+      configured.id,
+      actors[0]!.telegramUserId,
+      "confirm",
+      "YES",
+    );
+
+    const game = harness.game.getGameById(configured.id);
+    const player = mustBeDefined(
+      game.players.find((candidate) => candidate.telegramUserId === actors[0]!.telegramUserId),
+      "Expected clue player",
+    );
+    player.dmOpened = true;
+    harness.game.repository.update(game);
+    harness.expectationStore.set(configured.id, player.id, "CLUE");
+
+    await harness.subscriber.syncGame(configured.id);
+
+    const cluePrompt = mustBeDefined(
+      [...harness.game.notifier.sent]
+        .reverse()
+        .find((entry) => entry.kind.startsWith("private")),
+      "Expected clue prompt notification",
+    );
+    expect(cluePrompt.text).toBe(
+      harness.game.texts.privateEnterClueStatus(0, actors.length),
+    );
+
+    const updated = harness.game.getGameById(configured.id);
+    updated.words[player.id]!.clue = "space clue";
+    harness.game.repository.update(updated);
+    harness.expectationStore.delete(configured.id, player.id);
+    harness.game.notifier.sent.length = 0;
+
+    await harness.subscriber.syncGame(configured.id);
+
+    const summary = mustBeDefined(
+      [...harness.game.notifier.sent]
+        .reverse()
+        .find((entry) => entry.kind.startsWith("private")),
+      "Expected word summary notification",
+    );
+    expect(summary.text).toBe(
+      harness.game.texts.wordSummary("planet", "space clue"),
+    );
   });
 
   it("clears stale private panel state when DM delivery becomes blocked", async () => {

@@ -88,10 +88,16 @@ export class ReverseModeService extends BaseGameModeService {
         return `- ${this.context.playerLabel(game, row.playerId)}: ${avgRounds}/${avgQuestions}${row.crowns.length ? " 👑" : ""}`;
       })
       .join("\n");
+    const assignmentLines = game.players.map((player) => {
+      const entry = game.words[player.id];
+      return `- ${this.context.playerLabel(game, player.id)}: ${entry?.word ?? "-"}`;
+    });
 
     const sent = await this.context.notifier.sendGroupMessage(
       game.chatId,
-      texts.reverseSummary(ownerText, guesserText),
+      [texts.reverseSummary(ownerText, guesserText), texts.finalWordAssignments(assignmentLines)].join(
+        "\n\n",
+      ),
     );
     return sent instanceof Error ? sent : undefined;
   }
@@ -121,3 +127,4 @@ export class ReverseModeService extends BaseGameModeService {
     return this.context.publishGameStatus(updated);
   }
 }
+

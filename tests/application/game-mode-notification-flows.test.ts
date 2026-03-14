@@ -107,6 +107,50 @@ describe("game mode notification flows", () => {
     );
   });
 
+  it("formats the NORMAL final summary with assigned words", async () => {
+    const components = createGameServiceComponentHarness();
+    const started = await components.game.setupInProgressGame({
+      chatId: "chat-normal-summary",
+      actors: components.game.createActors(3),
+      mode: "NORMAL",
+      playMode: "ONLINE",
+      pairingMode: "RANDOM",
+    });
+    const finished = cloneGame(started);
+    finished.stage = "FINISHED";
+    finished.result = {
+      gameId: finished.id,
+      mode: "NORMAL",
+      createdAt: finished.updatedAt,
+      normal: [
+        {
+          playerId: finished.players[0]!.id,
+          rounds: 1,
+          questions: 2,
+          crowns: ["gold"],
+        },
+      ],
+    };
+
+    const lines = [
+      `- ${components.context.playerLabel(finished, finished.players[0]!.id)}: 1/2 👑`,
+    ];
+    const assignmentLines = finished.players.map((player) => {
+      const entry = finished.words[player.id]!;
+      return `- ${components.context.playerLabel(finished, player.id)} -> ${components.context.playerLabel(finished, entry.targetPlayerId ?? "-")}: ${entry.word ?? "-"}`;
+    });
+
+    components.game.notifier.sent.length = 0;
+    await components.normalMode.sendFinalSummary(finished);
+
+    expect(groupMessages(components).map((notification) => notification.text)).toContain(
+      [
+        components.context.textsForGame(finished).normalSummary(lines),
+        components.context.textsForGame(finished).finalWordAssignments(assignmentLines),
+      ].join("\n\n"),
+    );
+  });
+
   it("announces the current REVERSE offline turn with the target player and poll-start keyboard", async () => {
     const components = createGameServiceComponentHarness();
     const actors = components.game.createActors(3);
@@ -185,12 +229,20 @@ describe("game mode notification flows", () => {
 
     const ownerText = `- ${components.context.playerLabel(finished, finished.players[0]!.id)}: 1/2 👑`;
     const guesserText = `- ${components.context.playerLabel(finished, finished.players[1]!.id)}: 1.5/2.5`;
+    const assignmentLines = finished.players.map(
+      (player) => `- ${components.context.playerLabel(finished, player.id)}: ${finished.words[player.id]!.word ?? "-"}`,
+    );
 
     components.game.notifier.sent.length = 0;
     await components.reverseMode.sendFinalSummary(finished);
 
     expect(groupMessages(components).map((notification) => notification.text)).toContain(
-      components.context.textsForGame(finished).reverseSummary(ownerText, guesserText),
+      [
+        components.context.textsForGame(finished).reverseSummary(ownerText, guesserText),
+        components.context.textsForGame(finished).finalWordAssignments(assignmentLines),
+      ].join("\n\n"),
     );
   });
 });
+
+

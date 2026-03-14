@@ -125,6 +125,9 @@ it("formats reverse summaries with zero defaults and no crowns", async () => {
   expect(summaryText).toContain(
     `${components.context.playerLabel(finished, finished.players[1]!.id)}: 0/0`,
   );
+  expect(summaryText).toContain(
+    `${components.context.playerLabel(finished, finished.players[0]!.id)}: ${finished.words[finished.players[0]!.id]!.word ?? "-"}`,
+  );
   expect(summaryText.includes("👑")).toBe(false);
 });
 
@@ -154,3 +157,4 @@ it("returns notifier errors for reverse summaries without mutating the stored re
   expect(result).toBeInstanceOf(Error);
   expect(finished.result?.reverse).toEqual({ asWordOwner: [], asGuesser: [] });
 });
+

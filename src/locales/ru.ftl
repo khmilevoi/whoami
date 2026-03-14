@@ -46,6 +46,7 @@ other-players-words-list = Список слов других игроков:
   { $visibleWords }
 game-finished = Игра завершена.
 normal-summary-title = Сводка (обычный режим):
+final-word-assignments-title = Загаданные слова:
 vote-prompt = { $askerLabel } задал вопрос. Голосуем:
 reverse-target-turn = Сейчас угадываем слово игрока { $targetLabel }. Ход задавать вопрос у { $askerLabel }.
 reverse-summary-title = Сводка (обратный режим):
@@ -183,3 +184,4 @@ manual-pairing-current-chooser = Сейчас выбирает: { $playerLabel }
 manual-pairing-queue-position = Вы в очереди: { $queuePosition }
 manual-pairing-remaining = Осталось выборов: { $remainingSteps }
 manual-pairing-already-selected = Вы уже выбрали пару.
+
