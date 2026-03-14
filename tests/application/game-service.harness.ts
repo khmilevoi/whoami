@@ -59,6 +59,7 @@ interface HarnessOptions {
   idPrefix?: string;
   deepLink?: string;
   queuedIds?: string[];
+  subscribePregameUiSubscriber?: boolean;
 }
 
 export interface GameServiceHarness {
@@ -203,14 +204,16 @@ export const createGameServiceHarness = (
     expectationStore,
   );
 
-  statusService.subscribe(
-    new PregameUiStatusSubscriber(
-      context,
-      configDraftStore,
-      expectationStore,
-      uiStateStore,
-    ),
-  );
+  if (options.subscribePregameUiSubscriber ?? true) {
+    statusService.subscribe(
+      new PregameUiStatusSubscriber(
+        context,
+        configDraftStore,
+        expectationStore,
+        uiStateStore,
+      ),
+    );
+  }
 
   const createActors = (count: number, startIndex = 1): TestActor[] =>
     Array.from({ length: count }, (_, index) => createActor(startIndex + index));
@@ -534,13 +537,4 @@ export const createGameServiceHarness = (
     setupReverseOfflineInProgress,
   };
 };
-
-
-
-
-
-
-
-
-
 

@@ -1,4 +1,3 @@
-import * as appErrors from "../domain/errors.js";
 import type { NotificationError } from "../domain/errors.js";
 import { GameMode, GameState } from "../domain/types.js";
 import { GameStatusSubscriber, GameStatusTransition } from "./game-status-service.js";
@@ -20,7 +19,7 @@ export class GameFlowStatusSubscriber implements GameStatusSubscriber {
   async onGameStatusChanged(
     transition: GameStatusTransition,
   ): Promise<void | Error> {
-    const gameId = transition.current?.gameId;
+    const gameId = transition.current?.gameId ?? transition.previous?.gameId;
     if (!gameId) {
       return;
     }
@@ -29,11 +28,20 @@ export class GameFlowStatusSubscriber implements GameStatusSubscriber {
     if (game instanceof Error) {
       return game;
     }
-    if (!game.config) {
-      return new appErrors.GameConfigurationMissingError();
-    }
 
     const texts = this.context.textsForGame(game);
+
+    if (transition.changed.stageChanged && transition.current?.stage === "CANCELED") {
+      const sentCancel = await this.context.notifier.sendGroupMessage(
+        game.chatId,
+        texts.gameCancelledByCreator(),
+      );
+      return sentCancel instanceof Error ? sentCancel : undefined;
+    }
+
+    if (!game.config) {
+      return;
+    }
 
     if (
       transition.changed.stageChanged &&
@@ -91,14 +99,6 @@ export class GameFlowStatusSubscriber implements GameStatusSubscriber {
       }
 
       return;
-    }
-
-    if (transition.changed.stageChanged && transition.current?.stage === "CANCELED") {
-      const sentCancel = await this.context.notifier.sendGroupMessage(
-        game.chatId,
-        texts.gameCancelledByCreator(),
-      );
-      return sentCancel instanceof Error ? sentCancel : undefined;
     }
 
     if (transition.changed.stageChanged && transition.current?.stage === "FINISHED") {
@@ -161,3 +161,4 @@ export class GameFlowStatusSubscriber implements GameStatusSubscriber {
     return sentVote instanceof Error ? sentVote : undefined;
   }
 }
+

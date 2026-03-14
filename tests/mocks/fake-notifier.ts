@@ -34,6 +34,8 @@ export class FakeNotifier implements NotifierPort {
   readonly zeroMessageIdGroupEdits = new Set<string>();
   readonly zeroMessageIdPrivateEdits = new Set<string>();
   private messageId = 1;
+  private nextGroupSendDelay?: Promise<void>;
+  private releaseNextGroupSendDelay?: () => void;
 
   constructor(private readonly deepLink = "https://t.me/fake_bot") {}
 
@@ -65,10 +67,22 @@ export class FakeNotifier implements NotifierPort {
     this.zeroMessageIdPrivateEdits.add(userId);
   }
 
+  delayNextGroupSend(): () => void {
+    this.nextGroupSendDelay = new Promise<void>((resolve) => {
+      this.releaseNextGroupSendDelay = resolve;
+    });
+    return () => {
+      this.releaseNextGroupSendDelay?.();
+      this.releaseNextGroupSendDelay = undefined;
+    };
+  }
+
   async sendGroupMessage(
     chatId: string,
     text: string,
   ): Promise<NotificationReceipt | NotificationError> {
+    await this.waitForNextGroupSend();
+
     if (this.failedGroupMessages.has(chatId)) {
       return new TelegramApiError({
         operation: "sendMessage",
@@ -86,6 +100,8 @@ export class FakeNotifier implements NotifierPort {
     text: string,
     buttons: UiButton[][],
   ): Promise<NotificationReceipt | NotificationError> {
+    await this.waitForNextGroupSend();
+
     if (this.failedGroupMessages.has(chatId)) {
       return new TelegramApiError({
         operation: "sendMessage",
@@ -201,5 +217,15 @@ export class FakeNotifier implements NotifierPort {
     }
 
     return `https://t.me/c/${chatId.slice(4)}/${messageId}`;
+  }
+
+  private async waitForNextGroupSend(): Promise<void> {
+    const delay = this.nextGroupSendDelay;
+    if (!delay) {
+      return;
+    }
+
+    this.nextGroupSendDelay = undefined;
+    await delay;
   }
 }

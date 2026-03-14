@@ -16,6 +16,7 @@ import {
 
 export class PregameUiStatusSubscriber implements GameStatusSubscriber {
   private readonly renderer: PregameUiRenderer;
+  private readonly syncQueue = new Map<string, Promise<void>>();
 
   constructor(
     private readonly context: GameServiceContext,
@@ -38,12 +39,14 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
       return;
     }
 
-    if (!transition.current) {
-      this.uiStateStore.delete(gameId);
-      return;
-    }
+    return this.enqueueGameSync(gameId, async () => {
+      if (!transition.current) {
+        this.uiStateStore.delete(gameId);
+        return;
+      }
 
-    return this.syncGame(gameId);
+      return this.syncGame(gameId);
+    });
   }
 
   async syncGame(
@@ -60,6 +63,7 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
     const groupView = this.renderer.renderGroupView(game);
     const groupReceipt = await this.upsertGroupView(game, state, groupView);
     if (groupReceipt instanceof Error) return groupReceipt;
+    this.uiStateStore.set(game.id, state);
 
     for (const player of game.players) {
       const privateView = this.renderer.renderPrivateView(
@@ -75,9 +79,8 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
         privateView,
       );
       if (privateReceipt instanceof Error) return privateReceipt;
+      this.uiStateStore.set(game.id, state);
     }
-
-    this.uiStateStore.set(game.id, state);
   }
 
   private async upsertGroupView(
@@ -123,11 +126,13 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
     void | appErrors.MarkDmError | appErrors.GameNotFoundError | NotificationError
   > {
     if (game.stage === "LOBBY_OPEN") {
+      delete state.privatePanels[playerId];
       return;
     }
 
     const player = game.players.find((candidate) => candidate.id === playerId);
     if (!player?.dmOpened || player.stage === "BLOCKED_DM") {
+      delete state.privatePanels[playerId];
       return;
     }
 
@@ -156,6 +161,7 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
         )
       : await this.context.notifier.sendPrivateMessage(telegramUserId, view.text);
     if (created === false) {
+      delete state.privatePanels[playerId];
       return this.markDmBlocked(game.id, playerId);
     }
 
@@ -163,6 +169,25 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
       chatId: telegramUserId,
       messageId: created.messageId,
     };
+  }
+
+  private enqueueGameSync(
+    gameId: string,
+    action: () => Promise<void | Error>,
+  ): Promise<void | Error> {
+    const previous = this.syncQueue.get(gameId) ?? Promise.resolve();
+    const run = previous.catch(() => undefined).then(action);
+    const settled = run.then(
+      () => undefined,
+      () => undefined,
+    );
+
+    this.syncQueue.set(gameId, settled);
+    return run.finally(() => {
+      if (this.syncQueue.get(gameId) === settled) {
+        this.syncQueue.delete(gameId);
+      }
+    });
   }
 
   private markDmBlocked(

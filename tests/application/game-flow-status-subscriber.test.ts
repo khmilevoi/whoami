@@ -30,7 +30,7 @@ const changed = (
 });
 
 const createFlowHarness = (options?: { minPlayers?: number }) => {
-  const game = createGameServiceHarness(options);
+  const game = createGameServiceHarness({ ...options, subscribePregameUiSubscriber: false });
   const context = new GameServiceContext({
     engine: game.engine,
     repository: game.repository,
@@ -55,6 +55,12 @@ const createFlowHarness = (options?: { minPlayers?: number }) => {
 const groupMessages = (harness: { game: GameServiceHarness }) =>
   harness.game.notifier.sent.filter((notification) => notification.kind === "group-message");
 
+const flushReactiveEffects = async (): Promise<void> => {
+  await Promise.resolve();
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+};
+
 describe("game flow status subscriber", () => {
   it("ignores transitions without a current game snapshot", async () => {
     const harness = createFlowHarness();
@@ -69,6 +75,81 @@ describe("game flow status subscriber", () => {
     expect(harness.game.notifier.sent).toEqual([]);
   });
 
+  it("treats lobby and configuring transitions without config as no-ops", async () => {
+    const harness = createFlowHarness();
+    const actors = harness.game.createActors(3);
+
+    await harness.game.service.startGame("chat-flow-lobby", actors[0]!);
+    const lobbySnapshot = mustBeDefined(
+      harness.game.statusService.getByChatId("chat-flow-lobby"),
+      "Expected lobby snapshot",
+    );
+
+    await flushReactiveEffects();
+    harness.game.notifier.sent.length = 0;
+    await expect(
+      harness.subscriber.onGameStatusChanged({
+        previous: null,
+        current: lobbySnapshot,
+        changed: changed(),
+      }),
+    ).resolves.toBeUndefined();
+    expect(harness.game.notifier.sent).toEqual([]);
+
+    await harness.game.service.joinGame("chat-flow-lobby", actors[1]!);
+    await harness.game.service.joinGame("chat-flow-lobby", actors[2]!);
+    await harness.game.service.beginConfiguration(
+      "chat-flow-lobby",
+      actors[0]!.telegramUserId,
+    );
+
+    const configuringSnapshot = mustBeDefined(
+      harness.game.statusService.getByChatId("chat-flow-lobby"),
+      "Expected configuring snapshot",
+    );
+
+    await flushReactiveEffects();
+    harness.game.notifier.sent.length = 0;
+    await expect(
+      harness.subscriber.onGameStatusChanged({
+        previous: lobbySnapshot,
+        current: configuringSnapshot,
+        changed: changed({ stageChanged: true }),
+      }),
+    ).resolves.toBeUndefined();
+    expect(harness.game.notifier.sent).toEqual([]);
+  });
+
+  it("announces cancel before configuration is set", async () => {
+    const harness = createFlowHarness();
+    const actors = harness.game.createActors(3);
+
+    await harness.game.service.startGame("chat-flow-lobby-cancel", actors[0]!);
+    await harness.game.service.joinGame("chat-flow-lobby-cancel", actors[1]!);
+    await harness.game.service.joinGame("chat-flow-lobby-cancel", actors[2]!);
+
+    const lobbyGameId = mustBeDefined(
+      harness.game.repository.findActiveByChatId("chat-flow-lobby-cancel"),
+      "Expected lobby game",
+    ).id;
+
+    await flushReactiveEffects();
+    harness.game.notifier.sent.length = 0;
+    await harness.game.service.cancel(
+      "chat-flow-lobby-cancel",
+      actors[0]!.telegramUserId,
+    );
+    await flushReactiveEffects();
+
+    const canceled = mustBeDefined(
+      harness.game.repository.findById(lobbyGameId),
+      "Expected canceled game",
+    );
+    expect(groupMessages(harness).map((notification) => notification.text)).toContain(
+      harness.context.textsForGame(canceled).gameCancelledByCreator(),
+    );
+  });
+
   it("announces the first NORMAL turn after all players finish word preparation", async () => {
     const harness = createFlowHarness();
     const actors = harness.game.createActors(3);
@@ -80,8 +161,10 @@ describe("game flow status subscriber", () => {
       pairingMode: "RANDOM",
     });
 
+    await flushReactiveEffects();
     harness.game.notifier.sent.length = 0;
     await harness.game.completeWordCollection(configured.id, actors);
+    await flushReactiveEffects();
 
     const started = harness.game.getGameById(configured.id);
     const currentAsker = harness.game.getCurrentAsker(started.id);
@@ -116,12 +199,14 @@ describe("game flow status subscriber", () => {
       "Expected reverse target",
     );
 
+    await flushReactiveEffects();
     harness.game.notifier.sent.length = 0;
     await harness.game.service.handleGroupText(
       started.chatId,
       asker.telegramUserId,
       "reverse question",
     );
+    await flushReactiveEffects();
 
     const updated = harness.game.getGameById(started.id);
     const prompt = mustBeDefined(
@@ -160,6 +245,7 @@ describe("game flow status subscriber", () => {
     });
     const firstAsker = harness.game.getCurrentAsker(started.id);
 
+    await flushReactiveEffects();
     harness.game.notifier.sent.length = 0;
     await harness.game.service.handleGroupText(
       started.chatId,
@@ -180,6 +266,7 @@ describe("game flow status subscriber", () => {
       );
       await harness.game.service.handleVote(started.id, voter.telegramUserId, "NO");
     }
+    await flushReactiveEffects();
 
     const updated = harness.game.getGameById(started.id);
     const nextAsker = harness.game.getCurrentAsker(started.id);
@@ -207,11 +294,13 @@ describe("game flow status subscriber", () => {
       playMode: "ONLINE",
     });
 
+    await flushReactiveEffects();
     cancelHarness.game.notifier.sent.length = 0;
     await cancelHarness.game.service.cancel(
       configured.chatId,
       cancelActors[0]!.telegramUserId,
     );
+    await flushReactiveEffects();
 
     const canceled = mustBeDefined(
       cancelHarness.game.repository.findById(configured.id),
@@ -244,9 +333,11 @@ describe("game flow status subscriber", () => {
     );
     await finishHarness.game.service.handleVote(started.id, voter.telegramUserId, "GUESSED");
 
+    await flushReactiveEffects();
     finishHarness.game.notifier.sent.length = 0;
     const finalAsker = finishHarness.game.getCurrentAsker(started.id);
     await finishHarness.game.service.giveUp(started.chatId, finalAsker.telegramUserId);
+    await flushReactiveEffects();
 
     const finished = finishHarness.game.getGameById(started.id);
     const lines = (finished.result?.normal ?? []).map((row) => {
@@ -265,3 +356,4 @@ describe("game flow status subscriber", () => {
     );
   });
 });
+

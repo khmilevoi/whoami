@@ -30,7 +30,7 @@ export interface GameServiceComponentHarness {
 
 export const createGameServiceComponentHarness =
   (): GameServiceComponentHarness => {
-    const game = createGameServiceHarness();
+    const game = createGameServiceHarness({ subscribePregameUiSubscriber: false });
     const statusService = new InMemoryGameStatusService(game.repository, game.logger);
     const context = new GameServiceContext({
       engine: game.engine,
@@ -86,3 +86,4 @@ export const createGameServiceComponentHarness =
       expectationStore,
     };
   };
+

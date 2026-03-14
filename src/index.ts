@@ -32,13 +32,21 @@ const start = (): void | appErrors.StartAppError => {
 
   const container: AwilixContainer = buildContainer(config);
   const bot = container.resolve<Bot<BotContext>>("bot");
+  const logger = container.resolve<LoggerPort>("logger");
+
+  bot.catch((error) => {
+    logger.error("telegram_middleware_failed", {
+      reason: error.error instanceof Error ? error.error.message : String(error.error),
+      updateId: error.ctx.update.update_id,
+    });
+  });
+
   bot.api.config.use(autoRetry());
   bot.use(hydrate() as never);
   const i18n = container.resolve<I18n<BotContext>>("i18n");
   bot.use(i18n);
   bot.use(bindResolvedLocale());
 
-  const logger = container.resolve<LoggerPort>("logger");
   const texts = container.resolve<TextService>("texts");
   const gameService = container.resolve<GameService>("gameService");
   const configDraftStore = container.resolve<ConfigDraftStore>("configDraftStore");
@@ -128,5 +136,3 @@ if (result instanceof Error) {
   console.error(result);
   process.exit(1);
 }
-
-

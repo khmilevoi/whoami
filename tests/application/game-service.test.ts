@@ -13,7 +13,7 @@ import { mustBeDefined } from "../support/strict-helpers.js";
 const flushReactiveEffects = async (): Promise<void> => {
   await Promise.resolve();
   await Promise.resolve();
-  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
   await Promise.resolve();
 };
 
@@ -697,5 +697,4 @@ describe("game service", () => {
     );
   });
 });
-
 

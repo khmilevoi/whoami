@@ -2,10 +2,25 @@ import type { Conversation } from "@grammyjs/conversations";
 import * as appErrors from "../../domain/errors.js";
 import { GameService } from "../../application/game-service.js";
 import { getConfigProgress } from "../../application/pregame-ui-projection.js";
-import { ConfigDraftStore } from "../../application/stores/config-draft-store.js";
+import { ConfigDraft, ConfigDraftStore } from "../../application/stores/config-draft-store.js";
 import { TextService } from "../../application/text-service.js";
 import { GameMode, PairingMode, PlayMode } from "../../domain/types.js";
 import { BotContext } from "./bot-context.js";
+
+export interface PregameConfigWizardState {
+  step: "MODE" | "PLAY_MODE" | "PAIRING_MODE" | "CONFIRM";
+  mode?: GameMode;
+  playMode?: PlayMode;
+  pairingMode?: PairingMode;
+  awaitingConfirmation: boolean;
+}
+
+export type PregameConfigWizardAction =
+  | { type: "mode"; value: GameMode }
+  | { type: "play"; value: PlayMode }
+  | { type: "pair"; value: PairingMode }
+  | { type: "confirm" }
+  | { type: "restart" };
 
 const asActor = (ctx: { from?: BotContext["from"] }) => ({
   telegramUserId: String(ctx.from?.id ?? ""),
@@ -20,6 +35,94 @@ const buildKeyboard = (
 ) => ({
   inline_keyboard: rows,
 });
+
+const initialWizardState = (): PregameConfigWizardState => ({
+  step: "MODE",
+  awaitingConfirmation: false,
+});
+
+const toDraft = (state: PregameConfigWizardState): ConfigDraft => ({
+  step: state.step,
+  mode: state.mode,
+  playMode: state.playMode,
+  pairingMode: state.pairingMode,
+  awaitingConfirmation: state.awaitingConfirmation,
+});
+
+export const createPregameConfigWizardState = (
+  draft: ConfigDraft,
+): PregameConfigWizardState => {
+  if (!draft.mode) {
+    return initialWizardState();
+  }
+
+  if (!draft.playMode) {
+    return {
+      step: "PLAY_MODE",
+      mode: draft.mode,
+      awaitingConfirmation: false,
+    };
+  }
+
+  if (draft.mode === "NORMAL" && !draft.pairingMode) {
+    return {
+      step: "PAIRING_MODE",
+      mode: draft.mode,
+      playMode: draft.playMode,
+      awaitingConfirmation: false,
+    };
+  }
+
+  return {
+    step: "CONFIRM",
+    mode: draft.mode,
+    playMode: draft.playMode,
+    pairingMode: draft.mode === "NORMAL" ? draft.pairingMode : undefined,
+    awaitingConfirmation: true,
+  };
+};
+
+export const advancePregameConfigWizardState = (
+  state: PregameConfigWizardState,
+  action: PregameConfigWizardAction,
+): PregameConfigWizardState => {
+  if (action.type === "restart") {
+    return initialWizardState();
+  }
+
+  if (action.type === "mode") {
+    return {
+      step: "PLAY_MODE",
+      mode: action.value,
+      awaitingConfirmation: false,
+    };
+  }
+
+  if (action.type === "play") {
+    return {
+      step: state.mode === "NORMAL" ? "PAIRING_MODE" : "CONFIRM",
+      mode: state.mode,
+      playMode: action.value,
+      awaitingConfirmation: state.mode !== "NORMAL",
+    };
+  }
+
+  if (action.type === "pair") {
+    return {
+      step: "CONFIRM",
+      mode: state.mode,
+      playMode: state.playMode,
+      pairingMode: action.value,
+      awaitingConfirmation: true,
+    };
+  }
+
+  return {
+    ...state,
+    step: "CONFIRM",
+    awaitingConfirmation: true,
+  };
+};
 
 const deletePrompt = async (
   ctx: { chat?: BotContext["chat"]; api: BotContext["api"] },
@@ -38,9 +141,10 @@ const answerError = async (
   texts: TextService,
   error: Error,
 ): Promise<void> => {
-  const text = error instanceof appErrors.DomainAppErrorBase
-    ? error.message
-    : texts.genericErrorRetry();
+  const text =
+    error instanceof appErrors.DomainAppErrorBase
+      ? error.message
+      : texts.genericErrorRetry();
 
   await ctx.answerCallbackQuery({
     text: text.slice(0, 180),
@@ -62,7 +166,7 @@ const waitForWizardCallback = async (
       continue;
     }
 
-    const [_, action, value, payloadGameId] = parts;
+    const [, action, value, payloadGameId] = parts;
     if (!payloadGameId || payloadGameId !== gameId || !expectedActions.includes(action)) {
       await ctx.answerCallbackQuery();
       continue;
@@ -132,6 +236,28 @@ const confirmKeyboard = (texts: TextService, gameId: string) =>
     ],
   ]);
 
+const isTerminalWizardError = (error: Error): boolean =>
+  error instanceof appErrors.GameNotFoundError ||
+  error instanceof appErrors.PlayerNotFoundInGameError ||
+  error instanceof appErrors.OnlyGameCreatorCanConfigureError ||
+  error instanceof appErrors.GameCanBeConfiguredOnlyAfterLobbyClosedError;
+
+const loadInitialWizardState = async (
+  conversation: Conversation<BotContext>,
+  gameService: GameService,
+  configDraftStore: ConfigDraftStore,
+  creatorTelegramUserId: string,
+  gameId: string,
+): Promise<PregameConfigWizardState | null> =>
+  conversation.external(() => {
+    const snapshot = gameService.findConfiguringGameByCreator(creatorTelegramUserId);
+    if (!snapshot || snapshot.gameId !== gameId) {
+      return null;
+    }
+
+    return createPregameConfigWizardState(configDraftStore.get(gameId));
+  });
+
 export const runPregameConfigConversation = async (
   conversation: Conversation<BotContext>,
   ctx: BotContext,
@@ -140,17 +266,23 @@ export const runPregameConfigConversation = async (
   texts: TextService,
   gameId: string,
 ): Promise<void> => {
+  const creatorTelegramUserId = String(ctx.from?.id ?? "");
+  let state = await loadInitialWizardState(
+    conversation,
+    gameService,
+    configDraftStore,
+    creatorTelegramUserId,
+    gameId,
+  );
+  if (!state) {
+    return;
+  }
+
   while (true) {
-    const snapshot = gameService.findConfiguringGameByCreator(String(ctx.from?.id ?? ""));
-    if (!snapshot || snapshot.gameId !== gameId) {
-      return;
-    }
-
     const localizedTexts = texts.forLocale(ctx.locale);
-    const draft = configDraftStore.get(gameId);
-    const progress = getConfigProgress(draft);
+    const progress = getConfigProgress(toDraft(state));
 
-    if (!draft.mode || draft.step === "MODE") {
+    if (state.step === "MODE") {
       const prompt = await ctx.reply(
         [
           localizedTexts.chooseGameModePrompt(),
@@ -164,25 +296,37 @@ export const runPregameConfigConversation = async (
       );
       while (true) {
         const callback = await waitForWizardCallback(conversation, gameId, ["mode"]);
-        const result = await gameService.saveConfigDraftStep(
-          gameId,
-          asActor(callback.ctx),
-          "mode",
-          callback.value as GameMode,
+        const result = await conversation.external(() =>
+          gameService.saveConfigDraftStep(
+            gameId,
+            asActor(callback.ctx),
+            "mode",
+            callback.value as GameMode,
+          ),
         );
         if (result instanceof Error) {
+          if (isTerminalWizardError(result)) {
+            await callback.ctx.answerCallbackQuery();
+            await deletePrompt(callback.ctx, prompt.message_id);
+            return;
+          }
+
           await answerError(callback.ctx, localizedTexts, result);
           continue;
         }
 
         await callback.ctx.answerCallbackQuery();
         await deletePrompt(callback.ctx, prompt.message_id);
+        state = advancePregameConfigWizardState(state, {
+          type: "mode",
+          value: callback.value as GameMode,
+        });
         break;
       }
       continue;
     }
 
-    if (!draft.playMode || draft.step === "PLAY_MODE") {
+    if (state.step === "PLAY_MODE") {
       const prompt = await ctx.reply(
         [
           localizedTexts.choosePlayModePrompt(),
@@ -191,31 +335,43 @@ export const runPregameConfigConversation = async (
             progress.totalSteps,
             progress.remainingSteps,
           ),
-          localizedTexts.configDraftSummary(draft),
+          localizedTexts.configDraftSummary(state),
         ].join("\n"),
         { reply_markup: playKeyboard(localizedTexts, gameId) as never },
       );
       while (true) {
         const callback = await waitForWizardCallback(conversation, gameId, ["play"]);
-        const result = await gameService.saveConfigDraftStep(
-          gameId,
-          asActor(callback.ctx),
-          "play",
-          callback.value as PlayMode,
+        const result = await conversation.external(() =>
+          gameService.saveConfigDraftStep(
+            gameId,
+            asActor(callback.ctx),
+            "play",
+            callback.value as PlayMode,
+          ),
         );
         if (result instanceof Error) {
+          if (isTerminalWizardError(result)) {
+            await callback.ctx.answerCallbackQuery();
+            await deletePrompt(callback.ctx, prompt.message_id);
+            return;
+          }
+
           await answerError(callback.ctx, localizedTexts, result);
           continue;
         }
 
         await callback.ctx.answerCallbackQuery();
         await deletePrompt(callback.ctx, prompt.message_id);
+        state = advancePregameConfigWizardState(state, {
+          type: "play",
+          value: callback.value as PlayMode,
+        });
         break;
       }
       continue;
     }
 
-    if (draft.mode === "NORMAL" && (!draft.pairingMode || draft.step === "PAIRING_MODE")) {
+    if (state.step === "PAIRING_MODE") {
       const prompt = await ctx.reply(
         [
           localizedTexts.choosePairingModePrompt(),
@@ -224,25 +380,37 @@ export const runPregameConfigConversation = async (
             progress.totalSteps,
             progress.remainingSteps,
           ),
-          localizedTexts.configDraftSummary(draft),
+          localizedTexts.configDraftSummary(state),
         ].join("\n"),
         { reply_markup: pairKeyboard(localizedTexts, gameId) as never },
       );
       while (true) {
         const callback = await waitForWizardCallback(conversation, gameId, ["pair"]);
-        const result = await gameService.saveConfigDraftStep(
-          gameId,
-          asActor(callback.ctx),
-          "pair",
-          callback.value as PairingMode,
+        const result = await conversation.external(() =>
+          gameService.saveConfigDraftStep(
+            gameId,
+            asActor(callback.ctx),
+            "pair",
+            callback.value as PairingMode,
+          ),
         );
         if (result instanceof Error) {
+          if (isTerminalWizardError(result)) {
+            await callback.ctx.answerCallbackQuery();
+            await deletePrompt(callback.ctx, prompt.message_id);
+            return;
+          }
+
           await answerError(callback.ctx, localizedTexts, result);
           continue;
         }
 
         await callback.ctx.answerCallbackQuery();
         await deletePrompt(callback.ctx, prompt.message_id);
+        state = advancePregameConfigWizardState(state, {
+          type: "pair",
+          value: callback.value as PairingMode,
+        });
         break;
       }
       continue;
@@ -256,17 +424,24 @@ export const runPregameConfigConversation = async (
           progress.totalSteps,
           progress.remainingSteps,
         ),
-        localizedTexts.configDraftSummary(draft),
+        localizedTexts.configDraftSummary(state),
       ].join("\n"),
       { reply_markup: confirmKeyboard(localizedTexts, gameId) as never },
     );
     while (true) {
       const callback = await waitForWizardCallback(conversation, gameId, ["confirm", "restart"]);
-      const result =
+      const result = await conversation.external(() =>
         callback.action === "confirm"
-          ? await gameService.confirmConfigDraft(gameId, asActor(callback.ctx))
-          : await gameService.restartConfigDraft(gameId, asActor(callback.ctx));
+          ? gameService.confirmConfigDraft(gameId, asActor(callback.ctx))
+          : gameService.restartConfigDraft(gameId, asActor(callback.ctx)),
+      );
       if (result instanceof Error) {
+        if (isTerminalWizardError(result)) {
+          await callback.ctx.answerCallbackQuery();
+          await deletePrompt(callback.ctx, confirmPrompt.message_id);
+          return;
+        }
+
         await answerError(callback.ctx, localizedTexts, result);
         continue;
       }
@@ -276,8 +451,9 @@ export const runPregameConfigConversation = async (
       if (callback.action === "confirm") {
         return;
       }
+
+      state = advancePregameConfigWizardState(state, { type: "restart" });
       break;
     }
   }
 };
-
