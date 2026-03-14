@@ -74,10 +74,10 @@ describe("pregame ui status subscriber", () => {
     ).toHaveLength(1);
     expect(
       harness.game.notifier.sent.filter((entry) => entry.kind === "group-edit"),
-    ).toHaveLength(1);
+    ).toHaveLength(0);
   });
 
-  it("edits the existing group status message on repeated syncs", async () => {
+  it("skips telegram when the repeated group render is identical", async () => {
     const harness = createSubscriberHarness();
     const actor = harness.game.createActor(1);
 
@@ -97,7 +97,96 @@ describe("pregame ui status subscriber", () => {
     ).toHaveLength(0);
     expect(
       harness.game.notifier.sent.filter((entry) => entry.kind === "group-edit"),
-    ).toHaveLength(1);
+    ).toHaveLength(0);
+  });
+
+  it("does not post duplicate group updates when PREPARE_WORDS changes keep the same status text", async () => {
+    const harness = createSubscriberHarness();
+    const actors = harness.game.createActors(3);
+    const configured = await harness.game.setupConfiguredGame({
+      chatId: "chat-ui-prepare-unchanged",
+      actors,
+      mode: "NORMAL",
+      playMode: "ONLINE",
+      pairingMode: "RANDOM",
+    });
+
+    await harness.subscriber.syncGame(configured.id);
+    harness.game.notifier.sent.length = 0;
+
+    await harness.game.service.handlePrivateText(actors[0]!.telegramUserId, "draft-word");
+    await harness.subscriber.syncGame(configured.id);
+
+    expect(
+      harness.game.notifier.sent.filter((entry) => entry.kind === "group-message"),
+    ).toHaveLength(0);
+    expect(
+      harness.game.notifier.sent.filter((entry) => entry.kind === "group-edit"),
+    ).toHaveLength(0);
+  });
+
+  it("does not post duplicate group updates when IN_PROGRESS changes keep the same status text", async () => {
+    const harness = createSubscriberHarness();
+    const actors = harness.game.createActors(3);
+    const started = await harness.game.setupInProgressGame({
+      chatId: "chat-ui-in-progress-unchanged",
+      actors,
+      mode: "NORMAL",
+      playMode: "ONLINE",
+      pairingMode: "RANDOM",
+    });
+    const asker = harness.game.getCurrentAsker(started.id);
+
+    await harness.subscriber.syncGame(started.id);
+    harness.game.notifier.sent.length = 0;
+
+    await harness.game.service.handleGroupText(started.chatId, asker.telegramUserId, "?");
+    await harness.subscriber.syncGame(started.id);
+
+    expect(
+      harness.game.notifier.sent.filter((entry) => entry.kind === "group-message"),
+    ).toHaveLength(0);
+    expect(
+      harness.game.notifier.sent.filter((entry) => entry.kind === "group-edit"),
+    ).toHaveLength(0);
+  });
+
+  it("does not resend or block a private panel when the render is unchanged", async () => {
+    const harness = createSubscriberHarness();
+    const actors = harness.game.createActors(3);
+
+    await harness.game.service.startGame("chat-ui-private-unchanged", actors[0]!);
+    await harness.game.service.joinGame("chat-ui-private-unchanged", actors[1]!);
+    await harness.game.service.joinGame("chat-ui-private-unchanged", actors[2]!);
+    await harness.game.service.beginConfiguration(
+      "chat-ui-private-unchanged",
+      actors[0]!.telegramUserId,
+    );
+
+    const game = mustBeDefined(
+      harness.game.repository.findActiveByChatId("chat-ui-private-unchanged"),
+      "Expected configuring game",
+    );
+    const creator = mustBeDefined(
+      game.players.find((player) => player.id === game.creatorPlayerId),
+      "Expected creator",
+    );
+
+    creator.dmOpened = true;
+    harness.game.repository.update(game);
+
+    await harness.subscriber.syncGame(game.id);
+    harness.game.notifier.sent.length = 0;
+    harness.game.notifier.setPrivateEditUnchanged(creator.telegramUserId);
+
+    await harness.subscriber.syncGame(game.id);
+
+    expect(
+      harness.game.notifier.sent.filter((entry) => entry.kind.startsWith("private")),
+    ).toHaveLength(0);
+    expect(
+      harness.game.getGameById(game.id).players.find((player) => player.id === creator.id)?.stage,
+    ).not.toBe("BLOCKED_DM");
   });
 
   it("clears stale private panel state when DM delivery becomes blocked", async () => {
@@ -125,10 +214,12 @@ describe("pregame ui status subscriber", () => {
     harness.game.repository.update(game);
     harness.uiStateStore.set(game.id, {
       groupStatusMessageId: 77,
+      groupRenderKey: "group-render",
       privatePanels: {
         [creator.id]: {
           chatId: creator.telegramUserId,
           messageId: 88,
+          renderKey: "private-render",
         },
       },
     });
@@ -143,4 +234,3 @@ describe("pregame ui status subscriber", () => {
     expect(harness.uiStateStore.get(game.id).privatePanels[creator.id]).toBeUndefined();
   });
 });
-

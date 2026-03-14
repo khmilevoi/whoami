@@ -3,6 +3,7 @@ import { Bot } from "grammy";
 import { BotContext } from "./bot-context.js";
 import {
   LoggerPort,
+  MessageEditReceipt,
   NotificationReceipt,
   NotifierPort,
 } from "../../application/ports.js";
@@ -42,6 +43,14 @@ const toReceipt = (result: { message_id?: number } | true): NotificationReceipt 
   messageId: result === true ? 0 : (result.message_id ?? 0),
 });
 
+const toEditReceipt = (
+  result: { message_id?: number } | true,
+  status: MessageEditReceipt["status"],
+): MessageEditReceipt => ({
+  status,
+  messageId: result === true ? 0 : (result.message_id ?? 0),
+});
+
 const toInternalChatId = (chatId: string): string | null => {
   if (!chatId.startsWith("-100")) {
     return null;
@@ -49,6 +58,23 @@ const toInternalChatId = (chatId: string): string | null => {
 
   return chatId.slice(4);
 };
+
+const getTelegramErrorText = (error: unknown): string | null => {
+  if (!error || typeof error !== "object") {
+    return error instanceof Error ? error.message : null;
+  }
+
+  const description = Reflect.get(error, "description");
+  if (typeof description === "string") {
+    return description;
+  }
+
+  const message = Reflect.get(error, "message");
+  return typeof message === "string" ? message : null;
+};
+
+const isMessageNotModifiedError = (error: unknown): boolean =>
+  getTelegramErrorText(error)?.toLowerCase().includes("message is not modified") ?? false;
 
 export class TelegramNotifier implements NotifierPort {
   constructor(
@@ -101,18 +127,22 @@ export class TelegramNotifier implements NotifierPort {
       .editMessageText(chatId, messageId, text, {
         reply_markup: buttons ? (toKeyboard(buttons) as never) : undefined,
       })
-      .catch(
-        (error) =>
-          new appErrors.TelegramApiError({
-            operation: `editGroupMessage:${chatId}:${messageId}`,
-            cause: error,
-          }),
-      );
+      .then((response) => toEditReceipt(response, "edited"))
+      .catch((error) => {
+        if (isMessageNotModifiedError(error)) {
+          return { status: "unchanged", messageId } satisfies MessageEditReceipt;
+        }
+
+        return new appErrors.TelegramApiError({
+          operation: `editGroupMessage:${chatId}:${messageId}`,
+          cause: error,
+        });
+      });
     if (result instanceof Error) {
       return result;
     }
 
-    return toReceipt(result);
+    return result;
   }
 
   async sendPrivateMessage(userId: string, text: string): Promise<false | NotificationReceipt> {
@@ -164,18 +194,22 @@ export class TelegramNotifier implements NotifierPort {
     messageId: number,
     text: string,
     buttons?: UiButton[][],
-  ): Promise<false | NotificationReceipt> {
+  ): Promise<false | MessageEditReceipt> {
     const result = await this.bot.api
       .editMessageText(userId, messageId, text, {
         reply_markup: buttons ? (toKeyboard(buttons) as never) : undefined,
       })
-      .catch(
-        (error) =>
-          new appErrors.TelegramApiError({
-            operation: `editPrivateMessage:${userId}:${messageId}`,
-            cause: error,
-          }),
-      );
+      .then((response) => toEditReceipt(response, "edited"))
+      .catch((error) => {
+        if (isMessageNotModifiedError(error)) {
+          return { status: "unchanged", messageId } satisfies MessageEditReceipt;
+        }
+
+        return new appErrors.TelegramApiError({
+          operation: `editPrivateMessage:${userId}:${messageId}`,
+          cause: error,
+        });
+      });
     if (result instanceof Error) {
       this.logger.warn("telegram_private_edit_failed", {
         userId,
@@ -185,7 +219,7 @@ export class TelegramNotifier implements NotifierPort {
       return false;
     }
 
-    return toReceipt(result);
+    return result;
   }
 
   buildBotDeepLink(payload?: string): string {

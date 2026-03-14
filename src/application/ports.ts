@@ -11,6 +11,11 @@ export interface NotificationReceipt {
   messageId: number;
 }
 
+export interface MessageEditReceipt {
+  status: "edited" | "unchanged";
+  messageId: number;
+}
+
 export interface StoredPlayerProfile {
   id: string;
   telegramUserId: string;
@@ -72,7 +77,7 @@ export interface NotifierPort {
     messageId: number,
     text: string,
     buttons?: UiButton[][],
-  ): Promise<NotificationReceipt | NotificationError>;
+  ): Promise<MessageEditReceipt | NotificationError>;
   sendPrivateMessage(
     userId: string,
     text: string,
@@ -87,7 +92,7 @@ export interface NotifierPort {
     messageId: number,
     text: string,
     buttons?: UiButton[][],
-  ): Promise<false | NotificationReceipt>;
+  ): Promise<false | MessageEditReceipt>;
   buildBotDeepLink(payload?: string): string;
   buildGroupMessageLink(chatId: string, messageId: number): string | null;
 }

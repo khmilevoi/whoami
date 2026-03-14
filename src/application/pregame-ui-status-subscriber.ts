@@ -1,18 +1,43 @@
 import * as appErrors from "../domain/errors.js";
-import { GameState } from "../domain/types.js";
+import { GameState, UiButton } from "../domain/types.js";
 import type { NotificationError } from "../domain/errors.js";
 import {
   GameStatusSubscriber,
   GameStatusTransition,
 } from "./game-status-service.js";
 import { GameServiceContext } from "./game-service-context.js";
-import { PregameUiRenderer } from "./pregame-ui-renderer.js";
+import { PregameUiRenderer, RenderedView } from "./pregame-ui-renderer.js";
 import { ConfigDraftStore } from "./stores/config-draft-store.js";
 import { PrivateExpectationStore } from "./stores/private-expectation-store.js";
 import {
   PregameUiGameState,
   PregameUiStateStore,
 } from "./stores/pregame-ui-state-store.js";
+
+const normalizeButtons = (buttons?: UiButton[][]) =>
+  buttons?.map((row) =>
+    row.map((button) =>
+      button.kind === "callback"
+        ? {
+            kind: "callback" as const,
+            text: button.text,
+            data: button.data,
+            style: button.style ?? null,
+          }
+        : {
+            kind: "url" as const,
+            text: button.text,
+            url: button.url,
+            style: button.style ?? null,
+          },
+    ),
+  ) ?? null;
+
+const buildRenderKey = (view: RenderedView): string =>
+  JSON.stringify({
+    text: view.text,
+    buttons: normalizeButtons(view.buttons),
+  });
 
 export class PregameUiStatusSubscriber implements GameStatusSubscriber {
   private readonly renderer: PregameUiRenderer;
@@ -86,9 +111,14 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
   private async upsertGroupView(
     game: GameState,
     state: PregameUiGameState,
-    view: { text: string; buttons?: import("../domain/types.js").UiButton[][] },
+    view: RenderedView,
   ): Promise<void | NotificationError> {
+    const renderKey = buildRenderKey(view);
     const messageId = state.groupStatusMessageId;
+    if (messageId && state.groupRenderKey === renderKey) {
+      return;
+    }
+
     if (messageId) {
       const edited = await this.context.notifier.editGroupMessage(
         game.chatId,
@@ -98,6 +128,7 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
       );
       if (!(edited instanceof Error)) {
         state.groupStatusMessageId = edited.messageId || messageId;
+        state.groupRenderKey = renderKey;
         return;
       }
     }
@@ -114,6 +145,7 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
     }
 
     state.groupStatusMessageId = created.messageId;
+    state.groupRenderKey = renderKey;
   }
 
   private async upsertPrivateView(
@@ -121,7 +153,7 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
     state: PregameUiGameState,
     playerId: string,
     telegramUserId: string,
-    view: { text: string; buttons?: import("../domain/types.js").UiButton[][] },
+    view: RenderedView,
   ): Promise<
     void | appErrors.MarkDmError | appErrors.GameNotFoundError | NotificationError
   > {
@@ -136,7 +168,12 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
       return;
     }
 
+    const renderKey = buildRenderKey(view);
     const existing = state.privatePanels[playerId];
+    if (existing?.messageId && existing.renderKey === renderKey) {
+      return;
+    }
+
     if (existing) {
       const edited = await this.context.notifier.editPrivateMessage(
         telegramUserId,
@@ -148,6 +185,7 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
         state.privatePanels[playerId] = {
           chatId: telegramUserId,
           messageId: edited.messageId || existing.messageId,
+          renderKey,
         };
         return;
       }
@@ -168,6 +206,7 @@ export class PregameUiStatusSubscriber implements GameStatusSubscriber {
     state.privatePanels[playerId] = {
       chatId: telegramUserId,
       messageId: created.messageId,
+      renderKey,
     };
   }
 

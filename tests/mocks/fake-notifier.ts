@@ -1,7 +1,11 @@
 import type { NotificationError } from "../../src/domain/errors.js";
 import { TelegramApiError } from "../../src/domain/errors.js";
 import { UiButton } from "../../src/domain/types.js";
-import { NotificationReceipt, NotifierPort } from "../../src/application/ports.js";
+import {
+  MessageEditReceipt,
+  NotificationReceipt,
+  NotifierPort,
+} from "../../src/application/ports.js";
 
 export interface SentGroupMessage {
   kind: "group-message" | "group-edit";
@@ -31,6 +35,8 @@ export class FakeNotifier implements NotifierPort {
   readonly failedPrivateEdits = new Set<string>();
   readonly failedGroupEdits = new Set<string>();
   readonly failedGroupMessages = new Set<string>();
+  readonly unchangedGroupEdits = new Set<string>();
+  readonly unchangedPrivateEdits = new Set<string>();
   readonly zeroMessageIdGroupEdits = new Set<string>();
   readonly zeroMessageIdPrivateEdits = new Set<string>();
   private messageId = 1;
@@ -51,8 +57,16 @@ export class FakeNotifier implements NotifierPort {
     this.failedPrivateEdits.add(userId);
   }
 
+  setPrivateEditUnchanged(userId: string): void {
+    this.unchangedPrivateEdits.add(userId);
+  }
+
   setGroupEditFailure(chatId: string): void {
     this.failedGroupEdits.add(chatId);
+  }
+
+  setGroupEditUnchanged(chatId: string): void {
+    this.unchangedGroupEdits.add(chatId);
   }
 
   setGroupMessageFailure(chatId: string): void {
@@ -125,7 +139,7 @@ export class FakeNotifier implements NotifierPort {
     messageId: number,
     text: string,
     buttons?: UiButton[][],
-  ): Promise<NotificationReceipt | NotificationError> {
+  ): Promise<MessageEditReceipt | NotificationError> {
     if (this.failedGroupEdits.has(chatId)) {
       return new TelegramApiError({
         operation: "editMessageText",
@@ -141,6 +155,7 @@ export class FakeNotifier implements NotifierPort {
       messageId,
     });
     return {
+      status: this.unchangedGroupEdits.has(chatId) ? "unchanged" : "edited",
       messageId: this.zeroMessageIdGroupEdits.has(chatId) ? 0 : messageId,
     };
   }
@@ -186,7 +201,7 @@ export class FakeNotifier implements NotifierPort {
     messageId: number,
     text: string,
     buttons?: UiButton[][],
-  ): Promise<false | NotificationReceipt> {
+  ): Promise<false | MessageEditReceipt> {
     if (
       this.failedPrivateEdits.has(userId) ||
       this.failedPrivateMessages.has(userId) ||
@@ -203,6 +218,7 @@ export class FakeNotifier implements NotifierPort {
       messageId,
     });
     return {
+      status: this.unchangedPrivateEdits.has(userId) ? "unchanged" : "edited",
       messageId: this.zeroMessageIdPrivateEdits.has(userId) ? 0 : messageId,
     };
   }

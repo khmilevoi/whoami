@@ -1,10 +1,12 @@
 export interface PregameUiPanelState {
   chatId: string;
   messageId: number;
+  renderKey?: string;
 }
 
 export interface PregameUiGameState {
   groupStatusMessageId?: number;
+  groupRenderKey?: string;
   privatePanels: Record<string, PregameUiPanelState>;
 }
 
